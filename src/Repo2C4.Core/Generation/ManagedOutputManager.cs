@@ -11,6 +11,7 @@ public enum GeneratedFileChangeKind
     Added,
     Modified,
     Conflict,
+    Removed,
 }
 
 public sealed record GeneratedFileChange(
@@ -117,11 +118,31 @@ public static class ManagedOutputManager
             changes.Add(new GeneratedFileChange(file.FileName, kind, entry.Sha256, newHash));
         }
 
+        HashSet<string> nextNames = files.Select(file => file.FileName).ToHashSet(StringComparer.Ordinal);
+        foreach (GenerationManifestEntry stale in prior.Values
+            .Where(entry => !nextNames.Contains(entry.FileName))
+            .OrderBy(entry => entry.FileName, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string target = ResolveTarget(root, stale.FileName);
+            GeneratedFileChangeKind kind = GeneratedFileChangeKind.Conflict;
+            if (File.Exists(target) && !IsReparsePoint(target))
+            {
+                string current = await File.ReadAllTextAsync(target, cancellationToken).ConfigureAwait(false);
+                if (string.Equals(ComputeHash(current), stale.Sha256, StringComparison.Ordinal))
+                {
+                    kind = GeneratedFileChangeKind.Removed;
+                }
+            }
+
+            changes.Add(new GeneratedFileChange(stale.FileName, kind, stale.Sha256, string.Empty));
+        }
+
         return new GenerationPlan(
             ManifestFileName,
             [.. changes],
             changes.Any(item => item.Kind == GeneratedFileChangeKind.Conflict),
-            changes.Any(item => item.Kind is GeneratedFileChangeKind.Added or GeneratedFileChangeKind.Modified));
+            changes.Any(item => item.Kind is GeneratedFileChangeKind.Added or GeneratedFileChangeKind.Modified or GeneratedFileChangeKind.Removed));
     }
 
     public static async Task CommitAsync(
@@ -143,7 +164,7 @@ public static class ManagedOutputManager
             modelSchemaVersion,
             files,
             cancellationToken).ConfigureAwait(false);
-        if (currentPlan.HasConflicts)
+        if (currentPlan.HasConflicts || !plan.Changes.SequenceEqual(currentPlan.Changes))
         {
             throw new IOException("managed_output_conflict");
         }
@@ -177,6 +198,16 @@ public static class ManagedOutputManager
                 prepared.Add((temp, target, backup));
             }
 
+            foreach (GeneratedFileChange removed in currentPlan.Changes
+                .Where(change => change.Kind == GeneratedFileChangeKind.Removed))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string target = ResolveTarget(root, removed.FileName);
+                string backup = Path.Combine(transactionRoot, removed.FileName + ".bak");
+                File.Copy(target, backup, overwrite: false);
+                prepared.Add((string.Empty, target, backup));
+            }
+
             GenerationManifest manifest = new(
                 ManifestSchemaVersion,
                 modelSchemaVersion,
@@ -203,7 +234,11 @@ public static class ManagedOutputManager
                 foreach ((string temp, string target, string? backup) in prepared)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (File.Exists(target))
+                    if (string.IsNullOrEmpty(temp))
+                    {
+                        File.Delete(target);
+                    }
+                    else if (File.Exists(target))
                     {
                         File.Move(temp, target, overwrite: true);
                     }
@@ -211,6 +246,7 @@ public static class ManagedOutputManager
                     {
                         File.Move(temp, target);
                     }
+
                     committed.Add((target, backup));
                 }
             }
@@ -266,15 +302,44 @@ public static class ManagedOutputManager
         }
 
         string json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-        GenerationManifest? manifest = JsonSerializer.Deserialize<GenerationManifest>(json);
-        if (manifest is null || manifest.SchemaVersion != ManifestSchemaVersion)
+        GenerationManifest? manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<GenerationManifest>(json);
+        }
+        catch (JsonException exception)
+        {
+            throw new IOException("managed_output_manifest_invalid", exception);
+        }
+
+        if (manifest is null ||
+            manifest.SchemaVersion != ManifestSchemaVersion ||
+            string.IsNullOrWhiteSpace(manifest.ModelSchemaVersion) ||
+            manifest.Files is null)
         {
             throw new IOException("managed_output_manifest_invalid");
         }
 
-        foreach (GenerationManifestEntry entry in manifest.Files)
+        HashSet<string> names = new(StringComparer.Ordinal);
+        foreach (GenerationManifestEntry? entry in manifest.Files)
         {
-            ValidateFileName(entry.FileName);
+            if (entry is null ||
+                string.IsNullOrWhiteSpace(entry.Sha256) ||
+                entry.Sha256.Length != 64 ||
+                !entry.Sha256.All(Uri.IsHexDigit) ||
+                !names.Add(entry.FileName))
+            {
+                throw new IOException("managed_output_manifest_invalid");
+            }
+
+            try
+            {
+                ValidateFileName(entry.FileName);
+            }
+            catch (IOException exception)
+            {
+                throw new IOException("managed_output_manifest_invalid", exception);
+            }
         }
 
         return manifest;
