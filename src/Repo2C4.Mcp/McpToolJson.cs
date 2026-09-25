@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Repo2C4.Core.Contracts;
 
 namespace Repo2C4.Mcp;
@@ -14,6 +15,7 @@ internal static class McpToolJson
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = false,
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
         };
 
         options.Converters.Add(
