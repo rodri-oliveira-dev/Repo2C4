@@ -23,11 +23,55 @@ public sealed class McpLikeC4ToolsTests
         Assert.True(result.DryRun);
         Assert.False(result.Written);
         Assert.Equal(3, result.Files.Length);
+        Assert.NotEmpty(result.Changes);
+        Assert.False(result.HasConflicts);
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
     }
 
     [Fact]
-    public async Task WriteRequiresExplicitAuthorizationAndNeverOverwrites()
+    public async Task ManagedRegenerationDetectsManualEdits()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateSnapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+        ArchitectureModel model = CreateModel(snapshot);
+
+        _ = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            model,
+            dryRun: false,
+            write: true,
+            destinationPath: "architecture",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        string modelPath = Path.Combine(temp.Path, "architecture", "model.c4");
+        await File.AppendAllTextAsync(modelPath, "// human");
+
+        McpGenerateLikeC4Result preview = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            model,
+            destinationPath: "architecture",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(preview.HasConflicts);
+        Assert.Contains(preview.Changes, change => change.Kind == Repo2C4.Core.Generation.GeneratedFileChangeKind.Conflict);
+
+        Exception conflict = await Assert.ThrowsAnyAsync<Exception>(
+            () => tools.GenerateLikeC4(
+                entry.SnapshotId,
+                model,
+                dryRun: false,
+                write: true,
+                destinationPath: "architecture",
+                cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("managed_output_conflict", conflict.Message, StringComparison.Ordinal);
+        Assert.EndsWith("// human", await File.ReadAllTextAsync(modelPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WriteRequiresExplicitAuthorizationAndSupportsManagedIdempotency()
     {
         using TempDirectory temp = new();
         using McpSnapshotStore store = new();
@@ -58,15 +102,17 @@ public sealed class McpLikeC4ToolsTests
             written.Files,
             file => Assert.True(File.Exists(Path.Combine(temp.Path, "architecture", file.FileName))));
 
-        Exception conflict = await Assert.ThrowsAnyAsync<Exception>(
-            () => tools.GenerateLikeC4(
-                entry.SnapshotId,
-                model,
-                dryRun: false,
-                write: true,
-                destinationPath: "architecture",
-                cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Contains("destination_exists", conflict.Message, StringComparison.Ordinal);
+        McpGenerateLikeC4Result repeated = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            model,
+            dryRun: false,
+            write: true,
+            destinationPath: "architecture",
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(repeated.Written);
+        Assert.All(repeated.Changes, change => Assert.Equal(
+            Repo2C4.Core.Generation.GeneratedFileChangeKind.Unchanged,
+            change.Kind));
     }
 
     [Fact]
