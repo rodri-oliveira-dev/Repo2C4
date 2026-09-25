@@ -88,7 +88,7 @@ public sealed class McpSnapshotStoreTests
         RepositorySnapshot snapshot = new(
             ContractSchema.Version,
             "repo_cursor",
-            [],
+            [new RepositoryFile("src/App/App.csproj", 128, null)],
             [evidence],
             []);
         McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
