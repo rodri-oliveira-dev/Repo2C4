@@ -349,14 +349,14 @@ public sealed class McpClientEndToEndTests
         internal static TempFixture Create(string source)
         {
             string parent = Directory.CreateTempSubdirectory("repo2c4-mcp-client-e2e-").FullName;
-            string destination = Path.Combine(parent, "library-only");
+            string destination = System.IO.Path.Combine(parent, "library-only");
             Directory.CreateDirectory(destination);
 
             foreach (string sourceFile in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
             {
-                string relative = Path.GetRelativePath(source, sourceFile);
-                string target = Path.Combine(destination, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                string relative = System.IO.Path.GetRelativePath(source, sourceFile);
+                string target = System.IO.Path.Combine(destination, relative);
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
                 File.Copy(sourceFile, target);
             }
 
