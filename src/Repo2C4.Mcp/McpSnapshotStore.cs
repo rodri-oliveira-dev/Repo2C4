@@ -13,6 +13,7 @@ internal sealed class McpSnapshotStore : IDisposable
     private readonly TimeSpan _lifetime;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly byte[] _cursorKey;
+    private long _nextSequence;
     private bool _disposed;
 
     internal McpSnapshotStore(
@@ -43,16 +44,29 @@ internal sealed class McpSnapshotStore : IDisposable
         string canonical = ContractJson.SerializeSnapshot(snapshot);
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         string snapshotId = "snapshot_" + Convert.ToHexString(digest).ToLowerInvariant()[..32];
-        DateTimeOffset expiresAtUtc = _utcNow().Add(_lifetime);
-        SnapshotEntry entry = new(snapshotId, snapshot, expiresAtUtc);
-
         lock (_sync)
         {
-            PurgeExpiredCore(_utcNow());
-            _snapshots[snapshotId] = entry;
-        }
+            DateTimeOffset now = _utcNow();
+            PurgeExpiredCore(now);
 
-        return entry;
+            if (!_snapshots.ContainsKey(snapshotId) && _snapshots.Count >= McpLimits.MaxSnapshots)
+            {
+                string oldestSnapshotId = _snapshots
+                    .OrderBy(item => item.Value.Sequence)
+                    .ThenBy(item => item.Key, StringComparer.Ordinal)
+                    .First()
+                    .Key;
+                _snapshots.Remove(oldestSnapshotId);
+            }
+
+            SnapshotEntry entry = new(
+                snapshotId,
+                snapshot,
+                now.Add(_lifetime),
+                ++_nextSequence);
+            _snapshots[snapshotId] = entry;
+            return entry;
+        }
     }
 
     internal SnapshotEntry Get(string snapshotId)
@@ -212,5 +226,6 @@ internal sealed class McpSnapshotStore : IDisposable
     internal sealed record SnapshotEntry(
         string SnapshotId,
         RepositorySnapshot Snapshot,
-        DateTimeOffset ExpiresAtUtc);
+        DateTimeOffset ExpiresAtUtc,
+        long Sequence);
 }
