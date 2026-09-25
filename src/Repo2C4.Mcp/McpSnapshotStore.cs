@@ -192,7 +192,7 @@ internal sealed class McpSnapshotStore : IDisposable
     private static byte[] Base64UrlDecode(string value)
     {
         string normalized = value.Replace('-', '+').Replace('_', '/');
-        normalized += normalized.Length % 4 switch
+        normalized += (normalized.Length % 4) switch
         {
             0 => string.Empty,
             2 => "==",
