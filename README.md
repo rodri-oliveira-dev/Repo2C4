@@ -118,3 +118,8 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 **Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
 
 See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 4 issues #17–#19 share `phase/04-review-and-c3`; the single phase pull request is opened only after the last issue is implemented.
+
+
+## Selective C3
+
+C1/C2 generation remains the default. To derive a reviewable C3 proposal for exactly one existing C2 container, pass `--c3-container <container-id>` to the CLI or `c3ContainerId` to `generate_likec4` over MCP. The generated component boundaries are evidence-linked, bounded, and kept under review when repository-static signals cannot prove runtime behavior. Other containers are not expanded automatically.
