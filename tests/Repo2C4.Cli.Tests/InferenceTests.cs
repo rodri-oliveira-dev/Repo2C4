@@ -233,7 +233,14 @@ public sealed class InferenceTests
 
     private static HttpResponseMessage Success(string proposal) => new(HttpStatusCode.OK)
     {
-        Content = new StringContent(JsonSerializer.Serialize(new { response = proposal, done = true }), Encoding.UTF8, "application/json"),
+        Content = new StringContent(
+            JsonSerializer.Serialize(new
+            {
+                response = proposal,
+                done = true,
+            }),
+            Encoding.UTF8,
+            "application/json"),
     };
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) =>
@@ -261,8 +268,7 @@ public sealed class InferenceTests
         }
     }
 
-    private sealed class StubHandler(
-        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             send(request, cancellationToken);
@@ -272,7 +278,10 @@ public sealed class InferenceTests
     {
         public TempFolder() => Path = Directory.CreateTempSubdirectory("repo2c4-infer-").FullName;
 
-        public string Path { get; }
+        public string Path
+        {
+            get;
+        }
 
         public void Dispose()
         {
