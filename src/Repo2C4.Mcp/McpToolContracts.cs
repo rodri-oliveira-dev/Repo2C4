@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Generation;
 
@@ -44,6 +45,13 @@ public sealed record McpLikeC4File(
     string Content,
     int Utf8Bytes);
 
+public sealed record McpGeneratedFileChange(
+    string FileName,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<GeneratedFileChangeKind>))]
+    GeneratedFileChangeKind Kind,
+    string? PreviousHash,
+    string NewHash);
+
 public sealed record McpGenerateLikeC4Result(
     string SnapshotId,
     string SchemaVersion,
@@ -51,7 +59,7 @@ public sealed record McpGenerateLikeC4Result(
     bool Written,
     string? DestinationPath,
     McpLikeC4File[] Files,
-    GeneratedFileChange[] Changes,
+    McpGeneratedFileChange[] Changes,
     bool HasConflicts);
 
 public sealed record McpValidateLikeC4Result(
