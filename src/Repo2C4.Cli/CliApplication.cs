@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Repo2C4.Cli.Inference;
 using Repo2C4.Core.C3;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Generation;
@@ -16,6 +17,7 @@ public static class CliExitCodes
     public const int InvalidData = 3;
     public const int ValidationFailed = 4;
     public const int IoError = 5;
+    public const int InferenceFailed = 6;
 }
 
 internal static class CliApplication
@@ -26,7 +28,8 @@ internal static class CliApplication
         string[] args,
         TextWriter standardOutput,
         TextWriter standardError,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HttpClient? inferenceClient = null)
     {
         if (args.Length == 1 && args[0] is "--help" or "-h" or "help")
         {
@@ -50,6 +53,8 @@ internal static class CliApplication
 
         return command switch
         {
+            "infer" => await RunInferAsync(commandArguments, standardOutput, standardError, cancellationToken, inferenceClient)
+                .ConfigureAwait(false),
             "inspect" => await RunInspectAsync(commandArguments, standardOutput, standardError, cancellationToken)
                 .ConfigureAwait(false),
             "generate" => await RunGenerateAsync(commandArguments, standardOutput, standardError, cancellationToken)
@@ -58,6 +63,151 @@ internal static class CliApplication
                 .ConfigureAwait(false),
             _ => UnknownCommand(command, standardError),
         };
+    }
+
+    private static async Task<int> RunInferAsync(
+        string[] args,
+        TextWriter standardOutput,
+        TextWriter standardError,
+        CancellationToken cancellationToken,
+        HttpClient? inferenceClient)
+    {
+        if (!TryParseOptions(
+            args,
+            ["--snapshot", "--provider", "--model-id", "--output", "--endpoint", "--timeout-seconds"],
+            [],
+            out Dictionary<string, string> values,
+            out _,
+            out string? parseError))
+        {
+            standardError.WriteLine(parseError);
+            return CliExitCodes.UsageError;
+        }
+
+        if (!TryGetRequired(values, "--snapshot", out string snapshotPath)
+            || !TryGetRequired(values, "--provider", out string providerName)
+            || !TryGetRequired(values, "--model-id", out string modelId)
+            || !TryGetRequired(values, "--output", out string outputPath))
+        {
+            standardError.WriteLine("infer requires --snapshot FILE --provider ollama --model-id IDENTIFIER --output FILE.");
+            return CliExitCodes.UsageError;
+        }
+
+        if (!string.Equals(providerName, "ollama", StringComparison.Ordinal))
+        {
+            standardError.WriteLine("Only the local ollama provider is supported.");
+            return CliExitCodes.UsageError;
+        }
+
+        int timeoutSeconds = 90;
+        if (values.TryGetValue("--timeout-seconds", out string? timeoutText)
+            && (!int.TryParse(timeoutText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out timeoutSeconds)
+                || timeoutSeconds is < 1 or > 300))
+        {
+            standardError.WriteLine("--timeout-seconds must be between 1 and 300.");
+            return CliExitCodes.UsageError;
+        }
+
+        try
+        {
+            string fullSnapshot = Path.GetFullPath(snapshotPath);
+            string fullOutput = Path.GetFullPath(outputPath);
+            if (!File.Exists(fullSnapshot))
+            {
+                standardError.WriteLine("Snapshot input does not exist.");
+                return CliExitCodes.IoError;
+            }
+
+            if (new FileInfo(fullSnapshot).Length > MaxModelBytes)
+            {
+                standardError.WriteLine("Snapshot exceeds the 4 MiB CLI input limit.");
+                return CliExitCodes.InvalidData;
+            }
+
+            if (File.Exists(fullOutput))
+            {
+                standardError.WriteLine("Candidate output already exists; choose a new path.");
+                return CliExitCodes.IoError;
+            }
+
+            string json = await File.ReadAllTextAsync(fullSnapshot, cancellationToken).ConfigureAwait(false);
+            RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(json);
+            string endpoint = values.GetValueOrDefault("--endpoint") ?? "http://127.0.0.1:11434/";
+            using HttpClient? ownedClient = inferenceClient is null
+                ? new HttpClient(new HttpClientHandler { UseProxy = false })
+                : null;
+            IArchitectureInferenceProvider provider = new OllamaInferenceProvider(
+                inferenceClient ?? ownedClient!,
+                endpoint,
+                modelId,
+                TimeSpan.FromSeconds(timeoutSeconds));
+            ArchitectureModel candidate = await ArchitectureInference.ProposeAsync(
+                snapshot,
+                provider,
+                cancellationToken).ConfigureAwait(false);
+
+            string? outputDirectory = Path.GetDirectoryName(fullOutput);
+            if (outputDirectory is null)
+            {
+                standardError.WriteLine("Candidate output file path is invalid.");
+                return CliExitCodes.UsageError;
+            }
+
+            Directory.CreateDirectory(outputDirectory);
+            string temporary = fullOutput + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await WriteTextFileAsync(
+                    temporary,
+                    NormalizeText(ContractJson.SerializeModel(candidate)),
+                    overwrite: false,
+                    cancellationToken).ConfigureAwait(false);
+                File.Move(temporary, fullOutput);
+            }
+            finally
+            {
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
+            }
+
+            standardOutput.WriteLine(fullOutput);
+            standardError.WriteLine("provider=ollama model=" + modelId + "; candidate requires human review.");
+            return CliExitCodes.Success;
+        }
+        catch (InferenceException exception)
+        {
+            standardError.WriteLine(exception.Message);
+            return exception.Failure is InferenceFailure.InvalidInput
+                or InferenceFailure.InvalidResponse
+                or InferenceFailure.PayloadTooLarge
+                ? CliExitCodes.InvalidData
+                : CliExitCodes.InferenceFailed;
+        }
+        catch (ContractValidationException exception)
+        {
+            WriteContractErrors(exception, standardError);
+            return CliExitCodes.InvalidData;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ArgumentException)
+        {
+            standardError.WriteLine("Invalid inference option or local path.");
+            return CliExitCodes.UsageError;
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or NotSupportedException
+                or PathTooLongException)
+        {
+            standardError.WriteLine("Inference failed because a local path could not be read or written.");
+            return CliExitCodes.IoError;
+        }
     }
 
     private static async Task<int> RunInspectAsync(
@@ -398,6 +548,10 @@ internal static class CliApplication
     {
         switch (command)
         {
+            case "infer":
+                output.WriteLine("Usage: repo2c4 infer --snapshot FILE --provider ollama --model-id IDENTIFIER --output candidate.json [--endpoint http://127.0.0.1:11434/] [--timeout-seconds 90]");
+                output.WriteLine("Produces a review-required candidate from sanitized metadata using a local Ollama server; never generates C4 files.");
+                return CliExitCodes.Success;
             case "inspect":
                 output.WriteLine("Usage: repo2c4 inspect --repository PATH --output snapshot.json");
                 output.WriteLine("Collects bounded local evidence only. It does not infer a C4 model.");
@@ -422,11 +576,12 @@ internal static class CliApplication
         output.WriteLine();
         output.WriteLine("Commands:");
         output.WriteLine("  inspect  --repository PATH --output snapshot.json");
+        output.WriteLine("  infer    --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json");
         output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");
         output.WriteLine();
         output.WriteLine("inspect records evidence only; generate requires a user-proposed/reviewed ArchitectureModel.");
-        output.WriteLine("No command calls AI or converts package/project candidates into confirmed runtime architecture.");
+        output.WriteLine("Only infer calls a configured local AI provider. All AI proposals require human review.");
     }
 
     private static void WriteContractErrors(ContractValidationException exception, TextWriter error)
