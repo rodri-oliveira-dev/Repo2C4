@@ -31,7 +31,7 @@ public sealed class McpStdioIntegrationTests
                 .Select(tool => tool.GetProperty("name").GetString()!),
         ];
         Assert.Equal(
-            ["generate_likec4", "get_evidence", "get_snapshot", "inspect_repository", "validate_likec4"],
+            ["generate_likec4", "get_evidence", "get_evidence_report", "get_snapshot", "inspect_repository", "validate_likec4"],
             toolNames.Order(StringComparer.Ordinal));
         Assert.All(tools.EnumerateArray(), tool =>
         {
