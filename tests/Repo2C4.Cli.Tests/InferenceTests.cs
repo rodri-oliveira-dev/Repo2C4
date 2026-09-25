@@ -153,6 +153,26 @@ public sealed class InferenceTests
     }
 
     [Fact]
+    public void OversizedSnapshotIsRejectedBeforeContactingOllama()
+    {
+        RepositorySnapshot original = ContractJson.DeserializeSnapshot(File.ReadAllText(SnapshotPath));
+        RepositorySnapshot oversized = original with
+        {
+            Files =
+            [
+                .. Enumerable.Range(0, 257).Select(index =>
+                    new RepositoryFile("files/file_" + index.ToString("D4", System.Globalization.CultureInfo.InvariantCulture), 0, null)),
+            ],
+            Evidence = [],
+            Diagnostics = [],
+        };
+
+        InferenceException exception = Assert.Throws<InferenceException>(() => InferenceSnapshotSanitizer.Sanitize(oversized));
+
+        Assert.Equal(InferenceFailure.PayloadTooLarge, exception.Failure);
+    }
+
+    [Fact]
     public async Task OversizedResponseIsRejectedWithoutCandidateFile()
     {
         using TempFolder temp = new();
