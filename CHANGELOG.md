@@ -16,6 +16,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 - Local MCP stdio server foundation with maintained SDK transport, explicit authorized-root validation, traversal/symlink rejection, bounded Phase 3 host policies, cancellation handling and process-level handshake/tool-listing coverage.
 - Read-only MCP `inspect_repository`, `get_evidence` and `get_snapshot` tools reusing v1 Core evidence, with session-scoped expiring snapshots, authenticated bounded pagination, response ceilings and secret/prompt-injection negative coverage.
 - MCP `generate_likec4` and `validate_likec4` tools bound to session snapshots, with dry-run-by-default generation, fabricated-evidence/review-boundary checks, protected no-overwrite writes and official LikeC4 validation for proposed or authorized workspaces.
+- Vendor-neutral MCP client documentation, reusable evidence-first C1/C2 prompts and a deterministic protocol-client end-to-end test that compares preview/written LikeC4 with versioned golden files without any hosted AI dependency.
 
 ### Changed
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.

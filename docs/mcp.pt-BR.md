@@ -1,6 +1,6 @@
 # Servidor MCP stdio, ferramentas de inspeção e política de acesso local
 
-A Fase 3 executa o Repo2C4 como servidor MCP local por stdio. A issue #13 estabeleceu o transporte e o limite de filesystem, a #14 adicionou inspeção/evidências limitadas e a #15 adiciona geração/validação LikeC4 com escrita protegida. Configuração específica de clientes e o fluxo reutilizável de ponta a ponta permanecem reservados à #16.
+A Fase 3 executa o Repo2C4 como servidor MCP local por stdio. A issue #13 estabeleceu transporte e limite de filesystem, a #14 adicionou inspeção/evidências, a #15 adicionou geração/validação LikeC4 protegida e a #16 documenta e testa o fluxo completo com cliente independente de fornecedor.
 
 ## Iniciar o servidor
 
@@ -80,4 +80,4 @@ O projeto MCP referencia o Core; o Core não referencia o SDK MCP. Os contratos 
 
 O servidor não faz inferência arquitetural. Evidência estática, hipótese e fato arquitetural confirmado continuam distintos. `ProjectReference`, referências de pacotes e categorias terminadas em `.candidate` continuam sendo apenas sinais estáticos e não se tornam relações runtime confirmadas por serem expostas via MCP. A interpretação arquitetural continua sendo responsabilidade do cliente MCP.
 
-A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações Git, push/PR automático ou edição semântica de documentação existente. Configuração de clientes e o fluxo reutilizável documentado permanecem reservados à #16.
+A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações Git, push/PR automático ou edição semântica de documentação existente. A #16 adiciona configuração genérica de cliente, prompts reutilizáveis e reprodução determinística C1/C2 com cliente de protocolo. Consulte [fluxo com cliente MCP](mcp-client.pt-BR.md).

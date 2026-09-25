@@ -11,7 +11,7 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 | `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; MCP tools are added incrementally during phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Bounded inspection/evidence tools are exposed in issue #14, and issue #15 adds protected deterministic LikeC4 generation and official CLI validation. Client-specific setup remains scoped to issue #16.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection and interpretation remain client responsibilities.
 
 ## Prerequisites and verification
 
@@ -98,7 +98,7 @@ Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snaps
 
 The server embeds no AI provider and does not select models. The supplied `ArchitectureModel` must match the session snapshot exactly; fabricated evidence is rejected. Repository-static/candidate evidence cannot be promoted by the MCP server into a confirmed container boundary or runtime relation; architectural interpretation stays with the client.
 
-See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for schemas, dry-run/write semantics, validation, limits, controlled errors and the security boundary.
+See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for tool semantics and [MCP client workflow](docs/mcp-client.md) for generic client configuration, the reusable evidence-first prompt and deterministic C1/C2 reproduction.
 
 ## Entry point smoke tests
 
@@ -107,11 +107,11 @@ dotnet run --project src/Repo2C4.Cli/Repo2C4.Cli.csproj -- --help
 dotnet run --project src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -- --help
 ```
 
-CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite additionally starts the executable, performs a real stdio handshake, lists/calls the inspection tools, exercises pagination and negative security cases, and verifies that no non-protocol content is written to stdout.
+CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite starts the executable through a vendor-neutral JSON-RPC stdio client, performs real handshakes/tool calls, exercises pagination/security failures, reproduces both versioned C1 and C2 models, compares preview/written `.c4` files with goldens, and verifies that no non-protocol content is written to stdout.
 
 ## CI and distribution
 
-`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the MCP stdout boundary. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
+`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
 **Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
 

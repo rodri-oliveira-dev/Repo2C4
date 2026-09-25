@@ -1,6 +1,6 @@
 # MCP stdio server, inspection tools and local access policy
 
-Phase 3 runs Repo2C4 as a local MCP server over stdio. Issue #13 established the transport and filesystem boundary, issue #14 added bounded repository inspection/evidence retrieval, and issue #15 adds protected LikeC4 generation/validation. Client-specific setup and the reusable end-to-end client workflow remain scoped to issue #16.
+Phase 3 runs Repo2C4 as a local MCP server over stdio. Issue #13 established the transport and filesystem boundary, issue #14 added bounded repository inspection/evidence retrieval, issue #15 added protected LikeC4 generation/validation, and issue #16 documents and tests the complete vendor-neutral client flow.
 
 ## Start the server
 
@@ -80,4 +80,4 @@ The MCP project references Core; Core does not reference the MCP SDK. Existing v
 
 The server performs no architectural inference. Static evidence, hypotheses and confirmed architectural facts remain distinct. `ProjectReference`, package references and categories ending in `.candidate` remain static leads only and do not become confirmed runtime relationships when exposed over MCP. Architectural interpretation remains the MCP client's responsibility.
 
-Issue #15 reuses the Core emitter and validator without adding AI, Git operations, push/PR automation or semantic editing of existing documentation. Client configuration and the documented reusable client flow remain scoped to issue #16.
+Issue #15 reuses the Core emitter and validator without adding AI, Git operations, push/PR automation or semantic editing of existing documentation. Issue #16 adds generic client configuration, reusable review prompts and a deterministic C1/C2 protocol-client reproduction. See [MCP client workflow](mcp-client.md).
