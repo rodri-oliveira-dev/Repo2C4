@@ -10,7 +10,7 @@ public sealed class LikeC4CliValidatorTests
     {
         string missing = Path.Combine(Path.GetTempPath(), "repo2c4-missing-" + Guid.NewGuid().ToString("N"));
 
-        LikeC4ValidationResult result = await LikeC4CliValidator.ValidateAsync(missing);
+        LikeC4ValidationResult result = await LikeC4CliValidator.ValidateAsync(\n            missing,\n            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(result.IsValid);
         Assert.False(result.TimedOut);
@@ -26,7 +26,7 @@ public sealed class LikeC4CliValidatorTests
             "repo2c4-likec4-missing-" + Guid.NewGuid().ToString("N"),
             TimeSpan.FromSeconds(2));
 
-        LikeC4ValidationResult result = await LikeC4CliValidator.ValidateAsync(workspace.Path, options);
+        LikeC4ValidationResult result = await LikeC4CliValidator.ValidateAsync(\n            workspace.Path,\n            options,\n            TestContext.Current.CancellationToken);
 
         Assert.False(result.IsValid);
         Assert.False(result.TimedOut);
@@ -48,8 +48,8 @@ public sealed class LikeC4CliValidatorTests
         }
 
         string goldenRoot = Path.Combine(AppContext.BaseDirectory, "LikeC4Golden");
-        LikeC4ValidationResult c1 = await LikeC4CliValidator.ValidateAsync(Path.Combine(goldenRoot, "acme-c1"));
-        LikeC4ValidationResult c2 = await LikeC4CliValidator.ValidateAsync(Path.Combine(goldenRoot, "acme-c2"));
+        LikeC4ValidationResult c1 = await LikeC4CliValidator.ValidateAsync(\n            Path.Combine(goldenRoot, "acme-c1"),\n            cancellationToken: TestContext.Current.CancellationToken);
+        LikeC4ValidationResult c2 = await LikeC4CliValidator.ValidateAsync(\n            Path.Combine(goldenRoot, "acme-c2"),\n            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(c1.IsValid, DiagnosticSummary(c1));
         Assert.Equal(0, c1.ExitCode);
@@ -67,7 +67,7 @@ public sealed class LikeC4CliValidatorTests
             + "  broken = softwareSystem \"" + sentinel + "\n"
             + "}\n");
 
-        LikeC4ValidationResult syntaxResult = await LikeC4CliValidator.ValidateAsync(syntaxWorkspace.Path);
+        LikeC4ValidationResult syntaxResult = await LikeC4CliValidator.ValidateAsync(\n            syntaxWorkspace.Path,\n            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(syntaxResult.IsValid);
         Assert.NotEqual(0, syntaxResult.ExitCode);
@@ -95,7 +95,7 @@ public sealed class LikeC4CliValidatorTests
             + "  }\n"
             + "}\n");
 
-        LikeC4ValidationResult referenceResult = await LikeC4CliValidator.ValidateAsync(referenceWorkspace.Path);
+        LikeC4ValidationResult referenceResult = await LikeC4CliValidator.ValidateAsync(\n            referenceWorkspace.Path,\n            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(referenceResult.IsValid);
         Assert.NotEqual(0, referenceResult.ExitCode);
@@ -108,8 +108,9 @@ public sealed class LikeC4CliValidatorTests
     private static string DiagnosticSummary(LikeC4ValidationResult result) =>
         string.Join(
             "; ",
-            result.Diagnostics.Select(diagnostic =>
-                diagnostic.Code + ": " + (diagnostic.RelativePath ?? "<workspace>") + " - " + diagnostic.Message));
+            result.Diagnostics.Select(
+                diagnostic =>
+                    diagnostic.Code + ": " + (diagnostic.RelativePath ?? "<workspace>") + " - " + diagnostic.Message));
 
     private sealed class TempWorkspace : IDisposable
     {
