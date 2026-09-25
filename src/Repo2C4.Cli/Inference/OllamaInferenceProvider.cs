@@ -73,7 +73,10 @@ public sealed class OllamaInferenceProvider : IArchitectureInferenceProvider
             prompt,
             stream = false,
             format = "json",
-            options = new { num_predict = 4096 },
+            options = new
+            {
+                num_predict = 4096,
+            },
         });
         if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
         {
