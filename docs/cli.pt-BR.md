@@ -39,6 +39,14 @@ repo2c4 generate --model architecture.json --output DIR --overwrite
 
 `evidence-report.md` relaciona as afirmações do modelo aos IDs de evidência e às localizações relativas do repositório, separa hipóteses pendentes, avisos de varredura e itens sem suporte, sem copiar corpos de código nem valores sensíveis. Consulte [relatório de evidências e revisão arquitetural](evidence-report.md).
 
+Para solicitar C3 de exatamente um container C2 revisado, adicione `--c3-container ID`:
+
+```bash
+repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
+```
+
+Sem essa opção nenhum arquivo C3 é gerado. Uma seleção válida adiciona `components.c4` e `c3.views.c4`; os demais containers C2 não recebem vistas de componentes automaticamente. A proposta C3 é limitada, mantém sinais estáticos/candidatos sob revisão e falha quando o container selecionado não possui evidência suficiente.
+
 O diretório de saída e qualquer arquivo de destino já existente não podem ser symlink, junction ou reparse point. Os nomes gerados são fixos pelo Repo2C4 e não podem ser definidos pelo conteúdo do modelo.
 
 ### Validate
