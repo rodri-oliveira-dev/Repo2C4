@@ -338,11 +338,23 @@ public sealed class RepositoryScanner
 
         public Dictionary<string, int> Omissions { get; } = new(StringComparer.Ordinal);
 
-        public int VisitedEntries { get; set; }
+        public int VisitedEntries
+        {
+            get;
+            set;
+        }
 
-        public bool EntryBudgetReached { get; set; }
+        public bool EntryBudgetReached
+        {
+            get;
+            set;
+        }
 
-        public long TotalBytes { get; set; }
+        public long TotalBytes
+        {
+            get;
+            set;
+        }
 
         public void Skip(string code)
         {
