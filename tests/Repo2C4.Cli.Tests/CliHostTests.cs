@@ -91,6 +91,27 @@ public sealed class CliHostTests
     }
 
     [Fact]
+    public void GenerateSelectedC3WritesOnlyRequestedComponentView()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "EndToEnd", "architecture.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        int exitCode = Run([
+            "generate",
+            "--model", model,
+            "--output", outputDirectory,
+            "--c3-container", "el_web",
+        ]);
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.True(File.Exists(Path.Combine(outputDirectory, "components.c4")));
+        string c3View = File.ReadAllText(Path.Combine(outputDirectory, "c3.views.c4"));
+        Assert.Contains("C3 - Web API", c3View, StringComparison.Ordinal);
+        Assert.DoesNotContain("el_worker", c3View, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GenerateInvalidModelUsesDistinctInvalidDataExitCode()
     {
         using TempDirectory temp = new();
