@@ -45,7 +45,7 @@ Issue #15 adds two tools while keeping architectural interpretation in the MCP c
 
 | Tool | Purpose | Write behavior |
 | --- | --- | --- |
-| `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic `specification.c4`, `model.c4` and `views.c4`. | Defaults to `dryRun=true`. Repository writes require `dryRun=false`, `write=true` and an explicit repository-relative `destinationPath`. Existing generated files are never overwritten. |
+| `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic C1/C2 files. Optional `c3ContainerId` adds C3 only for that existing C2 container. | Defaults to `dryRun=true`. Repository writes require `dryRun=false`, `write=true` and an explicit repository-relative `destinationPath`. Existing generated files are never overwritten. |
 | `validate_likec4` | Run the existing controlled official LikeC4 CLI adapter against either the proposed generated files or an existing authorized destination directory. | Read-only. Omitting `destinationPath` validates an isolated temporary workspace; providing it validates an existing directory inside the authorized root. |
 
 The server does not accept the model snapshot on trust. `ContractValidator` must accept the model, and the model's canonical v1 snapshot must equal the snapshot identified by `snapshotId` in the current session. This rejects fabricated evidence even when a fabricated model is internally self-consistent.
@@ -87,3 +87,8 @@ The MCP project references Core; Core does not reference the MCP SDK. Existing v
 The server performs no architectural inference. Static evidence, hypotheses and confirmed architectural facts remain distinct. `ProjectReference`, package references and categories ending in `.candidate` remain static leads only and do not become confirmed runtime relationships when exposed over MCP. Architectural interpretation remains the MCP client's responsibility.
 
 Issue #15 reuses the Core emitter and validator without adding AI, Git operations, push/PR automation or semantic editing of existing documentation. Issue #16 adds generic client configuration, reusable review prompts and a deterministic C1/C2 protocol-client reproduction. See [MCP client workflow](mcp-client.md).
+
+
+## Selective C3
+
+Issue #18 keeps the stable C1/C2 model unchanged and adds a compatible C3 extension scoped to one explicitly selected C2 container. `generate_likec4` accepts optional `c3ContainerId`; omission preserves the existing C1/C2 behavior. A valid selection derives a bounded component proposal only from evidence already referenced by that container and emits `components.c4` plus `c3.views.c4`. Other containers do not receive C3 automatically. Candidate/static evidence remains `requiresReview`, and missing container, unsupported evidence, schema mismatch and C3 size limits fail with controlled contract errors.
