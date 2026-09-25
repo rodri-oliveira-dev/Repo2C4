@@ -147,9 +147,7 @@ public sealed class McpLikeC4ProtocolTests
         Assert.False(repeated.GetProperty("hasConflicts").GetBoolean());
         Assert.All(
             repeated.GetProperty("changes").EnumerateArray(),
-            change => Assert.Equal(
-                (int)Repo2C4.Core.Generation.GeneratedFileChangeKind.Unchanged,
-                change.GetProperty("kind").GetInt32()));
+            change => Assert.Equal("unchanged", change.GetProperty("kind").GetString()));
 
         ArchitectureModel invalidSchema = model with
         {
