@@ -45,14 +45,14 @@ A issue #15 adiciona duas ferramentas, mantendo a interpretação arquitetural n
 
 | Ferramenta | Finalidade | Comportamento de escrita |
 | --- | --- | --- |
-| `generate_likec4` | Recebe um `ArchitectureModel` v1 completo e o `snapshotId` da sessão, confirma que o snapshot embutido é exatamente o snapshot armazenado, preserva os limites de revisão e gera `specification.c4`, `model.c4` e `views.c4` deterministicamente. | O padrão é `dryRun=true`. Escrita exige `dryRun=false`, `write=true` e `destinationPath` relativo explícito. Arquivos gerados existentes nunca são sobrescritos. |
+| `generate_likec4` | Recebe um `ArchitectureModel` v1 completo e o `snapshotId` da sessão, confirma que o snapshot embutido é exatamente o snapshot armazenado, preserva os limites de revisão e gera saídas deterministicamente. | O padrão é `dryRun=true`. Com `destinationPath`, a resposta inclui resumo estruturado das mudanças. Escrita exige `dryRun=false`, `write=true`, ausência de conflitos e o mesmo destino explícito. |
 | `validate_likec4` | Executa o adaptador controlado da CLI oficial LikeC4 sobre os arquivos propostos ou sobre um destino autorizado existente. | Somente leitura. Sem `destinationPath`, valida workspace temporário isolado; com destino, valida um diretório existente dentro da raiz autorizada. |
 
 O servidor não confia no snapshot contido no modelo. O `ContractValidator` precisa aceitar o modelo e o snapshot v1 canônico do modelo deve ser idêntico ao snapshot apontado pelo `snapshotId` da sessão. Isso bloqueia evidência fabricada mesmo quando um modelo fabricado é internamente consistente.
 
 A fronteira MCP também preserva a política de mapeamento C4: container C2 ou relação runtime não podem ser `confirmed` quando o suporte consiste apenas em evidências estáticas `dotnet.*` ou `deployment.*`. Essas afirmações permanecem `requiresReview`. O cliente decide como interpretar a evidência e qual IA, se houver, utilizar; o servidor nunca seleciona nem chama provedor de IA.
 
-A escrita protegida resolve apenas diretórios filhos da raiz configurada, rejeita traversal e componentes linkados existentes, cria arquivos sem overwrite e tenta remover arquivos criados pela chamada caso ela falhe. Assim como na leitura, verificações gerenciadas não garantem no-follow atômico contra filesystem malicioso concorrente.
+A regeneração protegida resolve apenas diretórios filhos da raiz configurada, rejeita traversal e componentes linkados existentes, mantém `.repo2c4-manifest.json`, compara hashes atuais com o último snapshot gerado e classifica cada arquivo como `added`, `modified`, `unchanged` ou `conflict`. Arquivos editados manualmente ou colisões não gerenciadas nunca são sobrescritos. A escrita é preparada de forma transacional, com rollback em best effort, e o manifesto só é atualizado após a preparação bem-sucedida. Assim como na leitura, verificações gerenciadas não garantem no-follow atômico contra filesystem malicioso concorrente.
 
 ## Erros controlados e limites
 
@@ -65,7 +65,7 @@ Descrições e schemas MCP informam parâmetros e limites. Erros controlados esp
 - `cursor_invalid` para cursor malformado, alterado, incompatível ou fora de faixa;
 - `path_filter_invalid`, `category_invalid` e `section_invalid` para filtros inválidos;
 - `model_invalid`, `snapshot_mismatch` e `model_review_required` para modelos inseguros ou sem suporte suficiente;
-- `write_not_authorized`, `destination_required`, `destination_invalid`, `destination_exists` e `write_failed` para falhas de escrita protegida;
+- `write_not_authorized`, `destination_required`, `destination_invalid` e `managed_output_conflict` para falhas de escrita/regeneração protegida;
 - `validation_path_invalid` para diretório de validação ausente ou inseguro;
 - `tool_timeout` quando a inspeção excede 30 segundos;
 - `response_limit_exceeded` quando a resposta estruturada ultrapassaria o orçamento MCP de 1 MiB.
@@ -92,3 +92,8 @@ A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações 
 ## C3 seletivo
 
 A issue #18 mantém o modelo C1/C2 estável e adiciona uma extensão C3 compatível, limitada a um único container C2 explicitamente selecionado. `generate_likec4` aceita o parâmetro opcional `c3ContainerId`; sem ele, o comportamento C1/C2 permanece inalterado. Uma seleção válida deriva uma proposta limitada de componentes somente das evidências já associadas ao container selecionado e gera `components.c4` e `c3.views.c4`. Outros containers não recebem C3 automaticamente. Evidências estáticas ou candidatas permanecem `requiresReview`; container inexistente, evidência insuficiente, schema incompatível e limites excedidos geram erros controlados.
+
+
+## Regeneração gerenciada e revisão
+
+A issue #19 torna a regeneração review-first. `generate_likec4` continua em dry-run por padrão. Quando `destinationPath` é informado, o dry-run compara a proposta com o manifesto local e os arquivos atuais e devolve as mudanças sem tocar no filesystem. A aplicação deve ocorrer somente após revisar mudanças de fronteira e evidências. A escrita só é permitida quando cada arquivo gerenciado existente ainda corresponde ao SHA-256 registrado. Edição humana, arquivo gerenciado removido, arquivo linkado ou colisão com arquivo não gerenciado gera conflito e permanece intocado. Arquivos desconhecidos nunca são excluídos.
