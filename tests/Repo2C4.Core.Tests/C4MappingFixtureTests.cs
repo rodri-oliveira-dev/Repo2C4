@@ -73,6 +73,12 @@ public sealed class C4MappingFixtureTests
         Assert.DoesNotContain(
             model.Relations.SelectMany(relation => relation.EvidenceIds),
             id => evidenceById[id].Category == "dotnet.project.reference");
+
+        ArchitectureRelation workerRabbitMq =
+            Assert.Single(model.Relations, relation => relation.Id == "rel_worker_rabbitmq");
+        Assert.Empty(workerRabbitMq.EvidenceIds);
+        string workerReviewReason = Assert.IsType<string>(workerRabbitMq.ReviewReason);
+        Assert.Contains("No repository evidence links Worker to RabbitMQ", workerReviewReason, StringComparison.Ordinal);
     }
 
     [Fact]

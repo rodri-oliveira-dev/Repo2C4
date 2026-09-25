@@ -44,6 +44,6 @@
   "relations": [
     {"id":"rel_web_billing","sourceId":"el_web","destinationId":"el_billing","description":"Uses billing capabilities","evidenceIds":[],"status":"requiresReview","reviewReason":"No repository evidence confirms a runtime relation or protocol."},
     {"id":"rel_web_postgresql","sourceId":"el_web","destinationId":"el_postgresql","description":"Reads and writes application data","evidenceIds":["ev_postgresql_candidate"],"status":"requiresReview","reviewReason":"Package presence does not prove runtime database communication."},
-    {"id":"rel_worker_rabbitmq","sourceId":"el_worker","destinationId":"el_rabbitmq","description":"Publishes background messages","evidenceIds":["ev_rabbitmq_candidate"],"status":"requiresReview","reviewReason":"Package presence does not prove runtime broker communication."}
+    {"id":"rel_worker_rabbitmq","sourceId":"el_worker","destinationId":"el_rabbitmq","description":"Publishes background messages","evidenceIds":[],"status":"requiresReview","reviewReason":"No repository evidence links Worker to RabbitMQ; the relationship remains a review-only hypothesis."}
   ]
 }

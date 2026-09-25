@@ -110,8 +110,7 @@ internal static class CliApplication
             RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(options, cancellationToken);
             string json = NormalizeText(ContractJson.SerializeSnapshot(snapshot));
 
-            await File.WriteAllTextAsync(fullOutput, json, new UTF8Encoding(false), cancellationToken)
-                .ConfigureAwait(false);
+            await WriteTextFileAsync(fullOutput, json, overwrite: false, cancellationToken).ConfigureAwait(false);
             standardOutput.WriteLine(fullOutput);
             return CliExitCodes.Success;
         }
@@ -228,11 +227,8 @@ internal static class CliApplication
 
             foreach ((LikeC4GeneratedFile file, string target) in targets)
             {
-                await File.WriteAllTextAsync(
-                    target,
-                    NormalizeText(file.Content),
-                    new UTF8Encoding(false),
-                    cancellationToken).ConfigureAwait(false);
+                await WriteTextFileAsync(target, NormalizeText(file.Content), overwrite, cancellationToken)
+                    .ConfigureAwait(false);
                 standardOutput.WriteLine(target);
             }
 
@@ -454,6 +450,24 @@ internal static class CliApplication
     {
         FileAttributes attributes = File.GetAttributes(path);
         return (attributes & FileAttributes.ReparsePoint) != 0;
+    }
+
+    private static async Task WriteTextFileAsync(
+        string path,
+        string content,
+        bool overwrite,
+        CancellationToken cancellationToken)
+    {
+        FileMode mode = overwrite ? FileMode.Create : FileMode.CreateNew;
+        await using FileStream stream = new(
+            path,
+            mode,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 4096,
+            FileOptions.Asynchronous);
+        await using StreamWriter writer = new(stream, new UTF8Encoding(false));
+        await writer.WriteAsync(content.AsMemory(), cancellationToken).ConfigureAwait(false);
     }
 
     private static string NormalizeText(string content)

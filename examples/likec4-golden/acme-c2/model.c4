@@ -75,9 +75,8 @@ model {
     #requires-review
     metadata {
       architectureId "rel_worker_rabbitmq"
-      evidenceIds ["ev_rabbitmq_candidate"]
       reviewStatus "requiresReview"
-      reviewReason "Package presence does not prove runtime broker communication."
+      reviewReason "No repository evidence links Worker to RabbitMQ; the relationship remains a review-only hypothesis."
     }
   }
 }

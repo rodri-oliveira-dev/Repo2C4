@@ -143,6 +143,7 @@ public static partial class LikeC4CliValidator
         catch (OperationCanceledException)
         {
             TryKill(process);
+            await DrainAfterTerminationAsync(process, stdoutTask, stderrTask).ConfigureAwait(false);
             throw;
         }
 
