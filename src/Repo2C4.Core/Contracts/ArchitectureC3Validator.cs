@@ -62,7 +62,8 @@ public static class ArchitectureC3Validator
         Dictionary<string, ArchitectureElement> baseElements = model.BaseModel.Elements
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
 
-        if (!baseElements.TryGetValue(model.SelectedContainerId, out ArchitectureElement? selected) ||
+        if (string.IsNullOrWhiteSpace(model.SelectedContainerId) ||
+            !baseElements.TryGetValue(model.SelectedContainerId, out ArchitectureElement? selected) ||
             selected.Kind != ArchitectureElementKind.Container)
         {
             errors.Add(new ContractError(
@@ -94,7 +95,11 @@ public static class ArchitectureC3Validator
                     "Every C3 component must belong to the explicitly selected container."));
             }
 
-            if (!componentIds.Add(component.Id))
+            if (string.IsNullOrWhiteSpace(component.Id))
+            {
+                errors.Add(new ContractError("id.required", path + ".id", "Component ID is required."));
+            }
+            else if (!componentIds.Add(component.Id))
             {
                 errors.Add(new ContractError("id.duplicate", path + ".id", "Component IDs must be unique."));
             }
@@ -118,13 +123,19 @@ public static class ArchitectureC3Validator
                 continue;
             }
 
-            if (!relationIds.Add(relation.Id))
+            if (string.IsNullOrWhiteSpace(relation.Id))
+            {
+                errors.Add(new ContractError("id.required", path + ".id", "Relation ID is required."));
+            }
+            else if (!relationIds.Add(relation.Id))
             {
                 errors.Add(new ContractError("id.duplicate", path + ".id", "C3 relation IDs must be unique."));
             }
 
-            bool sourceExists = componentIds.Contains(relation.SourceId) || baseElements.ContainsKey(relation.SourceId);
-            bool destinationExists = componentIds.Contains(relation.DestinationId) || baseElements.ContainsKey(relation.DestinationId);
+            bool sourceExists = !string.IsNullOrWhiteSpace(relation.SourceId) &&
+                (componentIds.Contains(relation.SourceId) || baseElements.ContainsKey(relation.SourceId));
+            bool destinationExists = !string.IsNullOrWhiteSpace(relation.DestinationId) &&
+                (componentIds.Contains(relation.DestinationId) || baseElements.ContainsKey(relation.DestinationId));
             if (!sourceExists)
             {
                 errors.Add(new ContractError("relation.sourceMissing", path + ".sourceId", "Relation source must exist."));
