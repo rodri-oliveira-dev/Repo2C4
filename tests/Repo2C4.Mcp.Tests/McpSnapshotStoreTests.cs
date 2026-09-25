@@ -106,6 +106,33 @@ public sealed class McpSnapshotStoreTests
     }
 
     [Fact]
+    public void StoreEvictsOldestSnapshotWhenSessionLimitIsReached()
+    {
+        DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
+        using McpSnapshotStore store = new(
+            TimeSpan.FromMinutes(30),
+            () => now,
+            Enumerable.Repeat((byte)0x31, 32).ToArray());
+
+        List<McpSnapshotStore.SnapshotEntry> entries = [];
+        for (int index = 0; index <= McpLimits.MaxSnapshots; index++)
+        {
+            RepositorySnapshot snapshot = new(
+                ContractSchema.Version,
+                $"repo_{index:D2}",
+                [],
+                [],
+                []);
+            entries.Add(store.Store(snapshot));
+            now = now.AddSeconds(1);
+        }
+
+        Exception evicted = Assert.ThrowsAny<Exception>(() => store.Get(entries[0].SnapshotId));
+        Assert.Contains("snapshot_not_found_or_expired", evicted.Message, StringComparison.Ordinal);
+        Assert.Same(entries[^1].Snapshot, store.Get(entries[^1].SnapshotId).Snapshot);
+    }
+
+    [Fact]
     public void CursorIsBoundToSessionSnapshotAndFilters()
     {
         using McpSnapshotStore store = new(
