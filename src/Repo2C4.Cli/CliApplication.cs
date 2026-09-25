@@ -3,6 +3,7 @@ using System.Text;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Inspection;
 using Repo2C4.Core.LikeC4;
+using Repo2C4.Core.Review;
 
 namespace Repo2C4.Cli;
 
@@ -179,6 +180,7 @@ internal static class CliApplication
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
             IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.Emit(model);
+            EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
 
             string outputRoot = Path.GetFullPath(outputPath);
             if (Directory.Exists(outputRoot) && IsReparsePoint(outputRoot))
@@ -225,12 +227,39 @@ internal static class CliApplication
                 targets.Add((file, target));
             }
 
+            string reportTarget = Path.GetFullPath(Path.Combine(outputRoot, report.FileName));
+            if (!string.Equals(Path.GetDirectoryName(reportTarget), outputRoot, StringComparison.Ordinal))
+            {
+                standardError.WriteLine("Generated report path escaped the authorized output directory.");
+                return CliExitCodes.IoError;
+            }
+
+            if (File.Exists(reportTarget))
+            {
+                if (IsReparsePoint(reportTarget))
+                {
+                    standardError.WriteLine("Existing report file must not be a symlink or reparse point.");
+                    return CliExitCodes.IoError;
+                }
+
+                if (!overwrite)
+                {
+                    standardError.WriteLine(
+                        "Output file already exists: " + report.FileName + ". Re-run with --overwrite to replace it.");
+                    return CliExitCodes.IoError;
+                }
+            }
+
             foreach ((LikeC4GeneratedFile file, string target) in targets)
             {
                 await WriteTextFileAsync(target, NormalizeText(file.Content), overwrite, cancellationToken)
                     .ConfigureAwait(false);
                 standardOutput.WriteLine(target);
             }
+
+            await WriteTextFileAsync(reportTarget, NormalizeText(report.Content), overwrite, cancellationToken)
+                .ConfigureAwait(false);
+            standardOutput.WriteLine(reportTarget);
 
             return CliExitCodes.Success;
         }
@@ -400,7 +429,7 @@ internal static class CliApplication
                 return CliExitCodes.Success;
             case "generate":
                 output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--overwrite]");
-                output.WriteLine("Generates specification.c4, model.c4 and views.c4 from a reviewed v1 model.");
+                output.WriteLine("Generates specification.c4, model.c4, views.c4 and evidence-report.md from a reviewed v1 model.");
                 return CliExitCodes.Success;
             case "validate":
                 output.WriteLine("Usage: repo2c4 validate --output DIR");
