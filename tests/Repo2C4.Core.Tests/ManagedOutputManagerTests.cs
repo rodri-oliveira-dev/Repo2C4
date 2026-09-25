@@ -152,7 +152,10 @@ public sealed class ManagedOutputManagerTests
                 .FullName;
         }
 
-        public string Path { get; }
+        public string Path
+        {
+            get;
+        }
 
         public void Dispose()
         {
