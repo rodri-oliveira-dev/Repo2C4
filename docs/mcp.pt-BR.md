@@ -91,7 +91,7 @@ A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações 
 
 ## C3 seletivo
 
-A issue #18 mantém o modelo C1/C2 estável e adiciona uma extensão C3 compatível, limitada a um único container C2 explicitamente selecionado. `generate_likec4` aceita o parâmetro opcional `c3ContainerId`; sem ele, o comportamento C1/C2 permanece inalterado. Uma seleção válida deriva uma proposta limitada de componentes somente das evidências já associadas ao container selecionado e gera `components.c4` e `c3.views.c4`. Outros containers não recebem C3 automaticamente. Evidências estáticas ou candidatas permanecem `requiresReview`; container inexistente, evidência insuficiente, schema incompatível e limites excedidos geram erros controlados.
+A issue #18 mantém o modelo C1/C2 estável e adiciona uma extensão C3 compatível, limitada a um único container C2 explicitamente selecionado. `generate_likec4` aceita o parâmetro opcional `c3ContainerId`; sem ele, o comportamento C1/C2 permanece inalterado. Uma seleção válida deriva uma proposta limitada de componentes somente das evidências já associadas ao container selecionado e inclui os componentes dentro do container selecionado em `model.c4` e gera `c3.views.c4`. Outros containers não recebem C3 automaticamente. Evidências estáticas ou candidatas permanecem `requiresReview`; container inexistente, evidência insuficiente, schema incompatível e limites excedidos geram erros controlados.
 
 
 ## Regeneração gerenciada e revisão
