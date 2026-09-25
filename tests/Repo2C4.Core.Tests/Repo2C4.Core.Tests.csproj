@@ -20,4 +20,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Repo2C4.Core/Repo2C4.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../examples/models/*.json"
+          Link="MappingFixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
