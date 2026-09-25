@@ -91,6 +91,34 @@ public sealed class ManagedOutputManagerTests
     }
 
     [Fact]
+    public async Task FailedManifestCommitRollsBackNewlyWrittenOutputs()
+    {
+        using TempDirectory temp = new();
+        string output = Path.Combine(temp.Path, "out");
+        Directory.CreateDirectory(output);
+        string manifestPath = Path.Combine(output, ManagedOutputManager.ManifestFileName);
+        Directory.CreateDirectory(manifestPath);
+        LikeC4GeneratedFile[] files = [new("model.c4", "generated")];
+
+        GenerationPlan preview = await ManagedOutputManager.PreviewAsync(
+            output,
+            "1.0",
+            files,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAnyAsync<IOException>(
+            () => ManagedOutputManager.CommitAsync(
+                output,
+                "1.0",
+                files,
+                preview,
+                TestContext.Current.CancellationToken));
+
+        Assert.False(File.Exists(Path.Combine(output, "model.c4")));
+        Assert.True(Directory.Exists(manifestPath));
+    }
+
+    [Fact]
     public async Task InvalidPathIsRejected()
     {
         using TempDirectory temp = new();
