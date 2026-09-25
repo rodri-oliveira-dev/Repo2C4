@@ -28,7 +28,10 @@ public sealed class InferenceException : Exception
         Failure = failure;
     }
 
-    public InferenceFailure Failure { get; }
+    public InferenceFailure Failure
+    {
+        get;
+    }
 }
 
 /// <summary>
