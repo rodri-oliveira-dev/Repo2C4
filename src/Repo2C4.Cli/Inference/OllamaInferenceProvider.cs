@@ -162,7 +162,7 @@ public sealed class OllamaInferenceProvider : IArchitectureInferenceProvider
         }
         catch (JsonException)
         {
-            throw new InferenceException(InferenceFailure.InvalidResponse, "Ollama returned invalid JSON instead of a structured model.");
+            throw new InferenceException(InferenceFailure.InvalidResponse, "Ollama returned invalid JSON instead of a structured model proposal.");
         }
         catch (ContractValidationException)
         {
