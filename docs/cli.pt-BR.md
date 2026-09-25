@@ -1,6 +1,6 @@
-# CLI offline do Repo2C4
+# CLI do Repo2C4
 
-A CLI da Fase 2 disponibiliza três comandos locais. Nenhum deles chama provedor de IA, abre pull request, avalia MSBuild ou transforma candidatos de pacote/projeto em arquitetura runtime confirmada.
+Os comandos offline `inspect`, `generate` e `validate` não chamam IA, abrem pull request, avaliam MSBuild nem transformam candidatos em arquitetura runtime confirmada. O comando opcional `infer` usa explicitamente o provedor local Ollama para propor um modelo que deve passar por revisão humana.
 
 ## Comandos
 
@@ -15,6 +15,14 @@ repo2c4 inspect --repository PATH --output snapshot.json
 O identificador do repositório é derivado de forma determinística do nome do diretório raiz selecionado. Ele é um rótulo local estável, não uma identidade globalmente única.
 
 O arquivo de snapshot não pode existir previamente. Use outro caminho caso exista.
+
+### Infer (IA local opcional)
+
+```bash
+repo2c4 infer --snapshot snapshot.json --provider ollama --model-id IDENTIFICADOR --output candidate.json
+```
+
+As opções `--endpoint http://127.0.0.1:11434/` e `--timeout-seconds 90` configuram porta local e timeout. São aceitos somente endpoints HTTP loopback. O adaptador envia apenas uma projeção sanitizada e limitada das evidências, nunca arquivos brutos, segredos, caminhos originais ou descrições livres. A CLI valida o contrato v1, anexa localmente o snapshot original e obriga **revisão humana de todas as afirmações propostas pela IA**. Ela recusa respostas inválidas, modelo indisponível, timeout e sobrescrita do arquivo de saída. Veja [o tutorial de inferência local e revisão](inference.pt-BR.md).
 
 ### Generate
 
@@ -70,6 +78,7 @@ repo2c4 validate --output DIR
 | `3` | Snapshot/modelo v1 inválido. |
 | `4` | Validação LikeC4 falhou ou a CLI configurada não conseguiu validar. |
 | `5` | Operação local de arquivo/caminho falhou ou a política de overwrite bloqueou a operação. |
+| `6` | Provedor de inferência local indisponível ou tempo limite excedido. |
 
 O código original do LikeC4 aparece apenas como contexto diagnóstico e é mapeado para o código `4` do Repo2C4.
 
