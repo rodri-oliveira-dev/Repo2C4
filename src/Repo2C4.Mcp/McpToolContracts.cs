@@ -68,6 +68,7 @@ public sealed class CamelCaseGeneratedChangeKindConverter : JsonConverter<Genera
         GeneratedFileChangeKind value,
         JsonSerializerOptions options)
     {
+        ArgumentNullException.ThrowIfNull(writer);
         writer.WriteStringValue(value.ToString().ToLowerInvariant());
     }
 }
