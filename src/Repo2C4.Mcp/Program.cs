@@ -52,9 +52,10 @@ public static class Program
             return 2;
         }
 
+        string authorizedRoot;
         try
         {
-            RepositoryAccessPolicy.ValidateAuthorizedRoot(hostOptions.RepositoryRoot);
+            authorizedRoot = RepositoryAccessPolicy.ValidateAuthorizedRoot(hostOptions.RepositoryRoot);
         }
         catch (ArgumentException)
         {
@@ -78,8 +79,8 @@ public static class Program
         }
 
         using McpSnapshotStore snapshotStore = new();
-        McpArchitectureTools architectureTools = new(hostOptions.RepositoryRoot, snapshotStore);
-        McpLikeC4Tools likeC4Tools = new(hostOptions.RepositoryRoot, snapshotStore);
+        McpArchitectureTools architectureTools = new(authorizedRoot, snapshotStore);
+        McpLikeC4Tools likeC4Tools = new(authorizedRoot, snapshotStore);
         var toolCollection = architectureTools.CreateToolCollection();
         likeC4Tools.AddTools(toolCollection);
 
