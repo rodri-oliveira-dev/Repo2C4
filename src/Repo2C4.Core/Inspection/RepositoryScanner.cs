@@ -34,7 +34,7 @@ public sealed class RepositoryScanner
     /// Scans metadata synchronously; callers can cancel and serialize the returned v1 snapshot.
     /// Enumeration is capped and omitted-entry counts are lower bounds if enumeration stops early.
     /// </summary>
-    public RepositorySnapshot Scan(RepositoryScanOptions options, CancellationToken cancellationToken = default)
+    public static RepositorySnapshot Scan(RepositoryScanOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();

@@ -6,8 +6,6 @@ namespace Repo2C4.Core.Tests;
 
 public sealed class RepositoryScannerTests
 {
-    private readonly RepositoryScanner scanner = new();
-
     [Fact]
     public void UnchangedDirectoryProducesIdenticalCanonicalSnapshots()
     {
@@ -242,7 +240,7 @@ public sealed class RepositoryScannerTests
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => scanner.Scan(repository.Options(), cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() => RepositoryScanner.Scan(repository.Options(), cancellation.Token));
     }
 
     [Fact]
@@ -265,7 +263,7 @@ public sealed class RepositoryScannerTests
     }
 
     private RepositorySnapshot Scan(RepositoryScanOptions options) =>
-        scanner.Scan(options, TestContext.Current.CancellationToken);
+        RepositoryScanner.Scan(options, TestContext.Current.CancellationToken);
 
     private sealed class TemporaryRepository : IDisposable
     {
