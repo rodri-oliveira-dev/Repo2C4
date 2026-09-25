@@ -384,10 +384,18 @@ internal sealed class McpArchitectureTools
         }
 
         string relative = Path.GetRelativePath(_authorizedRoot, trimmed).Replace('\\', '/');
-        string identity = string.Equals(relative, ".", StringComparison.Ordinal)
+        string normalizedRelative = NormalizeRepositoryIdentityPath(
+            relative,
+            caseInsensitive: OperatingSystem.IsWindows());
+        string identity = string.Equals(normalizedRelative, ".", StringComparison.Ordinal)
             ? name.ToLowerInvariant()
-            : name.ToLowerInvariant() + "\n" + relative;
+            : name.ToLowerInvariant() + "\n" + normalizedRelative;
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         return "repo_" + Convert.ToHexString(digest).ToLowerInvariant()[..24];
     }
+
+    internal static string NormalizeRepositoryIdentityPath(
+        string relativePath,
+        bool caseInsensitive) =>
+        caseInsensitive ? relativePath.ToLowerInvariant() : relativePath;
 }
