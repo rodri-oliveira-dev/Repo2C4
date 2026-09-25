@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Text;
 using Repo2C4.Core.Contracts;
 
 namespace Repo2C4.Cli.Inference;
@@ -78,7 +77,7 @@ public static class InferenceSnapshotSanitizer
                 description));
         }
 
-        return new RepositorySnapshot(snapshot.SchemaVersion, snapshot.RepositoryId, files.MoveToImmutable(), evidence.MoveToImmutable(), []);
+        return new RepositorySnapshot(snapshot.SchemaVersion, snapshot.RepositoryId, files.ToImmutable(), evidence.ToImmutable(), []);
     }
 
     private static bool TryDescribe(Evidence evidence, out string? description)
