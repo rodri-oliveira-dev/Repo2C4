@@ -57,4 +57,4 @@ $CLI generate \
 $CLI validate --output artifacts/e2e/acme-web-c3
 ```
 
-This adds `components.c4` and `c3.views.c4` for `el_web`. No C3 view is created for `el_worker` or other containers. The generated components remain review-required because static repository evidence does not independently prove component boundaries or runtime calls.
+This nests the C3 component proposals for `el_web` in `model.c4` and adds `c3.views.c4`. No C3 view is created for `el_worker` or other containers. The generated components remain review-required because static repository evidence does not independently prove component boundaries or runtime calls.
