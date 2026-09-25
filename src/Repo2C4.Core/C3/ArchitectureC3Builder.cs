@@ -61,7 +61,7 @@ public static class ArchitectureC3Builder
             Evidence[] matching =
             [
                 .. selectedEvidence.Where(item =>
-                    prefix.EndsWith(".", StringComparison.Ordinal)
+                    prefix.EndsWith('.')
                         ? item.Category.StartsWith(prefix, StringComparison.Ordinal)
                         : item.Category == prefix),
             ];
