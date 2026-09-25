@@ -91,7 +91,7 @@ Issue #15 reuses the Core emitter and validator without adding AI, Git operation
 
 ## Selective C3
 
-Issue #18 keeps the stable C1/C2 model unchanged and adds a compatible C3 extension scoped to one explicitly selected C2 container. `generate_likec4` accepts optional `c3ContainerId`; omission preserves the existing C1/C2 behavior. A valid selection derives a bounded component proposal only from evidence already referenced by that container and nests components inside the selected container in `model.c4` and emits `c3.views.c4`. Other containers do not receive C3 automatically. Candidate/static evidence remains `requiresReview`, and missing container, unsupported evidence, schema mismatch and C3 size limits fail with controlled contract errors.
+Issue #18 keeps the stable C1/C2 model unchanged and adds a compatible C3 extension scoped to one explicitly selected C2 container. `generate_likec4` accepts optional `c3ContainerId`; omission preserves the existing C1/C2 behavior. A valid selection derives a bounded component proposal from repository evidence in the relative file paths referenced by that container (including evidence not directly listed in the container's evidence IDs) and nests components inside the selected container in `model.c4` and emits `c3.views.c4`. Other containers do not receive C3 automatically. Candidate/static evidence remains `requiresReview`, and missing container, unsupported evidence, schema mismatch and C3 size limits fail with controlled contract errors.
 
 
 ## Managed regeneration and review
