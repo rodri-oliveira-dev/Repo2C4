@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Repo2C4.Cli.Inference;
@@ -45,7 +46,7 @@ public sealed class InferenceTests
             Assert.Equal(HttpMethod.Post, request.Method);
             Assert.Equal("http://127.0.0.1:11434/api/generate", request.RequestUri!.ToString());
             transmitted = await request.Content!.ReadAsStringAsync(token);
-            string proposal = ValidProposal(snapshot.Evidence[0].Id);
+            string proposal = ValidProposal(OpaqueEvidenceId(snapshot.Evidence[0].Id));
             return Success(proposal);
         });
 
@@ -59,6 +60,8 @@ public sealed class InferenceTests
         Assert.NotNull(transmitted);
         Assert.DoesNotContain("SECRET_VALUE_DO_NOT_SEND", transmitted, StringComparison.Ordinal);
         Assert.DoesNotContain(sensitivePath, transmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain(snapshot.RepositoryId, transmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain(snapshot.Evidence[0].Id, transmitted, StringComparison.Ordinal);
         Assert.DoesNotContain("sensitive", transmitted, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("files/file_0001", transmitted, StringComparison.Ordinal);
 
@@ -206,6 +209,9 @@ public sealed class InferenceTests
         IArchitectureInferenceProvider provider = new AlteredSnapshotProvider();
         await Assert.ThrowsAsync<InferenceException>(() => ArchitectureInference.ProposeAsync(snapshot, provider, CancellationToken.None));
     }
+
+    private static string OpaqueEvidenceId(string id) =>
+        "ev_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id))).ToLowerInvariant()[..24];
 
     private static string ValidProposal(string evidenceId) => JsonSerializer.Serialize(new
     {
