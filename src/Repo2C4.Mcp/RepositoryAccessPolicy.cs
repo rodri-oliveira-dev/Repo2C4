@@ -6,10 +6,8 @@ namespace Repo2C4.Mcp;
 public static class RepositoryAccessPolicy
 {
     /// <summary>Validates that a repository root is absolute, existing and not a symbolic/reparse link.</summary>
-    public static void ValidateAuthorizedRoot(string rootPath)
-    {
-        _ = GetAuthorizedRoot(rootPath);
-    }
+    public static string ValidateAuthorizedRoot(string rootPath) =>
+        GetAuthorizedRoot(rootPath);
 
     /// <summary>
     /// Resolves one existing relative path without permitting traversal or linked path components.
