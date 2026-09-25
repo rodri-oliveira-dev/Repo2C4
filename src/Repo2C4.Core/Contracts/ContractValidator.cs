@@ -13,7 +13,10 @@ public sealed class ContractValidationException : Exception
         Errors = errors;
     }
 
-    public ImmutableArray<ContractError> Errors { get; }
+    public ImmutableArray<ContractError> Errors
+    {
+        get;
+    }
 }
 
 /// <summary>Validates schema, identifiers, provenance, C1/C2 containment and referential integrity.</summary>

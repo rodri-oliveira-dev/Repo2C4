@@ -11,6 +11,7 @@ public static class ContractJson
 
     public static string SerializeSnapshot(RepositorySnapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         ThrowIfInvalid(ContractValidator.ValidateSnapshot(snapshot));
         return JsonSerializer.Serialize(CanonicalSnapshot(snapshot), Options);
     }
@@ -25,6 +26,7 @@ public static class ContractJson
 
     public static string SerializeModel(ArchitectureModel model)
     {
+        ArgumentNullException.ThrowIfNull(model);
         ThrowIfInvalid(ContractValidator.ValidateModel(model));
         return JsonSerializer.Serialize(CanonicalModel(model), Options);
     }
@@ -43,7 +45,7 @@ public static class ContractJson
         {
             return JsonSerializer.Deserialize<T>(json, Options);
         }
-        catch (JsonException exception)
+        catch (JsonException)
         {
             throw new ContractValidationException([new ContractError(
                 "json.invalid",
