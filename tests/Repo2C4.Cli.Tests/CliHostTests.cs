@@ -93,7 +93,7 @@ public sealed class CliHostTests
     [Fact]
     public void GenerateSelectedC3WritesOnlyRequestedComponentView()
     {
-        string model = Path.Combine(AppContext.BaseDirectory, "EndToEnd", "architecture.c2.v1.json");
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "acme.c2.v1.json");
         using TempDirectory temp = new();
         string outputDirectory = Path.Combine(temp.Path, "likec4");
 
