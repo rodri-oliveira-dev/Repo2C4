@@ -21,7 +21,7 @@ internal sealed class McpSnapshotStore : IDisposable
         byte[]? cursorKey = null)
     {
         _lifetime = lifetime ?? McpLimits.SnapshotLifetime;
-        _utcNow = utcNow ?? static () => DateTimeOffset.UtcNow;
+        _utcNow = utcNow ?? (static () => DateTimeOffset.UtcNow);
         _cursorKey = cursorKey is null ? RandomNumberGenerator.GetBytes(32) : [.. cursorKey];
 
         if (_lifetime <= TimeSpan.Zero)
