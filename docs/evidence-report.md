@@ -9,10 +9,11 @@ The report is intentionally metadata-only. It contains architecture IDs, evidenc
 Generate LikeC4 and the report together:
 
 ```bash
-repo2c4 generate --model architecture.json --output DIR
+repo2c4 generate --model architecture.json --output DIR          # preview only
+repo2c4 generate --model architecture.json --output DIR --apply  # write managed outputs
 ```
 
-The output directory contains `specification.c4`, `model.c4`, `views.c4` and `evidence-report.md`.
+After `--apply`, the output directory contains `specification.c4`, `model.c4`, `views.c4`, `evidence-report.md` and `.repo2c4-manifest.json`.
 
 ## Review workflow
 
