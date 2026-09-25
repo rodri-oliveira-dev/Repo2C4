@@ -155,7 +155,7 @@ internal sealed class McpLikeC4Tools
 
         if (!write)
         {
-            GeneratedFileChange[] changes = plan?.Changes ?? [];
+            McpGeneratedFileChange[] changes = plan is null ? [] : [.. plan.Changes.Select(ToMcpChange)];
             return McpResponseGuard.EnsureWithinLimit(new McpGenerateLikeC4Result(
                 entry.SnapshotId,
                 model.SchemaVersion,
@@ -209,7 +209,7 @@ internal sealed class McpLikeC4Tools
             true,
             NormalizeDestinationForResponse(destinationPath),
             files,
-            plan.Changes,
+            [.. plan.Changes.Select(ToMcpChange)],
             false));
     }
 
@@ -427,6 +427,9 @@ internal sealed class McpLikeC4Tools
             }
         }
     }
+
+    private static McpGeneratedFileChange ToMcpChange(GeneratedFileChange change) =>
+        new(change.FileName, change.Kind, change.PreviousHash, change.NewHash);
 
     private static bool IsStaticRepositorySignal(Evidence evidence) =>
         evidence.Category.StartsWith("dotnet.", StringComparison.Ordinal) ||
