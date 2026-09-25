@@ -1,9 +1,9 @@
 using AwesomeAssertions;
 using NSubstitute;
-using Template.Library;
+using Repo2C4;
 using Xunit;
 
-namespace Template.Library.Tests;
+namespace Repo2C4.Tests;
 
 public sealed class Class1Tests
 {
