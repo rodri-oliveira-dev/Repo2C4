@@ -126,6 +126,35 @@ public sealed class ArchitectureC3Tests
     }
 
     [Fact]
+    public void ComponentIdCollidingWithBaseElementIsRejectedBeforeEmission()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+        ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_web");
+        Assert.NotEmpty(c3.Components);
+        ArchitectureC3Model colliding = c3 with
+        {
+            Components =
+            [
+                c3.Components[0] with
+                {
+                    Id = "el_web",
+                },
+                .. c3.Components.Skip(1),
+            ],
+        };
+
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(colliding),
+            error => error.Code == "id.duplicate" && error.Path == "$.components[0].id");
+
+        ContractValidationException exception = Assert.Throws<ContractValidationException>(
+            () => LikeC4Emitter.EmitWithC3(c2, colliding));
+        Assert.Contains(
+            exception.Errors,
+            error => error.Code == "id.duplicate" && error.Path == "$.components[0].id");
+    }
+
+    [Fact]
     public void MalformedBaseAndRelationIdsReturnValidationErrors()
     {
         ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
