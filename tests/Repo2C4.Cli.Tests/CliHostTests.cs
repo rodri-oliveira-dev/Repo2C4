@@ -65,7 +65,7 @@ public sealed class CliHostTests
         using TempDirectory temp = new();
         string outputDirectory = Path.Combine(temp.Path, "likec4");
 
-        int previewExit = Run(["generate", "--model", model, "--output", outputDirectory]);
+        int previewExit = Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]);
 
         Assert.Equal(CliExitCodes.Success, previewExit);
         Assert.False(Directory.Exists(outputDirectory));
