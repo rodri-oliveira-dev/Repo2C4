@@ -15,6 +15,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 - Offline CLI commands `inspect`, `generate` and `validate`, deterministic end-to-end fixtures, explicit overwrite protection and CI smoke coverage for the complete Phase 2 flow.
 - Local MCP stdio server foundation with maintained SDK transport, explicit authorized-root validation, traversal/symlink rejection, bounded Phase 3 host policies, cancellation handling and process-level handshake/tool-listing coverage.
 - Read-only MCP `inspect_repository`, `get_evidence` and `get_snapshot` tools reusing v1 Core evidence, with session-scoped expiring snapshots, authenticated bounded pagination, response ceilings and secret/prompt-injection negative coverage.
+- MCP `generate_likec4` and `validate_likec4` tools bound to session snapshots, with dry-run-by-default generation, fabricated-evidence/review-boundary checks, protected no-overwrite writes and official LikeC4 validation for proposed or authorized workspaces.
 
 ### Changed
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.

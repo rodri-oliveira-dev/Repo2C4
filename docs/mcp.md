@@ -1,6 +1,6 @@
 # MCP stdio server, inspection tools and local access policy
 
-Phase 3 runs Repo2C4 as a local MCP server over stdio. Issue #13 established the transport and filesystem boundary; issue #14 exposes only bounded repository inspection and evidence retrieval. LikeC4 generation/validation tools remain out of scope until issue #15.
+Phase 3 runs Repo2C4 as a local MCP server over stdio. Issue #13 established the transport and filesystem boundary, issue #14 added bounded repository inspection/evidence retrieval, and issue #15 adds protected LikeC4 generation/validation. Client-specific setup and the reusable end-to-end client workflow remain scoped to issue #16.
 
 ## Start the server
 
@@ -33,6 +33,21 @@ Issue #14 exposes exactly three read-only tools:
 
 Snapshots live only in the current stdio session and expire after 30 minutes. Snapshot IDs are stable hashes of the canonical v1 snapshot; possession of an ID from another session does not grant access because each session maintains its own store. Pagination cursors are opaque HMAC-authenticated tokens bound to that session, snapshot, tool scope and filters. Modified, cross-filter or out-of-range cursors fail with a controlled `cursor_invalid` error.
 
+## LikeC4 generation and validation tools
+
+Issue #15 adds two tools while keeping architectural interpretation in the MCP client:
+
+| Tool | Purpose | Write behavior |
+| --- | --- | --- |
+| `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic `specification.c4`, `model.c4` and `views.c4`. | Defaults to `dryRun=true`. Repository writes require `dryRun=false`, `write=true` and an explicit repository-relative `destinationPath`. Existing generated files are never overwritten. |
+| `validate_likec4` | Run the existing controlled official LikeC4 CLI adapter against either the proposed generated files or an existing authorized destination directory. | Read-only. Omitting `destinationPath` validates an isolated temporary workspace; providing it validates an existing directory inside the authorized root. |
+
+The server does not accept the model snapshot on trust. `ContractValidator` must accept the model, and the model's canonical v1 snapshot must equal the snapshot identified by `snapshotId` in the current session. This rejects fabricated evidence even when a fabricated model is internally self-consistent.
+
+The MCP boundary also preserves the C4 mapping policy: a C2 container or runtime relation cannot be marked `confirmed` when its support consists only of repository-static `dotnet.*` or `deployment.*` evidence. Such assertions remain `requiresReview`. The client chooses how to interpret evidence and which AI, if any, to use; the server never selects or calls an AI provider.
+
+Protected writes resolve only child directories beneath the configured root, reject traversal and linked existing path components, create files with no-overwrite semantics, and roll back files created by a failed call on a best-effort basis. As with the read boundary, managed checks cannot provide an atomic no-follow guarantee against a concurrently malicious filesystem.
+
 ## Controlled errors and limits
 
 The tool descriptions and generated MCP input schemas state their parameters and bounds. Expected controlled errors include:
@@ -43,6 +58,9 @@ The tool descriptions and generated MCP input schemas state their parameters and
 - `snapshot_not_found_or_expired` for missing, expired or cross-session snapshot references;
 - `cursor_invalid` for malformed, modified, mismatched or out-of-range cursors;
 - `path_filter_invalid`, `category_invalid` and `section_invalid` for invalid filters;
+- `model_invalid`, `snapshot_mismatch` and `model_review_required` for unsafe or unsupported architecture models;
+- `write_not_authorized`, `destination_required`, `destination_invalid`, `destination_exists` and `write_failed` for protected-write failures;
+- `validation_path_invalid` for an unsafe or missing validation directory;
 - `tool_timeout` when inspection exceeds 30 seconds;
 - `response_limit_exceeded` if a structured tool response would exceed the 1 MiB MCP budget.
 
@@ -50,7 +68,7 @@ The host ceiling remains 1,000 inspected files and 1 MiB per MCP response. Defau
 
 ## Authorized repository root
 
-The configured root must be a fully qualified existing directory without parent traversal and must not itself be a symbolic link, junction or other reparse point. Tool repository paths are relative to this root. Resolution rejects absolute paths, traversal, normalization outside the root, nonexistent paths and symbolic/reparse-link components.
+The configured root must be a fully qualified existing directory without parent traversal and must not itself be a symbolic link, junction or other reparse point. Read/validation paths are relative to this root and must already exist. Protected write destinations may be new child directories, but every existing path component is revalidated and generated files use no-overwrite creation.
 
 The existing Core scanner/extractor remains the data source. It keeps its mandatory sensitive-file exclusions and bounded reads. `.env`, credential/key names and other protected paths are not surfaced. Repository source bodies, README instructions, connection strings and raw secrets are not MCP evidence payloads.
 
@@ -62,4 +80,4 @@ The MCP project references Core; Core does not reference the MCP SDK. Existing v
 
 The server performs no architectural inference. Static evidence, hypotheses and confirmed architectural facts remain distinct. `ProjectReference`, package references and categories ending in `.candidate` remain static leads only and do not become confirmed runtime relationships when exposed over MCP. Architectural interpretation remains the MCP client's responsibility.
 
-LikeC4 generation, validation and protected writes are intentionally absent from issue #14 and remain scoped to issue #15.
+Issue #15 reuses the Core emitter and validator without adding AI, Git operations, push/PR automation or semantic editing of existing documentation. Client configuration and the documented reusable client flow remain scoped to issue #16.

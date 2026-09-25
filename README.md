@@ -11,7 +11,7 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 | `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; MCP tools are added incrementally during phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Bounded inspection/evidence tools are exposed in issue #14; LikeC4 MCP generation/validation remains scoped to issue #15.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Bounded inspection/evidence tools are exposed in issue #14, and issue #15 adds protected deterministic LikeC4 generation and official CLI validation. Client-specific setup remains scoped to issue #16.
 
 ## Prerequisites and verification
 
@@ -94,11 +94,11 @@ dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
 
 `REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Future tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
 
-Issue #14 adds exactly three read-only domain tools: `inspect_repository`, `get_evidence` and `get_snapshot`. They reuse the Core v1 contracts, keep snapshots session-scoped with a 30-minute expiry, paginate with authenticated cursors and never return generic file contents. LikeC4 generation/validation remains absent until issue #15.
+Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snapshot` tools. Issue #15 adds `generate_likec4` and `validate_likec4`: generation is dry-run by default, writing requires explicit dual authorization plus a relative destination, and existing generated files are never overwritten. Validation reuses the controlled official LikeC4 CLI adapter.
 
-The server embeds no AI provider and does not select models. `.candidate` signals and `ProjectReference` remain unverified/static evidence; architectural interpretation stays with the MCP client.
+The server embeds no AI provider and does not select models. The supplied `ArchitectureModel` must match the session snapshot exactly; fabricated evidence is rejected. Repository-static/candidate evidence cannot be promoted by the MCP server into a confirmed container boundary or runtime relation; architectural interpretation stays with the client.
 
-See [MCP stdio, inspection tools and access policy](docs/mcp.md) for configuration, schemas, limits, controlled errors and the security boundary.
+See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for schemas, dry-run/write semantics, validation, limits, controlled errors and the security boundary.
 
 ## Entry point smoke tests
 
