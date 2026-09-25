@@ -133,9 +133,16 @@ internal static class CliApplication
             string json = await File.ReadAllTextAsync(fullSnapshot, cancellationToken).ConfigureAwait(false);
             RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(json);
             string endpoint = values.GetValueOrDefault("--endpoint") ?? "http://127.0.0.1:11434/";
-            using HttpClient? ownedClient = inferenceClient is null
-                ? new HttpClient(new HttpClientHandler { UseProxy = false })
+            using HttpClientHandler? ownedHandler = inferenceClient is null
+                ? new HttpClientHandler
+                {
+                    UseProxy = false,
+                    CheckCertificateRevocationList = true,
+                }
                 : null;
+            using HttpClient? ownedClient = ownedHandler is null
+                ? null
+                : new HttpClient(ownedHandler, disposeHandler: false);
             IArchitectureInferenceProvider provider = new OllamaInferenceProvider(
                 inferenceClient ?? ownedClient!,
                 endpoint,
