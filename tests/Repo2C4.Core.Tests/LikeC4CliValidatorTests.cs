@@ -119,7 +119,10 @@ public sealed class LikeC4CliValidatorTests
             Path = Directory.CreateTempSubdirectory("repo2c4-likec4-").FullName;
         }
 
-        public string Path { get; }
+        public string Path
+        {
+            get;
+        }
 
         public void Dispose()
         {
