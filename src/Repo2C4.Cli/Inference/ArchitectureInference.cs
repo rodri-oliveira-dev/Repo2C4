@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
 using Repo2C4.Core.Contracts;
 
 namespace Repo2C4.Cli.Inference;
@@ -69,7 +71,7 @@ public static class InferenceSnapshotSanitizer
             }
 
             evidence.Add(new Evidence(
-                item.Id,
+                OpaqueId("ev", item.Id),
                 item.Category,
                 aliases[item.RelativePath],
                 null,
@@ -77,8 +79,11 @@ public static class InferenceSnapshotSanitizer
                 description));
         }
 
-        return new RepositorySnapshot(snapshot.SchemaVersion, snapshot.RepositoryId, files.ToImmutable(), evidence.ToImmutable(), []);
+        return new RepositorySnapshot(snapshot.SchemaVersion, OpaqueId("repo", snapshot.RepositoryId), files.ToImmutable(), evidence.ToImmutable(), []);
     }
+
+    internal static string OpaqueId(string prefix, string value) =>
+        prefix + "_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant()[..24];
 
     private static bool TryDescribe(Evidence evidence, out string? description)
     {
@@ -139,6 +144,10 @@ public static class ArchitectureInference
             throw new InferenceException(InferenceFailure.InvalidResponse, "Provider returned an altered evidence snapshot.");
         }
 
+        Dictionary<string, string> originalEvidenceIds = snapshot.Evidence.ToDictionary(
+            item => InferenceSnapshotSanitizer.OpaqueId("ev", item.Id),
+            item => item.Id,
+            StringComparer.Ordinal);
         ArchitectureModel candidate = inferred with
         {
             Snapshot = snapshot,
@@ -148,6 +157,7 @@ public static class ArchitectureInference
                 {
                     Status = ReviewStatus.RequiresReview,
                     ReviewReason = ReviewReason,
+                    EvidenceIds = [.. element.EvidenceIds.Select(id => originalEvidenceIds[id])],
                 }),
             ],
             Relations =
@@ -156,6 +166,7 @@ public static class ArchitectureInference
                 {
                     Status = ReviewStatus.RequiresReview,
                     ReviewReason = ReviewReason,
+                    EvidenceIds = [.. relation.EvidenceIds.Select(id => originalEvidenceIds[id])],
                 }),
             ],
         };
