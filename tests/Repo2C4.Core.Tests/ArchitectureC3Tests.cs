@@ -1,0 +1,96 @@
+using Repo2C4.Core.C3;
+using Repo2C4.Core.Contracts;
+using Repo2C4.Core.LikeC4;
+using Xunit;
+
+namespace Repo2C4.Core.Tests;
+
+public sealed class ArchitectureC3Tests
+{
+    [Fact]
+    public void SelectedContainerProducesOnlyItsC3Components()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+
+        ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_web");
+
+        Assert.Equal("el_web", c3.SelectedContainerId);
+        Assert.NotEmpty(c3.Components);
+        Assert.All(c3.Components, item => Assert.Equal("el_web", item.ContainerId));
+        Assert.DoesNotContain(c3.Components, item => item.Name.Contains("Worker", StringComparison.OrdinalIgnoreCase));
+
+        IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.EmitC3(c3);
+        Assert.Contains(files, file => file.FileName == "components.c4");
+        Assert.Contains(files, file => file.FileName == "c3.views.c4");
+        Assert.DoesNotContain(
+            files.Single(file => file.FileName == "c3.views.c4").Content,
+            "el_worker",
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MissingContainerIsRejected()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+
+        ContractValidationException error = Assert.Throws<ContractValidationException>(
+            () => ArchitectureC3Builder.Build(c2, "el_missing"));
+
+        Assert.Contains(error.Errors, item => item.Code == "c3.containerMissing");
+    }
+
+    [Fact]
+    public void ContainerWithoutEvidenceProducesInsufficientEvidenceDiagnostic()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+        ArchitectureElement worker = c2.Elements.Single(item => item.Id == "el_worker");
+        ArchitectureElement emptyWorker = worker with
+        {
+            EvidenceIds = [],
+            Status = ReviewStatus.RequiresReview,
+            ReviewReason = "No component evidence.",
+        };
+        c2 = c2 with
+        {
+            Elements = [.. c2.Elements.Select(item => item.Id == worker.Id ? emptyWorker : item)],
+        };
+
+        ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_worker");
+        ContractValidationException error = Assert.Throws<ContractValidationException>(
+            () => LikeC4Emitter.EmitC3(c3));
+
+        Assert.Contains(error.Errors, item => item.Code == "c3.insufficientEvidence");
+    }
+
+    [Fact]
+    public void InvalidSchemaAndLargeInputsAreRejected()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+        ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_web");
+
+        ArchitectureC3Model invalidSchema = c3 with { SchemaVersion = "9.0" };
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(invalidSchema),
+            item => item.Code == "schema.unsupported");
+
+        ArchitectureComponent seed = c3.Components[0];
+        ArchitectureC3Model tooLarge = c3 with
+        {
+            Components =
+            [
+                .. Enumerable.Range(0, ArchitectureC3Validator.MaxComponents + 1)
+                    .Select(index => seed with { Id = "cmp_" + index }),
+            ],
+        };
+
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(tooLarge),
+            item => item.Code == "c3.componentLimit");
+    }
+
+    private static ArchitectureModel LoadModel(string fileName)
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "MappingFixtures", fileName);
+        return ContractJson.DeserializeModel(File.ReadAllText(path));
+    }
+}
