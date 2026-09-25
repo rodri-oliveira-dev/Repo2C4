@@ -22,27 +22,20 @@ public sealed class EvidenceReportGeneratorTests
     }
 
     [Fact]
-    public void ReportListsWarningsAndMissingOrigins()
+    public void ReportListsWarningsAndMissingEvidenceReferences()
     {
-        Evidence evidence = new(
-            "ev_app",
-            "dotnet.project.kind",
-            "src/App.csproj",
-            1,
-            EvidenceSourceType.ProjectFile,
-            "Static declaration.");
         RepositorySnapshot snapshot = new(
             ContractSchema.Version,
             "repo_test",
             [],
-            [evidence],
-            [new RepositoryDiagnostic("scan.limit", DiagnosticSeverity.Warning, null, "Limit reached.")]);
+            [],
+            [new RepositoryDiagnostic("scan.limit", DiagnosticSeverity.Warning, null, "secret-token=should-not-leak")]);
         ArchitectureElement element = new(
             "el_app",
             ArchitectureElementKind.SoftwareSystem,
             "App",
             null,
-            [evidence.Id],
+            ["ev_removed"],
             ReviewStatus.RequiresReview,
             "Deployment boundary needs review.");
         ArchitectureModel model = new(
@@ -55,7 +48,8 @@ public sealed class EvidenceReportGeneratorTests
         EvidenceReportResult result = EvidenceReportGenerator.Generate(model);
 
         Assert.Contains("scan.limit", result.Content, StringComparison.Ordinal);
-        Assert.Contains("src/App.csproj", result.Content, StringComparison.Ordinal);
+        Assert.Contains("ev_removed", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("should-not-leak", result.Content, StringComparison.Ordinal);
         Assert.Equal(1, result.Summary.MissingOrigins);
     }
 
