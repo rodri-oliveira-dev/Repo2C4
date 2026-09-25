@@ -320,7 +320,10 @@ public sealed class InferenceTests
             ArchitectureModel model = new(
                 ContractSchema.Version,
                 ArchitectureLevel.C1,
-                sanitizedSnapshot with { RepositoryId = "repo_modified" },
+                sanitizedSnapshot with
+                {
+                    RepositoryId = "repo_modified",
+                },
                 [],
                 []);
             return Task.FromResult(model);
