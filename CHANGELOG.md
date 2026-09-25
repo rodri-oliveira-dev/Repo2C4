@@ -13,6 +13,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 - Pure deterministic LikeC4 C1/C2 emitter producing `specification.c4`, `model.c4` and `views.c4` in memory, with review/provenance metadata, DSL-safe escaping and golden fixtures.
 - Controlled official LikeC4 CLI validation adapter with bounded diagnostics, timeout/unavailable-tool handling and pinned real CLI validation in CI.
 - Offline CLI commands `inspect`, `generate` and `validate`, deterministic end-to-end fixtures, explicit overwrite protection and CI smoke coverage for the complete Phase 2 flow.
+- Local MCP stdio server foundation with maintained SDK transport, explicit authorized-root validation, traversal/symlink rejection, bounded Phase 3 host policies, cancellation handling and process-level handshake/tool-listing coverage.
 
 ### Changed
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.
