@@ -46,9 +46,9 @@ public sealed class RepositoryFactExtractorTests
         fixture.Add("Dockerfile", "FROM mcr.microsoft.com/dotnet/aspnet:10.0");
         fixture.Add("compose.yaml", "services: {}");
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
         string json = ContractJson.SerializeSnapshot(snapshot);
-        Assert.Equal(json, ContractJson.SerializeSnapshot(RepositoryFactExtractor.Extract(fixture.Options())));
+        Assert.Equal(json, ContractJson.SerializeSnapshot(Extract(fixture.Options())));
         Assert.Empty(ContractValidator.ValidateSnapshot(snapshot));
 
         Assert.Equal(3, snapshot.Evidence.Count(item => item.Category == "dotnet.solution.project"));
@@ -93,7 +93,7 @@ public sealed class RepositoryFactExtractorTests
             </Project>
             """);
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.Contains(snapshot.Evidence, item => item.Category == "dotnet.project.kind"
             && item.Description.Contains("Library", StringComparison.Ordinal));
@@ -119,7 +119,7 @@ public sealed class RepositoryFactExtractorTests
             </Project>
             """);
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.Contains(snapshot.Evidence, item => item.Category == "dotnet.solution.project"
             && item.RelativePath == "Legacy.sln" && item.Line == 2);
@@ -138,7 +138,7 @@ public sealed class RepositoryFactExtractorTests
             </Project>
             """);
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.DoesNotContain(snapshot.Evidence, item => item.Category == "dotnet.project.reference");
         Assert.Contains(snapshot.Diagnostics, item => item.Code == "extract.outsideRootReference");
@@ -155,7 +155,7 @@ public sealed class RepositoryFactExtractorTests
             </Project>
             """);
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.Contains(snapshot.Evidence, item => item.Category == "dotnet.project");
         Assert.DoesNotContain(snapshot.Evidence, item => item.Category == "dotnet.project.targetFramework");
@@ -174,7 +174,7 @@ public sealed class RepositoryFactExtractorTests
             """);
         fixture.Add("Good.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.Equal(2, snapshot.Diagnostics.Count(item => item.Code == "extract.invalidXml"));
         Assert.Contains(snapshot.Evidence, item => item.Category == "dotnet.project"
@@ -189,7 +189,7 @@ public sealed class RepositoryFactExtractorTests
         fixture.Add("Huge.csproj", "<Project>" + new string('x', 600_000) + "</Project>");
         fixture.Add("Small.csproj", "<Project />");
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options() with
+        RepositorySnapshot snapshot = Extract(fixture.Options() with
         {
             MaxBytesPerFile = 700_000,
             MaxTotalBytes = 800_000
@@ -210,7 +210,7 @@ public sealed class RepositoryFactExtractorTests
         fixture.AddBytes("Image.cs", [65, 0, 66]);
         fixture.Add("Normal.csproj", "<Project />");
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
         string json = ContractJson.SerializeSnapshot(snapshot);
 
         Assert.DoesNotContain("DO_NOT_EMIT_123", json, StringComparison.Ordinal);
@@ -230,7 +230,7 @@ public sealed class RepositoryFactExtractorTests
             client.ConnectToRedis();
             """);
 
-        RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(fixture.Options());
+        RepositorySnapshot snapshot = Extract(fixture.Options());
 
         Assert.DoesNotContain(snapshot.Evidence, item => item.Category == "dotnet.integration.rabbitmq.candidate");
         Assert.Contains(snapshot.Evidence, item => item.Category == "dotnet.integration.postgresql.candidate"
@@ -251,6 +251,9 @@ public sealed class RepositoryFactExtractorTests
         Assert.Throws<OperationCanceledException>(() =>
             RepositoryFactExtractor.Extract(fixture.Options(), cancellation.Token));
     }
+
+    private static RepositorySnapshot Extract(RepositoryScanOptions options) =>
+        RepositoryFactExtractor.Extract(options, TestContext.Current.CancellationToken);
 
     private sealed class Fixture : IDisposable
     {
