@@ -75,9 +75,9 @@ internal static class CliApplication
         if (!TryParseOptions(
             args,
             ["--snapshot", "--provider", "--model-id", "--output", "--endpoint", "--timeout-seconds"],
-            [],
+            ["--allow-external-ai"],
             out Dictionary<string, string> values,
-            out _,
+            out HashSet<string> flags,
             out string? parseError))
         {
             standardError.WriteLine(parseError);
@@ -89,13 +89,27 @@ internal static class CliApplication
             || !TryGetRequired(values, "--model-id", out string modelId)
             || !TryGetRequired(values, "--output", out string outputPath))
         {
-            standardError.WriteLine("infer requires --snapshot FILE --provider ollama --model-id IDENTIFIER --output FILE.");
+            standardError.WriteLine("infer requires --snapshot FILE --provider ollama|openai --model-id IDENTIFIER --output FILE.");
             return CliExitCodes.UsageError;
         }
 
-        if (!string.Equals(providerName, "ollama", StringComparison.Ordinal))
+        bool externalProvider = string.Equals(providerName, "openai", StringComparison.Ordinal);
+        if (!externalProvider && !string.Equals(providerName, "ollama", StringComparison.Ordinal))
         {
-            standardError.WriteLine("Only the local ollama provider is supported.");
+            standardError.WriteLine("Supported inference providers: ollama and openai.");
+            return CliExitCodes.UsageError;
+        }
+
+        if (externalProvider && !flags.Contains("--allow-external-ai"))
+        {
+            standardError.WriteLine("OpenAI requires explicit --allow-external-ai consent before sending sanitized evidence.");
+            return CliExitCodes.UsageError;
+        }
+
+        if ((!externalProvider && flags.Contains("--allow-external-ai"))
+            || (externalProvider && values.ContainsKey("--endpoint")))
+        {
+            standardError.WriteLine("--allow-external-ai applies only to openai; --endpoint applies only to ollama.");
             return CliExitCodes.UsageError;
         }
 
@@ -132,6 +146,27 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullSnapshot, cancellationToken).ConfigureAwait(false);
             RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(json);
+            // Resolve credentials only after explicit cloud consent, and never log their value.
+            string? apiKey = externalProvider ? Environment.GetEnvironmentVariable("OPENAI_API_KEY") : null;
+            if (externalProvider && string.IsNullOrWhiteSpace(apiKey))
+            {
+                standardError.WriteLine("OPENAI_API_KEY is required for the openai provider; no request was sent.");
+                return CliExitCodes.UsageError;
+            }
+
+            RepositorySnapshot? cloudProjection = externalProvider
+                ? InferenceSnapshotSanitizer.Sanitize(snapshot)
+                : null;
+            if (cloudProjection is not null)
+            {
+                standardError.WriteLine(
+                    "External AI consent: sending "
+                    + cloudProjection.Files.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " anonymized file entries and "
+                    + cloudProjection.Evidence.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " sanitized evidence records from the selected snapshot to api.openai.com.");
+            }
+
             string endpoint = values.GetValueOrDefault("--endpoint") ?? "http://127.0.0.1:11434/";
             using HttpClientHandler? ownedHandler = inferenceClient is null
                 ? new HttpClientHandler
@@ -150,11 +185,17 @@ internal static class CliApplication
                 ownedClient.Timeout = Timeout.InfiniteTimeSpan;
             }
 
-            IArchitectureInferenceProvider provider = new OllamaInferenceProvider(
-                inferenceClient ?? ownedClient!,
-                endpoint,
-                modelId,
-                TimeSpan.FromSeconds(timeoutSeconds));
+            IArchitectureInferenceProvider provider = externalProvider
+                ? new OpenAiInferenceProvider(
+                    inferenceClient ?? ownedClient!,
+                    modelId,
+                    apiKey!,
+                    TimeSpan.FromSeconds(timeoutSeconds))
+                : new OllamaInferenceProvider(
+                    inferenceClient ?? ownedClient!,
+                    endpoint,
+                    modelId,
+                    TimeSpan.FromSeconds(timeoutSeconds));
             ArchitectureModel candidate = await ArchitectureInference.ProposeAsync(
                 snapshot,
                 provider,
@@ -194,7 +235,7 @@ internal static class CliApplication
             }
 
             standardOutput.WriteLine(fullOutput);
-            standardError.WriteLine("provider=ollama model=" + modelId + "; candidate requires human review.");
+            standardError.WriteLine("provider=" + providerName + " model=" + modelId + "; candidate requires human review.");
             return CliExitCodes.Success;
         }
         catch (InferenceException exception)
@@ -570,8 +611,9 @@ internal static class CliApplication
         switch (command)
         {
             case "infer":
-                output.WriteLine("Usage: repo2c4 infer --snapshot FILE --provider ollama --model-id IDENTIFIER --output candidate.json [--endpoint http://127.0.0.1:11434/] [--timeout-seconds 90]");
-                output.WriteLine("Produces a review-required candidate from sanitized metadata using a local Ollama server; never generates C4 files.");
+                output.WriteLine("Usage: repo2c4 infer --snapshot FILE --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai] [--endpoint http://127.0.0.1:11434/] [--timeout-seconds 90]");
+                output.WriteLine("OpenAI additionally requires --allow-external-ai and OPENAI_API_KEY; --endpoint is local Ollama only.");
+                output.WriteLine("Proposes a review-required model from sanitized metadata; never generates C4 files.");
                 return CliExitCodes.Success;
             case "inspect":
                 output.WriteLine("Usage: repo2c4 inspect --repository PATH --output snapshot.json");
@@ -597,12 +639,12 @@ internal static class CliApplication
         output.WriteLine();
         output.WriteLine("Commands:");
         output.WriteLine("  inspect  --repository PATH --output snapshot.json");
-        output.WriteLine("  infer    --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json");
+        output.WriteLine("  infer    --snapshot snapshot.json --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai]");
         output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");
         output.WriteLine();
         output.WriteLine("inspect records evidence only; generate requires a user-proposed/reviewed ArchitectureModel.");
-        output.WriteLine("Only infer calls a configured local AI provider. All AI proposals require human review.");
+        output.WriteLine("Only infer calls AI. Cloud inference requires explicit consent and OPENAI_API_KEY; all proposals require human review.");
     }
 
     private static void WriteContractErrors(ContractValidationException exception, TextWriter error)
