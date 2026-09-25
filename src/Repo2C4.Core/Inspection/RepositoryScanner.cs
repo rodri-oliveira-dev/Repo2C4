@@ -128,6 +128,12 @@ public sealed class RepositoryScanner
         foreach (string entry in children.OrderBy(item => Path.GetFileName(item), StringComparer.Ordinal))
         {
             state.CancellationToken.ThrowIfCancellationRequested();
+            if (state.VisitedEntries >= state.Options.MaxVisitedEntries)
+            {
+                state.EntryBudgetReached = true;
+                break;
+            }
+
             state.VisitedEntries++;
 
             string relative = Path.GetRelativePath(root, entry).Replace('\\', '/');
@@ -247,8 +253,10 @@ public sealed class RepositoryScanner
         return lower == ".env"
             || lower.StartsWith(".env.", StringComparison.Ordinal)
             || lower is ".npmrc" or ".pypirc" or ".netrc" or "id_rsa" or "id_ed25519"
-            || lower.StartsWith("secret", StringComparison.Ordinal)
-            || lower.StartsWith("credential", StringComparison.Ordinal)
+            || lower.Contains("secret", StringComparison.Ordinal)
+            || lower.Contains("credential", StringComparison.Ordinal)
+            || lower.Contains("token", StringComparison.Ordinal)
+            || lower.StartsWith("appsettings.", StringComparison.Ordinal)
             || lower.StartsWith("private_key", StringComparison.Ordinal)
             || lower.StartsWith("appsettings.local.", StringComparison.Ordinal)
             || lower.Contains(".secrets.", StringComparison.Ordinal)
