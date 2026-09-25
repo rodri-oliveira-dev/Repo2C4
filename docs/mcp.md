@@ -45,14 +45,14 @@ Issue #15 adds two tools while keeping architectural interpretation in the MCP c
 
 | Tool | Purpose | Write behavior |
 | --- | --- | --- |
-| `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic C1/C2 files. Optional `c3ContainerId` adds C3 only for that existing C2 container. | Defaults to `dryRun=true`. Repository writes require `dryRun=false`, `write=true` and an explicit repository-relative `destinationPath`. Existing generated files are never overwritten. |
+| `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic C1/C2 files. Optional `c3ContainerId` adds C3 only for that existing C2 container. | Defaults to `dryRun=true`. With `destinationPath`, the response includes a structured managed-output change summary. Writing requires `dryRun=false`, `write=true`, no conflicts, and the same explicit destination. |
 | `validate_likec4` | Run the existing controlled official LikeC4 CLI adapter against either the proposed generated files or an existing authorized destination directory. | Read-only. Omitting `destinationPath` validates an isolated temporary workspace; providing it validates an existing directory inside the authorized root. |
 
 The server does not accept the model snapshot on trust. `ContractValidator` must accept the model, and the model's canonical v1 snapshot must equal the snapshot identified by `snapshotId` in the current session. This rejects fabricated evidence even when a fabricated model is internally self-consistent.
 
 The MCP boundary also preserves the C4 mapping policy: a C2 container or runtime relation cannot be marked `confirmed` when its support consists only of repository-static `dotnet.*` or `deployment.*` evidence. Such assertions remain `requiresReview`. The client chooses how to interpret evidence and which AI, if any, to use; the server never selects or calls an AI provider.
 
-Protected writes resolve only child directories beneath the configured root, reject traversal and linked existing path components, create files with no-overwrite semantics, and roll back files created by a failed call on a best-effort basis. As with the read boundary, managed checks cannot provide an atomic no-follow guarantee against a concurrently malicious filesystem.
+Protected regeneration resolves only child directories beneath the configured root, rejects traversal and linked existing path components, tracks generated files in `.repo2c4-manifest.json`, compares current hashes with the previous generated snapshot, and reports `added`, `modified`, `unchanged` or `conflict`. Manually edited or unmanaged colliding files are never overwritten. Writes are staged and committed transactionally with best-effort rollback, and the manifest is updated only after successful preparation. As with the read boundary, managed checks cannot provide an atomic no-follow guarantee against a concurrently malicious filesystem.
 
 ## Controlled errors and limits
 
@@ -65,7 +65,7 @@ The tool descriptions and generated MCP input schemas state their parameters and
 - `cursor_invalid` for malformed, modified, mismatched or out-of-range cursors;
 - `path_filter_invalid`, `category_invalid` and `section_invalid` for invalid filters;
 - `model_invalid`, `snapshot_mismatch` and `model_review_required` for unsafe or unsupported architecture models;
-- `write_not_authorized`, `destination_required`, `destination_invalid`, `destination_exists` and `write_failed` for protected-write failures;
+- `write_not_authorized`, `destination_required`, `destination_invalid` and `managed_output_conflict` for protected-write/regeneration failures;
 - `validation_path_invalid` for an unsafe or missing validation directory;
 - `tool_timeout` when inspection exceeds 30 seconds;
 - `response_limit_exceeded` if a structured tool response would exceed the 1 MiB MCP budget.
@@ -92,3 +92,8 @@ Issue #15 reuses the Core emitter and validator without adding AI, Git operation
 ## Selective C3
 
 Issue #18 keeps the stable C1/C2 model unchanged and adds a compatible C3 extension scoped to one explicitly selected C2 container. `generate_likec4` accepts optional `c3ContainerId`; omission preserves the existing C1/C2 behavior. A valid selection derives a bounded component proposal only from evidence already referenced by that container and emits `components.c4` plus `c3.views.c4`. Other containers do not receive C3 automatically. Candidate/static evidence remains `requiresReview`, and missing container, unsupported evidence, schema mismatch and C3 size limits fail with controlled contract errors.
+
+
+## Managed regeneration and review
+
+Issue #19 changes regeneration to a review-first flow. `generate_likec4` remains dry-run by default. When a `destinationPath` is supplied, dry-run compares the proposed output with the local manifest and current files, returning structured changes without touching the filesystem. Apply only after reviewing boundary changes and evidence changes. A write is permitted only when every existing managed file still matches its recorded SHA-256 hash. Human edits, deleted managed files, linked files, and unmanaged files that collide with generated names produce a conflict and remain untouched. Unknown files are never deleted.
