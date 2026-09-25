@@ -35,7 +35,7 @@ Snapshots live only in the current stdio session and expire after 30 minutes. Sn
 
 ## Evidence report tool
 
-Issue #17 adds read-only `get_evidence_report`. It accepts `snapshotId` plus a complete v1 `ArchitectureModel`, verifies the session snapshot binding and returns deterministic `evidence-report.md` content with summary counts for confirmed assertions, review-required assertions, scan warnings and missing origins. The report contains only model/evidence IDs and repository-relative metadata. It does not read source bodies, emit absolute paths, write files or call AI.
+Issue #17 adds read-only `get_evidence_report`. It accepts `snapshotId` plus a complete v1 `ArchitectureModel`, verifies the session snapshot binding and returns a bounded summary of the deterministic report: counts, review-required assertion IDs and warning codes. The full Markdown report remains a CLI artifact. The MCP response does not include source bodies, configuration values or absolute paths, does not write files and does not call AI.
 
 See [evidence report and architectural review](evidence-report.md).
 
