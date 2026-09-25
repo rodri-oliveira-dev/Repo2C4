@@ -46,7 +46,7 @@ Issue #15 adds two tools while keeping architectural interpretation in the MCP c
 | Tool | Purpose | Write behavior |
 | --- | --- | --- |
 | `generate_likec4` | Accept a complete v1 `ArchitectureModel` plus its session `snapshotId`, verify that the embedded snapshot exactly matches the stored snapshot, enforce review boundaries, and emit deterministic C1/C2 files. Optional `c3ContainerId` adds C3 only for that existing C2 container. | Defaults to `dryRun=true`. With `destinationPath`, the response includes a structured managed-output change summary. Writing requires `dryRun=false`, `write=true`, no conflicts, and the same explicit destination. |
-| `validate_likec4` | Run the existing controlled official LikeC4 CLI adapter against either the proposed generated files or an existing authorized destination directory. | Read-only. Omitting `destinationPath` validates an isolated temporary workspace; providing it validates an existing directory inside the authorized root. |
+| `validate_likec4` | Run the existing controlled official LikeC4 CLI adapter against either the proposed generated files (including optional `c3ContainerId`) or an existing authorized destination directory. | Read-only. Omitting `destinationPath` validates an isolated temporary workspace; providing it validates an existing directory inside the authorized root. |
 
 The server does not accept the model snapshot on trust. `ContractValidator` must accept the model, and the model's canonical v1 snapshot must equal the snapshot identified by `snapshotId` in the current session. This rejects fabricated evidence even when a fabricated model is internally self-consistent.
 
