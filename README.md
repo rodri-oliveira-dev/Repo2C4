@@ -81,6 +81,8 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
 
 `inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Generation is preview-only by default. `--apply` writes only Repo2C4-managed files whose current SHA-256 still matches `.repo2c4-manifest.json`; manual edits and unmanaged collisions become conflicts and remain untouched.
 
+Optional local AI inference can propose a review-required model through `infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json`. The offline CLI and MCP remain independent of Ollama; see the local inference guide in [English](docs/inference.md) or [Português](docs/inference.pt-BR.md).
+
 Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
 ## MCP stdio foundation (issue #13)
