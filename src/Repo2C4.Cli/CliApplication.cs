@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Repo2C4.Core.C3;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.Generation;
 using Repo2C4.Core.Inspection;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
@@ -146,7 +147,7 @@ internal static class CliApplication
         if (!TryParseOptions(
             args,
             ["--model", "--output", "--c3-container"],
-            ["--overwrite"],
+            ["--apply"],
             out Dictionary<string, string> values,
             out HashSet<string> flags,
             out string? parseError))
@@ -192,6 +193,11 @@ internal static class CliApplication
             }
 
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
+            List<LikeC4GeneratedFile> managedFiles =
+            [
+                .. files.Select(file => new LikeC4GeneratedFile(file.FileName, NormalizeText(file.Content))),
+                new LikeC4GeneratedFile(report.FileName, NormalizeText(report.Content)),
+            ];
 
             string outputRoot = Path.GetFullPath(outputPath);
             if (Directory.Exists(outputRoot) && IsReparsePoint(outputRoot))
@@ -200,78 +206,36 @@ internal static class CliApplication
                 return CliExitCodes.IoError;
             }
 
-            Directory.CreateDirectory(outputRoot);
-            if (IsReparsePoint(outputRoot))
+            GenerationPlan plan = await ManagedOutputManager.PreviewAsync(
+                outputRoot,
+                model.SchemaVersion,
+                managedFiles,
+                cancellationToken).ConfigureAwait(false);
+
+            foreach (GeneratedFileChange change in plan.Changes)
             {
-                standardError.WriteLine("Output directory must not be a symlink, junction or reparse point.");
+                standardOutput.WriteLine(change.Kind.ToString().ToLowerInvariant() + " " + change.FileName);
+            }
+
+            if (plan.HasConflicts)
+            {
+                standardError.WriteLine("Generation preview found conflicts. Manually edited or unmanaged files were not changed.");
                 return CliExitCodes.IoError;
             }
 
-            bool overwrite = flags.Contains("--overwrite");
-            List<(LikeC4GeneratedFile File, string Target)> targets = [];
-            foreach (LikeC4GeneratedFile file in files)
+            if (!flags.Contains("--apply"))
             {
-                string target = Path.GetFullPath(Path.Combine(outputRoot, file.FileName));
-                string? targetDirectory = Path.GetDirectoryName(target);
-                if (!string.Equals(targetDirectory, outputRoot, StringComparison.Ordinal))
-                {
-                    standardError.WriteLine("Generated file path escaped the authorized output directory.");
-                    return CliExitCodes.IoError;
-                }
-
-                if (File.Exists(target))
-                {
-                    if (IsReparsePoint(target))
-                    {
-                        standardError.WriteLine("Existing output file must not be a symlink or reparse point.");
-                        return CliExitCodes.IoError;
-                    }
-
-                    if (!overwrite)
-                    {
-                        standardError.WriteLine(
-                            "Output file already exists: " + file.FileName + ". Re-run with --overwrite to replace it.");
-                        return CliExitCodes.IoError;
-                    }
-                }
-
-                targets.Add((file, target));
+                standardOutput.WriteLine("preview-only");
+                return CliExitCodes.Success;
             }
 
-            string reportTarget = Path.GetFullPath(Path.Combine(outputRoot, report.FileName));
-            if (!string.Equals(Path.GetDirectoryName(reportTarget), outputRoot, StringComparison.Ordinal))
-            {
-                standardError.WriteLine("Generated report path escaped the authorized output directory.");
-                return CliExitCodes.IoError;
-            }
-
-            if (File.Exists(reportTarget))
-            {
-                if (IsReparsePoint(reportTarget))
-                {
-                    standardError.WriteLine("Existing report file must not be a symlink or reparse point.");
-                    return CliExitCodes.IoError;
-                }
-
-                if (!overwrite)
-                {
-                    standardError.WriteLine(
-                        "Output file already exists: " + report.FileName + ". Re-run with --overwrite to replace it.");
-                    return CliExitCodes.IoError;
-                }
-            }
-
-            foreach ((LikeC4GeneratedFile file, string target) in targets)
-            {
-                await WriteTextFileAsync(target, NormalizeText(file.Content), overwrite, cancellationToken)
-                    .ConfigureAwait(false);
-                standardOutput.WriteLine(target);
-            }
-
-            await WriteTextFileAsync(reportTarget, NormalizeText(report.Content), overwrite, cancellationToken)
-                .ConfigureAwait(false);
-            standardOutput.WriteLine(reportTarget);
-
+            await ManagedOutputManager.CommitAsync(
+                outputRoot,
+                model.SchemaVersion,
+                managedFiles,
+                plan,
+                cancellationToken).ConfigureAwait(false);
+            standardOutput.WriteLine("applied " + ManagedOutputManager.ManifestFileName);
             return CliExitCodes.Success;
         }
         catch (ContractValidationException exception)
@@ -439,8 +403,8 @@ internal static class CliApplication
                 output.WriteLine("Collects bounded local evidence only. It does not infer a C4 model.");
                 return CliExitCodes.Success;
             case "generate":
-                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--overwrite]");
-                output.WriteLine("Generates C1/C2 outputs and evidence-report.md; --c3-container ID additionally emits a selected C3 view.");
+                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
+                output.WriteLine("Previews deterministic C1/C2 outputs and evidence-report.md; --apply writes only managed, unchanged outputs. --c3-container ID adds selected C3.");
                 return CliExitCodes.Success;
             case "validate":
                 output.WriteLine("Usage: repo2c4 validate --output DIR");
@@ -458,7 +422,7 @@ internal static class CliApplication
         output.WriteLine();
         output.WriteLine("Commands:");
         output.WriteLine("  inspect  --repository PATH --output snapshot.json");
-        output.WriteLine("  generate --model architecture.json --output DIR [--overwrite]");
+        output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");
         output.WriteLine();
         output.WriteLine("inspect records evidence only; generate requires a user-proposed/reviewed ArchitectureModel.");
