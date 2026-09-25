@@ -40,10 +40,10 @@ public sealed class ManagedOutputManagerTests
         using TempDirectory temp = new();
         string output = Path.Combine(temp.Path, "out");
         LikeC4GeneratedFile[] files = [new("model.c4", "model { }\n")];
-        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
-        await ManagedOutputManager.CommitAsync(output, "1.0", files, first);
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(output, "1.0", files, first, TestContext.Current.CancellationToken);
 
-        GenerationPlan second = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
+        GenerationPlan second = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
 
         Assert.False(second.HasChanges);
         Assert.False(second.HasConflicts);
@@ -56,23 +56,23 @@ public sealed class ManagedOutputManagerTests
         using TempDirectory temp = new();
         string output = Path.Combine(temp.Path, "out");
         LikeC4GeneratedFile[] files = [new("model.c4", "model { }\n")];
-        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
-        await ManagedOutputManager.CommitAsync(output, "1.0", files, first);
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(output, "1.0", files, first, TestContext.Current.CancellationToken);
 
         string target = Path.Combine(output, "model.c4");
-        await File.AppendAllTextAsync(target, "// human");
-        GenerationPlan edited = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
+        await File.AppendAllTextAsync(target, "// human", TestContext.Current.CancellationToken);
+        GenerationPlan edited = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
         Assert.True(edited.HasConflicts);
         Assert.Equal(GeneratedFileChangeKind.Conflict, Assert.Single(edited.Changes).Kind);
-        Assert.EndsWith("// human", await File.ReadAllTextAsync(target), StringComparison.Ordinal);
+        Assert.EndsWith("// human", await File.ReadAllTextAsync(target, TestContext.Current.CancellationToken), StringComparison.Ordinal);
 
         string unmanagedOutput = Path.Combine(temp.Path, "unmanaged");
         Directory.CreateDirectory(unmanagedOutput);
         string unmanaged = Path.Combine(unmanagedOutput, "model.c4");
-        await File.WriteAllTextAsync(unmanaged, "human");
-        GenerationPlan unmanagedPlan = await ManagedOutputManager.PreviewAsync(unmanagedOutput, "1.0", files);
+        await File.WriteAllTextAsync(unmanaged, "human", TestContext.Current.CancellationToken);
+        GenerationPlan unmanagedPlan = await ManagedOutputManager.PreviewAsync(unmanagedOutput, "1.0", files, TestContext.Current.CancellationToken);
         Assert.True(unmanagedPlan.HasConflicts);
-        Assert.Equal("human", await File.ReadAllTextAsync(unmanaged));
+        Assert.Equal("human", await File.ReadAllTextAsync(unmanaged, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -81,11 +81,11 @@ public sealed class ManagedOutputManagerTests
         using TempDirectory temp = new();
         string output = Path.Combine(temp.Path, "out");
         LikeC4GeneratedFile[] files = [new("model.c4", "model { }\n")];
-        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
-        await ManagedOutputManager.CommitAsync(output, "1.0", files, first);
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(output, "1.0", files, first, TestContext.Current.CancellationToken);
         File.Delete(Path.Combine(output, "model.c4"));
 
-        GenerationPlan plan = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
+        GenerationPlan plan = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
 
         Assert.True(plan.HasConflicts);
     }
@@ -110,12 +110,12 @@ public sealed class ManagedOutputManagerTests
         using TempDirectory temp = new();
         string output = Path.Combine(temp.Path, "out");
         LikeC4GeneratedFile[] files = [new("model.c4", "old")];
-        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files);
-        await ManagedOutputManager.CommitAsync(output, "1.0", files, first);
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(output, "1.0", files, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(output, "1.0", files, first, TestContext.Current.CancellationToken);
 
         string manifest = Path.Combine(output, ManagedOutputManager.ManifestFileName);
-        string manifestBefore = await File.ReadAllTextAsync(manifest);
-        await File.WriteAllTextAsync(Path.Combine(output, "model.c4"), "manual");
+        string manifestBefore = await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(output, "model.c4"), "manual", TestContext.Current.CancellationToken);
         LikeC4GeneratedFile[] changed = [new("model.c4", "new")];
         GenerationPlan conflict = await ManagedOutputManager.PreviewAsync(output, "1.0", changed);
 
@@ -127,13 +127,16 @@ public sealed class ManagedOutputManagerTests
                 conflict,
                 TestContext.Current.CancellationToken));
 
-        Assert.Equal("manual", await File.ReadAllTextAsync(Path.Combine(output, "model.c4")));
-        Assert.Equal(manifestBefore, await File.ReadAllTextAsync(manifest));
+        Assert.Equal("manual", await File.ReadAllTextAsync(Path.Combine(output, "model.c4"), TestContext.Current.CancellationToken));
+        Assert.Equal(manifestBefore, await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken));
     }
 
     private sealed class TempDirectory : IDisposable
     {
-        public TempDirectory() => Path = Directory.CreateTempSubdirectory("repo2c4-managed-output-").FullName;
+        public TempDirectory()
+        {
+            Path = Directory.CreateTempSubdirectory("repo2c4-managed-output-").FullName;
+        }
 
         public string Path { get; }
 
