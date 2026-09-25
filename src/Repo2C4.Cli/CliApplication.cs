@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.C3;
 using Repo2C4.Core.Inspection;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
@@ -144,7 +145,7 @@ internal static class CliApplication
     {
         if (!TryParseOptions(
             args,
-            ["--model", "--output"],
+            ["--model", "--output", "--c3-container"],
             ["--overwrite"],
             out Dictionary<string, string> values,
             out HashSet<string> flags,
@@ -179,7 +180,13 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
-            IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.Emit(model);
+            List<LikeC4GeneratedFile> files = [.. LikeC4Emitter.Emit(model)];
+            if (values.TryGetValue("--c3-container", out string? selectedContainer))
+            {
+                ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, selectedContainer);
+                files.AddRange(LikeC4Emitter.EmitC3(c3));
+            }
+
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
 
             string outputRoot = Path.GetFullPath(outputPath);
@@ -429,7 +436,7 @@ internal static class CliApplication
                 return CliExitCodes.Success;
             case "generate":
                 output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--overwrite]");
-                output.WriteLine("Generates specification.c4, model.c4, views.c4 and evidence-report.md from a reviewed v1 model.");
+                output.WriteLine("Generates C1/C2 outputs and evidence-report.md; --c3-container ID additionally emits a selected C3 view.");
                 return CliExitCodes.Success;
             case "validate":
                 output.WriteLine("Usage: repo2c4 validate --output DIR");
