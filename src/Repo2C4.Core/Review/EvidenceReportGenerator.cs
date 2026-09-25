@@ -49,7 +49,13 @@ public static class EvidenceReportGenerator
                 element.ReviewReason,
                 evidenceById);
             (element.Status == ReviewStatus.Confirmed ? confirmed : review).Add(line);
-            CollectMissingOrigins(element.EvidenceIds, evidenceById, inventoriedPaths, missingOrigins);
+            CollectMissingOrigins(
+                "Element",
+                element.Id,
+                element.EvidenceIds,
+                evidenceById,
+                inventoriedPaths,
+                missingOrigins);
         }
 
         foreach (ArchitectureRelation relation in model.Relations.OrderBy(item => item.Id, StringComparer.Ordinal))
@@ -62,7 +68,13 @@ public static class EvidenceReportGenerator
                 relation.ReviewReason,
                 evidenceById);
             (relation.Status == ReviewStatus.Confirmed ? confirmed : review).Add(line);
-            CollectMissingOrigins(relation.EvidenceIds, evidenceById, inventoriedPaths, missingOrigins);
+            CollectMissingOrigins(
+                "Relation",
+                relation.Id,
+                relation.EvidenceIds,
+                evidenceById,
+                inventoriedPaths,
+                missingOrigins);
         }
 
         RepositoryDiagnostic[] warnings =
@@ -95,116 +107,8 @@ public static class EvidenceReportGenerator
                 missingOrigins.Count));
     }
 
-    private static ImmutableArray<ContractError> ValidateReportModel(ArchitectureModel model)
-    {
-        List<ContractError> errors = [];
-
-        if (model.SchemaVersion != ContractSchema.Version)
-        {
-            errors.Add(new ContractError(
-                "schema.unsupported",
-                "$.schemaVersion",
-                "Only schema version " + ContractSchema.Version + " is supported."));
-        }
-
-        if (!Enum.IsDefined(model.Level))
-        {
-            errors.Add(new ContractError("level.invalid", "$.level", "Level must be C1 or C2."));
-        }
-
-        errors.AddRange(ContractValidator.ValidateSnapshot(model.Snapshot));
-
-        if (model.Elements.IsDefault || model.Relations.IsDefault)
-        {
-            errors.Add(new ContractError(
-                "collection.missing",
-                "$",
-                "Elements and relations must be initialized collections."));
-            return [.. errors];
-        }
-
-        HashSet<string> elementIds = new(StringComparer.Ordinal);
-        for (int index = 0; index < model.Elements.Length; index++)
-        {
-            ArchitectureElement? element = model.Elements[index];
-            string path = "$.elements[" + index + "]";
-            if (element is null)
-            {
-                errors.Add(new ContractError("element.missing", path, "Element must not be null."));
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(element.Id) || !elementIds.Add(element.Id))
-            {
-                errors.Add(new ContractError("id.invalid", path + ".id", "Element ID must be present and unique."));
-            }
-
-            if (!Enum.IsDefined(element.Kind))
-            {
-                errors.Add(new ContractError("kind.invalid", path + ".kind", "Unknown architectural element kind."));
-            }
-
-            if (!Enum.IsDefined(element.Status))
-            {
-                errors.Add(new ContractError("review.status", path + ".status", "Unknown review status."));
-            }
-
-            if (element.Status == ReviewStatus.RequiresReview && string.IsNullOrWhiteSpace(element.ReviewReason))
-            {
-                errors.Add(new ContractError(
-                    "review.reason",
-                    path + ".reviewReason",
-                    "An inference requiring review must explain why."));
-            }
-
-            if (model.Level == ArchitectureLevel.C1 && element.Kind == ArchitectureElementKind.Container)
-            {
-                errors.Add(new ContractError("level.container", path + ".kind", "Containers belong to C2, not C1."));
-            }
-        }
-
-        for (int index = 0; index < model.Relations.Length; index++)
-        {
-            ArchitectureRelation? relation = model.Relations[index];
-            string path = "$.relations[" + index + "]";
-            if (relation is null)
-            {
-                errors.Add(new ContractError("relation.missing", path, "Relation must not be null."));
-                continue;
-            }
-
-            if (!elementIds.Contains(relation.SourceId))
-            {
-                errors.Add(new ContractError(
-                    "relation.sourceMissing",
-                    path + ".sourceId",
-                    "Relation source must be an existing element."));
-            }
-
-            if (!elementIds.Contains(relation.DestinationId))
-            {
-                errors.Add(new ContractError(
-                    "relation.destinationMissing",
-                    path + ".destinationId",
-                    "Relation destination must be an existing element."));
-            }
-
-            if (!Enum.IsDefined(relation.Status))
-            {
-                errors.Add(new ContractError("review.status", path + ".status", "Unknown review status."));
-            }
-
-            if (relation.Status == ReviewStatus.RequiresReview && string.IsNullOrWhiteSpace(relation.ReviewReason))
-            {
-                errors.Add(new ContractError(
-                    "review.reason",
-                    path + ".reviewReason",
-                    "An inference requiring review must explain why."));
-            }
-        }
-
-        return [.. errors];
-    }
+    private static ImmutableArray<ContractError> ValidateReportModel(ArchitectureModel model) =>
+        ContractValidator.ValidateModel(model);
 
     private static void AppendSection(StringBuilder builder, string title, List<string> items, string emptyMessage)
     {
@@ -304,16 +208,26 @@ public static class EvidenceReportGenerator
     }
 
     private static void CollectMissingOrigins(
+        string assertionKind,
+        string assertionId,
         IEnumerable<string> evidenceIds,
         Dictionary<string, Evidence> evidenceById,
         HashSet<string> inventoriedPaths,
         HashSet<string> missingOrigins)
     {
-        foreach (string id in evidenceIds.Distinct(StringComparer.Ordinal))
+        string[] ids = [.. evidenceIds.Distinct(StringComparer.Ordinal)];
+        if (ids.Length == 0)
+        {
+            missingOrigins.Add(
+                assertionKind + " " + Code(assertionId) +
+                ": no supporting evidence is referenced; review is required.");
+            return;
+        }
+
+        foreach (string id in ids)
         {
             if (!evidenceById.TryGetValue(id, out Evidence? evidence))
             {
-                missingOrigins.Add(Code(id) + ": referenced evidence is not present in the snapshot.");
                 continue;
             }
 
