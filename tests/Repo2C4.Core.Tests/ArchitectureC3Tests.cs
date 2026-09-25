@@ -76,7 +76,10 @@ public sealed class ArchitectureC3Tests
         ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
         ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_web");
 
-        ArchitectureC3Model invalidSchema = c3 with { SchemaVersion = "9.0" };
+        ArchitectureC3Model invalidSchema = c3 with
+        {
+            SchemaVersion = "9.0",
+        };
         Assert.Contains(
             ArchitectureC3Validator.Validate(invalidSchema),
             item => item.Code == "schema.unsupported");
