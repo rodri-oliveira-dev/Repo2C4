@@ -249,9 +249,10 @@ public sealed class McpLikeC4ToolsTests
             CreateModel(snapshot),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal("evidence-report.md", result.FileName);
-        Assert.Contains("Hypotheses requiring review", result.Content, StringComparison.Ordinal);
+        Assert.Equal("evidence-report.md", result.ReportFileName);
         Assert.Equal(1, result.ReviewRequiredAssertions);
+        Assert.Contains("el_system", result.ReviewRequiredIds);
+        Assert.Empty(result.WarningCodes);
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
     }
 
