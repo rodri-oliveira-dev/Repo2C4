@@ -6,12 +6,12 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 
 | Project | Responsibility |
 | --- | --- |
-| `src/Repo2C4.Core` | Reusable contracts and inspection logic (upcoming foundation issues). |
+| `src/Repo2C4.Core` | Versioned evidence contracts and bounded local metadata inventory; fact extraction follows in issue #8. |
 | `src/Repo2C4.Cli` | Offline CLI host; feature commands are not yet implemented. |
 | `src/Repo2C4.Mcp` | Stdio-safe MCP host scaffold; protocol transport arrives in phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. There is no repository inspection, AI provider, renderer or live MCP protocol at this stage.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core includes a bounded local file inventory. Architectural fact extraction, AI providers, rendering and a live MCP protocol are not yet implemented.
 
 ## Prerequisites and verification
 
@@ -27,6 +27,16 @@ dotnet test Repo2C4.slnx --configuration Release --no-build --coverlet --coverle
 ```
 
 The baseline retains Central Package Management, committed SDK-generated package locks, analyzers, nullable checks, deterministic builds, warnings as errors and NuGet auditing.
+
+## Bounded local inventory (issue #7)
+
+`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. CLI and MCP scanning commands remain unimplemented in this phase.
+
+Default exclusions include `.git`, `bin`, `obj`, `node_modules`, `artifacts` and other generated directories, `.env*`, `appsettings.*`, credentials, keys and names indicative of secrets. Only known text-oriented extensions are considered. A bounded 4 KiB prefix probe rejects files with NUL bytes. Caller-supplied `IncludePatterns` and `ExcludePatterns` accept bounded relative globs (`*`, `?`, `**`), without overriding mandatory safety exclusions.
+
+Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total accepted file sizes** and **20,000 visited filesystem entries**. Adjust `MaxFiles`, `MaxBytesPerFile`, `MaxTotalBytes` and `MaxVisitedEntries` explicitly to fit the authorized checkout. The returned `RepositorySnapshot` includes only file-relative paths, sizes and bounded diagnostics, never source bodies or raw secrets. `sha256` is null because whole-file hashes are not computed. `scan.*` diagnostics give observed omission counts for excluded, inaccessible, binary and oversized files or limit exhaustion. When the entry budget stops enumeration, `scan.entryLimit` warns that unvisited entries were not counted and omission totals are **lower bounds**. Cancellation throws `OperationCanceledException`, never returning a partial result as a successful snapshot. Two scans of an unchanged repository yield the same `ContractJson.SerializeSnapshot` output.
+
+**Security boundary:** the caller must authorize the root and run against a trusted, stable, preferably read-only checkout with least-privilege permissions. Managed pre/post-open link checks cannot guarantee atomic no-follow semantics during concurrent, malicious filesystem changes. Future readers of snapshot paths must revalidate containment, permissions, links and byte limits at the actual point of use. A nominally safe text file can still contain secrets. Before any future provider sends content or metadata off-machine, obtain explicit user consent and apply appropriate secret redaction. This phase sends nothing to an AI provider.
 
 ## Entry point smoke tests
 

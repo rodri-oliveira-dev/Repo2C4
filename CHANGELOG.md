@@ -7,6 +7,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ### Added
 - Multi-project foundation with isolated Core, CLI and MCP hosts and corresponding test projects.
 - Explicit CLI/MCP startup behavior, MCP stdout isolation and CI smoke tests.
+- Bounded local repository scanner with normalized relative paths, mandatory sensitive-file exclusions, symlink rejection, file/byte/entry budgets, cancellation and counted omission diagnostics.
 
 ### Changed
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.
