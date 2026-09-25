@@ -156,7 +156,7 @@ public sealed class CliHostTests
 
         Assert.Equal(
             CliExitCodes.Success,
-            Run(["generate", "--model", model, "--output", outputDirectory]));
+            Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]));
         Assert.Equal(
             CliExitCodes.Success,
             Run(["validate", "--output", outputDirectory]));
