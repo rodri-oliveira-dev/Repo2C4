@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Explicit-consent OpenAI Responses API inference adapter with caller-selected model, environment-only credentials, bounded sanitized upload, safe cloud HTTP diagnostics, fake-transport tests and bilingual cost/privacy documentation; Core and MCP remain provider-independent.
 - Optional, local-only `infer` CLI command backed by a configurable Ollama model, sanitized and bounded evidence projection, mandatory human-review status, structured v1 candidate validation, guarded candidate file creation, fake-HTTP tests and bilingual walkthroughs.
 - Multi-project foundation with isolated Core, CLI and MCP hosts and corresponding test projects.
 - Explicit CLI/MCP startup behavior, MCP stdout isolation and CI smoke tests.
