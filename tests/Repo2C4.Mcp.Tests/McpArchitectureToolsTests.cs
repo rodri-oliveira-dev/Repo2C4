@@ -23,6 +23,23 @@ public sealed class McpArchitectureToolsTests
         Assert.NotEqual(firstResult.RepositoryId, secondResult.RepositoryId);
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void RepositoryIdentityPathNormalizationRespectsCaseSensitivity(
+        bool caseInsensitive,
+        bool expectedEqual)
+    {
+        string first = McpArchitectureTools.NormalizeRepositoryIdentityPath(
+            "a/App",
+            caseInsensitive);
+        string second = McpArchitectureTools.NormalizeRepositoryIdentityPath(
+            "A/app",
+            caseInsensitive);
+
+        Assert.Equal(expectedEqual, string.Equals(first, second, StringComparison.Ordinal));
+    }
+
     private static string CreateRepository(string root, string parent, string name)
     {
         string path = Path.Combine(root, parent, name);
