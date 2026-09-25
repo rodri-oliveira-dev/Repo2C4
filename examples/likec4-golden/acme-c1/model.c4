@@ -1,0 +1,28 @@
+model {
+  el_acme = softwareSystem "Acme system" {
+    #requires-review
+    metadata {
+      architectureId "el_acme"
+      evidenceIds ["ev_solution_web", "ev_solution_worker"]
+      reviewStatus "requiresReview"
+      reviewReason "Selecting one focal software system from repository structure is an architectural decision."
+    }
+  }
+  el_billing = softwareSystem "Billing system" {
+    #requires-review
+    metadata {
+      architectureId "el_billing"
+      reviewStatus "requiresReview"
+      reviewReason "External system is a review-only proposal; no repository evidence identifies it."
+    }
+  }
+
+  el_acme -> el_billing "Uses billing capabilities" {
+    #requires-review
+    metadata {
+      architectureId "rel_acme_billing"
+      reviewStatus "requiresReview"
+      reviewReason "No repository evidence confirms a runtime relation or protocol."
+    }
+  }
+}

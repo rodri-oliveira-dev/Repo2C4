@@ -1,0 +1,82 @@
+model {
+  el_acme = softwareSystem "Acme system" {
+    #requires-review
+    metadata {
+      architectureId "el_acme"
+      evidenceIds ["ev_solution_web", "ev_solution_worker"]
+      reviewStatus "requiresReview"
+      reviewReason "Selecting one focal software system from repository structure is an architectural decision."
+    }
+
+    el_postgresql = container "PostgreSQL" {
+      #requires-review
+      metadata {
+        architectureId "el_postgresql"
+        evidenceIds ["ev_postgresql_candidate"]
+        reviewStatus "requiresReview"
+        reviewReason "A package reference is only a PostgreSQL integration candidate and does not prove an owned or deployed database container."
+      }
+    }
+    el_rabbitmq = container "RabbitMQ" {
+      #requires-review
+      metadata {
+        architectureId "el_rabbitmq"
+        evidenceIds ["ev_rabbitmq_candidate"]
+        reviewStatus "requiresReview"
+        reviewReason "A package reference is only a RabbitMQ integration candidate and does not prove an owned or deployed broker container."
+      }
+    }
+    el_web = container "Web API" {
+      #requires-review
+      metadata {
+        architectureId "el_web"
+        evidenceIds ["ev_web_http_project", "ev_web_http_source", "ev_web_kind", "ev_web_project"]
+        reviewStatus "requiresReview"
+        reviewReason "Executable and HTTP signals make Web a container candidate; the deployment boundary must be confirmed."
+      }
+    }
+    el_worker = container "Worker" {
+      #requires-review
+      metadata {
+        architectureId "el_worker"
+        evidenceIds ["ev_worker_host_project", "ev_worker_host_source", "ev_worker_kind", "ev_worker_project"]
+        reviewStatus "requiresReview"
+        reviewReason "Executable and worker-host signals make Worker a container candidate; the deployment boundary must be confirmed."
+      }
+    }
+  }
+  el_billing = softwareSystem "Billing system" {
+    #requires-review
+    metadata {
+      architectureId "el_billing"
+      reviewStatus "requiresReview"
+      reviewReason "External system is a review-only proposal; no repository evidence identifies it."
+    }
+  }
+
+  el_acme.el_web -> el_billing "Uses billing capabilities" {
+    #requires-review
+    metadata {
+      architectureId "rel_web_billing"
+      reviewStatus "requiresReview"
+      reviewReason "No repository evidence confirms a runtime relation or protocol."
+    }
+  }
+  el_acme.el_web -> el_acme.el_postgresql "Reads and writes application data" {
+    #requires-review
+    metadata {
+      architectureId "rel_web_postgresql"
+      evidenceIds ["ev_postgresql_candidate"]
+      reviewStatus "requiresReview"
+      reviewReason "Package presence does not prove runtime database communication."
+    }
+  }
+  el_acme.el_worker -> el_acme.el_rabbitmq "Publishes background messages" {
+    #requires-review
+    metadata {
+      architectureId "rel_worker_rabbitmq"
+      reviewStatus "requiresReview"
+      reviewReason "No repository evidence links Worker to RabbitMQ; the relationship remains a review-only hypothesis."
+    }
+  }
+}

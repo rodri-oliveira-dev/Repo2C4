@@ -6,8 +6,8 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 
 | Project | Responsibility |
 | --- | --- |
-| `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory and evidence-backed .NET declaration extraction. |
-| `src/Repo2C4.Cli` | Offline CLI host; feature commands are not yet implemented. |
+| `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
+| `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate` commands; no AI calls or automatic architecture inference. |
 | `src/Repo2C4.Mcp` | Stdio-safe MCP host scaffold; protocol transport arrives in phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
@@ -30,7 +30,7 @@ The baseline retains Central Package Management, committed SDK-generated package
 
 ## Bounded local inventory (issue #7)
 
-`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. CLI and MCP scanning commands remain unimplemented in this phase.
+`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. The offline CLI exposes this capability through `inspect`; MCP scanning remains unimplemented until a later phase.
 
 Default exclusions include `.git`, `bin`, `obj`, `node_modules`, `artifacts` and other generated directories, `.env*`, `appsettings.*`, credentials, keys and names indicative of secrets. Only known text-oriented extensions are considered. A bounded 4 KiB prefix probe rejects files with NUL bytes. Caller-supplied `IncludePatterns` and `ExcludePatterns` accept bounded relative globs (`*`, `?`, `**`), without overriding mandatory safety exclusions.
 
@@ -42,9 +42,46 @@ Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total
 
 `RepositoryFactExtractor.Extract(options, cancellationToken)` inventories an explicitly authorized local checkout with `RepositoryScanner`, then inspects only accepted .NET solution, project and source files to populate `RepositorySnapshot.Evidence`. It recognizes .sln/.slnx project listings, declared executable/library/test characteristics, target frameworks, build-time `ProjectReference`, HTTP/worker host signals, Npgsql/RabbitMQ/Redis integration **candidates**, and Docker/compose manifest presence. Facts retain relative file paths and lines where available. A build-time project dependency is not a runtime relationship; an SDK, package or source signal is not proof of a deployed C4 container or a live network connection.
 
-Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted. The CLI `inspect` command and MCP transport are not yet implemented.
+Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted by inspection. The CLI exposes this path through `inspect`; MCP transport remains unimplemented.
 
 See [fixtures, v1 snapshot and reproduction](examples/README.md) and [evidence categories](docs/contracts.md).
+
+## Deterministic LikeC4 emission (issue #10)
+
+`LikeC4Emitter.Emit(model)` converts a validated `ArchitectureModel` into `specification.c4`, `model.c4` and `views.c4` entirely in memory. Generation is deterministic, emits LF line endings, preserves C1/C2 containment and keeps `requiresReview` visible in LikeC4 tags/metadata rather than promoting hypotheses to confirmed architecture.
+
+LikeC4 local identifiers are derived from v1 architecture IDs by replacing `.` with `_`; collisions in the same LikeC4 scope are rejected instead of receiving arbitrary suffixes. Names, relation descriptions and review reasons are quoted/escaped so DSL-looking text cannot introduce new statements. The emitter performs no repository I/O, process execution, AI/network calls or PR operations.
+
+See [deterministic LikeC4 generation](docs/likec4-generation.md) and the checked-in golden files under `examples/likec4-golden/`.
+
+## Official LikeC4 validation (issue #11)
+
+`LikeC4CliValidator.ValidateAsync(workspace)` invokes only the official `likec4 validate` command in the selected workspace. It returns a structured result for success, validation failure, timeout, missing workspace or unavailable CLI, without returning raw LikeC4 stdout/stderr or source lines.
+
+Runtime code does **not** install Node.js or LikeC4. The CI integration baseline explicitly pins Node.js `22.23.3` and `likec4@1.59.4`, then validates the generated C1/C2 golden workspaces plus controlled syntax/reference failures. Ordinary Core tests still require only .NET and no network.
+
+See [LikeC4 CLI validation](docs/likec4-validation.md) for installation, command, exit codes, diagnostic safety and integration-test boundaries.
+
+## Offline CLI workflow (issue #12)
+
+The Phase 2 CLI now provides the complete local flow:
+
+```bash
+dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll inspect \
+  --repository examples/fixtures/library-only \
+  --output artifacts/snapshot.v1.json
+
+dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll generate \
+  --model examples/end-to-end/architecture.c2.v1.json \
+  --output artifacts/likec4
+
+dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
+  --output artifacts/likec4
+```
+
+`inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Existing LikeC4 files are not replaced unless `--overwrite` is supplied.
+
+Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
 ## Entry point smoke tests
 
@@ -57,8 +94,8 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 ## CI and distribution
 
-`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage and smoke tests. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
+`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration and the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`). CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
 **Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
 
-See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). All foundation issues #5–#8 share branch `phase/01-foundation`, and a single PR is opened only when the phase is complete.
+See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 2 issues #9–#12 share `phase/02-likec4-offline` and are delivered in one pull request after the complete offline flow is validated.

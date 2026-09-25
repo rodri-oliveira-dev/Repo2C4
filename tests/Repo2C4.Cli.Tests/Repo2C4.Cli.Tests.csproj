@@ -20,4 +20,12 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Repo2C4.Cli/Repo2C4.Cli.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../examples/fixtures/library-only/**"
+          Link="Fixtures/library-only/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/end-to-end/*.json"
+          Link="EndToEnd/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

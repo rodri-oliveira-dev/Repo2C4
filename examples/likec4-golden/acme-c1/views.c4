@@ -1,0 +1,7 @@
+views {
+  view c1 {
+    title "C1 - System Context"
+    include el_acme
+    include el_billing
+  }
+}

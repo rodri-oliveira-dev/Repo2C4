@@ -1,0 +1,12 @@
+specification {
+  element actor {
+    style {
+      shape person
+    }
+  }
+  element softwareSystem
+  element container
+  tag requires-review {
+    color amber
+  }
+}
