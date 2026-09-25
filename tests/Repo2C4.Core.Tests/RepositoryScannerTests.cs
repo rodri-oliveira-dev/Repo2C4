@@ -262,7 +262,7 @@ public sealed class RepositoryScannerTests
         }));
     }
 
-    private RepositorySnapshot Scan(RepositoryScanOptions options) =>
+    private static RepositorySnapshot Scan(RepositoryScanOptions options) =>
         RepositoryScanner.Scan(options, TestContext.Current.CancellationToken);
 
     private sealed class TemporaryRepository : IDisposable
