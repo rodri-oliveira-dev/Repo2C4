@@ -337,19 +337,27 @@ internal sealed class McpLikeC4Tools
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string target = ResolveGeneratedTarget(outputRoot, file.FileName);
-                await using FileStream stream = new(
+                FileStream stream = new(
                     target,
                     FileMode.CreateNew,
                     FileAccess.Write,
                     FileShare.None,
                     4096,
                     useAsync: true);
-                createdFiles.Add(target);
-                await using StreamWriter writer = new(
-                    stream,
-                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-                await writer.WriteAsync(file.Content.AsMemory(), cancellationToken).ConfigureAwait(false);
-                await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+                await using (stream.ConfigureAwait(false))
+                {
+                    createdFiles.Add(target);
+                    StreamWriter writer = new(
+                        stream,
+                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                        bufferSize: 1_024,
+                        leaveOpen: true);
+                    await using (writer.ConfigureAwait(false))
+                    {
+                        await writer.WriteAsync(file.Content.AsMemory(), cancellationToken).ConfigureAwait(false);
+                        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
         }
         catch (McpException)
