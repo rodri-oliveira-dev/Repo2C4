@@ -136,7 +136,11 @@ public sealed class ManagedOutputManagerTests
             await File.ReadAllTextAsync(
                 Path.Combine(output, "model.c4"),
                 TestContext.Current.CancellationToken));
-        Assert.Equal(manifestBefore, await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken));
+        Assert.Equal(
+            manifestBefore,
+            await File.ReadAllTextAsync(
+                manifest,
+                TestContext.Current.CancellationToken));
     }
 
     private sealed class TempDirectory : IDisposable
