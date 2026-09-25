@@ -125,6 +125,39 @@ public sealed class ArchitectureC3Tests
             item => item.Code == "c3.componentLimit");
     }
 
+    [Fact]
+    public void MalformedBaseAndRelationIdsReturnValidationErrors()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+        ArchitectureC3Model valid = ArchitectureC3Builder.Build(c2, "el_web");
+        ArchitectureC3Model invalidBase = valid with
+        {
+            BaseModel = c2 with { Elements = default },
+        };
+
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(invalidBase),
+            error => error.Path.StartsWith("$.baseModel", StringComparison.Ordinal));
+
+        ArchitectureC3Model missingContainer = valid with { SelectedContainerId = null! };
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(missingContainer),
+            error => error.Code == "c3.containerMissing");
+
+        ArchitectureComponentRelation invalidRelation = new(
+            "rel_invalid",
+            null!,
+            null!,
+            "Invalid endpoints",
+            [],
+            ReviewStatus.RequiresReview,
+            "Missing endpoint IDs.");
+        ArchitectureC3Model invalidIds = valid with { Relations = [invalidRelation] };
+        IReadOnlyList<ContractError> errors = ArchitectureC3Validator.Validate(invalidIds);
+        Assert.Contains(errors, error => error.Code == "relation.sourceMissing");
+        Assert.Contains(errors, error => error.Code == "relation.destinationMissing");
+    }
+
     private static ArchitectureModel LoadModel(string fileName)
     {
         string path = Path.Combine(AppContext.BaseDirectory, "MappingFixtures", fileName);
