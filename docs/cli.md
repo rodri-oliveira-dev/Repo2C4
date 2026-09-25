@@ -24,17 +24,20 @@ repo2c4 generate --model architecture.json --output DIR
 
 The input must be a valid v1 `ArchitectureModel` that was proposed or reviewed by a human. The command does not infer a C4 model from the snapshot.
 
-Exactly three files are produced inside the selected directory:
+Four files are produced inside the selected directory:
 
 - `specification.c4`
 - `model.c4`
 - `views.c4`
+- `evidence-report.md`
 
-Existing generated files are not replaced by default. To replace the three fixed outputs explicitly:
+Existing generated files are not replaced by default. To replace the four fixed outputs explicitly:
 
 ```bash
 repo2c4 generate --model architecture.json --output DIR --overwrite
 ```
+
+`evidence-report.md` maps model assertions to evidence IDs and repository-relative locations, lists hypotheses, scan warnings and missing origins, and omits source bodies and sensitive values. See [evidence report and architectural review](evidence-report.md).
 
 The output directory and any existing target file must not be a symlink, junction or reparse point. Generated filenames are fixed by Repo2C4 and cannot be supplied by model content.
 
