@@ -1,0 +1,212 @@
+name: Agent governance validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'AGENTS.md'
+      - '.agents/**'
+      - '.validation/validate-agent-sources.py'
+      - '.template.config/template.json'
+      - '.github/workflows/agent-governance-validation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'AGENTS.md'
+      - '.agents/**'
+      - '.validation/validate-agent-sources.py'
+      - '.template.config/template.json'
+      - '.github/workflows/agent-governance-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-agent-baseline:
+    name: Validate agent baseline and generated template
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Configure .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate agent governance source files
+        shell: bash
+        run: |
+          required=(
+            "AGENTS.md"
+            ".agents/SOURCES.md"
+            ".agents/THIRD-PARTY-NOTICES.md"
+            ".validation/validate-agent-sources.py"
+            ".agents/skills/dotnet-issue-implementation/SKILL.md"
+            ".agents/skills/dotnet-bug-investigation/SKILL.md"
+            ".agents/skills/dotnet-pr-review/SKILL.md"
+            ".agents/skills/dotnet-security-review/SKILL.md"
+            ".agents/skills/dotnet-library-change/SKILL.md"
+            ".agents/skills/dotnet-refactoring-engineer/SKILL.md"
+            ".agents/skills/coverage-analysis/SKILL.md"
+            ".agents/skills/test-gap-analysis/SKILL.md"
+            ".agents/skills/test-anti-patterns/SKILL.md"
+            ".agents/skills/microbenchmarking/SKILL.md"
+            ".agents/skills/ci-release-governance/SKILL.md"
+            ".agents/skills/authoring-github-workflows/SKILL.md"
+            ".agents/skills/nuget-trusted-publishing/SKILL.md"
+            ".agents/skills/directory-build-organization/SKILL.md"
+            ".agents/skills/binlog-failure-analysis/SKILL.md"
+          )
+
+          references=(
+            ".agents/skills/nuget-trusted-publishing/references/package-types.md"
+            ".agents/skills/nuget-trusted-publishing/references/publish-workflow.md"
+            ".agents/skills/test-gap-analysis/references/mutation-catalog.md"
+            ".agents/skills/microbenchmarking/references/bdn-internals-and-tuning.md"
+            ".agents/skills/microbenchmarking/references/comparison-strategies.md"
+            ".agents/skills/microbenchmarking/references/diagnosers-and-exporters.md"
+            ".agents/skills/microbenchmarking/references/project-setup-and-running.md"
+            ".agents/skills/microbenchmarking/references/writing-benchmarks.md"
+            ".agents/skills/directory-build-organization/references/common-patterns.md"
+            ".agents/skills/directory-build-organization/references/multi-level-examples.md"
+            ".agents/skills/directory-build-organization/references/targetframework-props-pitfall.md"
+          )
+
+          for file in "${required[@]}" "${references[@]}"; do
+            if [ ! -s "$file" ]; then
+              echo "Required agent governance file is missing or empty: $file"
+              exit 1
+            fi
+          done
+
+          grep -Fq '## Gerenciamento de contexto' AGENTS.md
+          grep -Fq '350 linhas' AGENTS.md
+          grep -Fq '## Roteamento de tarefas e delegação' AGENTS.md
+          grep -Fq 'Validação determinística prevalece' AGENTS.md
+          grep -Fq 'dotnet-issue-implementation' AGENTS.md
+          grep -Fq 'dotnet-bug-investigation' AGENTS.md
+          grep -Fq 'dotnet-pr-review' AGENTS.md
+          grep -Fq 'dotnet-security-review' AGENTS.md
+          grep -Fq 'coverage-analysis' AGENTS.md
+          grep -Fq 'test-gap-analysis' AGENTS.md
+          grep -Fq 'microbenchmarking' AGENTS.md
+          grep -Fq 'ci-release-governance' AGENTS.md
+          grep -Fq 'authoring-github-workflows' AGENTS.md
+          grep -Fq 'nuget-trusted-publishing' AGENTS.md
+          grep -Fq 'directory-build-organization' AGENTS.md
+          grep -Fq 'binlog-failure-analysis' AGENTS.md
+          grep -Fq 'dotnet restore --locked-mode' AGENTS.md
+          grep -Fq 'dotnet build --configuration Release --no-restore' AGENTS.md
+          grep -Fq 'dotnet test --configuration Release --no-build' AGENTS.md
+          grep -Fq '.agents/SOURCES.md' AGENTS.md
+
+          python .validation/validate-agent-sources.py .
+
+          for file in "${required[@]:4}"; do
+            head -n 1 "$file" | grep -Fxq -- '---'
+            grep -Eq '^name: [a-z0-9-]+$' "$file"
+            grep -Fq 'description:' "$file"
+            grep -Fq 'license: MIT' "$file"
+          done
+
+      - name: Validate GitHub Actions syntax with actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTIONLINT_VERSION='1.7.12'
+          ACTIONLINT_SHA256='8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --proto '=https' \
+            --proto-redir '=https' \
+            --output actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint -shellcheck= -pyflakes= -color .github/workflows/*.yml
+
+      - name: Install template from checkout
+        run: dotnet new install .
+
+      - name: Generate validation library
+        shell: bash
+        run: |
+          generated="$RUNNER_TEMP/generated-agent-template/Validation.AgentLibrary"
+          mkdir -p "$(dirname "$generated")"
+          dotnet new rodri-lib -n Validation.AgentLibrary -o "$generated"
+          echo "GENERATED_ROOT=$generated" >> "$GITHUB_ENV"
+
+      - name: Validate generated agent baseline
+        shell: bash
+        run: |
+          required=(
+            "AGENTS.md"
+            ".agents/SOURCES.md"
+            ".agents/THIRD-PARTY-NOTICES.md"
+            ".agents/skills/dotnet-issue-implementation/SKILL.md"
+            ".agents/skills/dotnet-bug-investigation/SKILL.md"
+            ".agents/skills/dotnet-pr-review/SKILL.md"
+            ".agents/skills/dotnet-security-review/SKILL.md"
+            ".agents/skills/dotnet-library-change/SKILL.md"
+            ".agents/skills/dotnet-refactoring-engineer/SKILL.md"
+            ".agents/skills/coverage-analysis/SKILL.md"
+            ".agents/skills/test-gap-analysis/SKILL.md"
+            ".agents/skills/test-anti-patterns/SKILL.md"
+            ".agents/skills/microbenchmarking/SKILL.md"
+            ".agents/skills/ci-release-governance/SKILL.md"
+            ".agents/skills/authoring-github-workflows/SKILL.md"
+            ".agents/skills/nuget-trusted-publishing/SKILL.md"
+            ".agents/skills/directory-build-organization/SKILL.md"
+            ".agents/skills/binlog-failure-analysis/SKILL.md"
+          )
+
+          references=(
+            ".agents/skills/nuget-trusted-publishing/references/package-types.md"
+            ".agents/skills/nuget-trusted-publishing/references/publish-workflow.md"
+            ".agents/skills/test-gap-analysis/references/mutation-catalog.md"
+            ".agents/skills/microbenchmarking/references/bdn-internals-and-tuning.md"
+            ".agents/skills/microbenchmarking/references/comparison-strategies.md"
+            ".agents/skills/microbenchmarking/references/diagnosers-and-exporters.md"
+            ".agents/skills/microbenchmarking/references/project-setup-and-running.md"
+            ".agents/skills/microbenchmarking/references/writing-benchmarks.md"
+            ".agents/skills/directory-build-organization/references/common-patterns.md"
+            ".agents/skills/directory-build-organization/references/multi-level-examples.md"
+            ".agents/skills/directory-build-organization/references/targetframework-props-pitfall.md"
+          )
+
+          for path in "${required[@]}" "${references[@]}"; do
+            if [ ! -s "$GENERATED_ROOT/$path" ]; then
+              echo "Generated template is missing agent governance file: $path"
+              exit 1
+            fi
+          done
+
+          grep -Fq '## Gerenciamento de contexto' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq '## Roteamento de tarefas e delegação' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'Validação determinística prevalece' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'authoring-github-workflows' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'nuget-trusted-publishing' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'test-gap-analysis' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'microbenchmarking' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'directory-build-organization' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq 'binlog-failure-analysis' "$GENERATED_ROOT/AGENTS.md"
+          grep -Fq '.agents/SOURCES.md' "$GENERATED_ROOT/AGENTS.md"
+
+          python .validation/validate-agent-sources.py "$GENERATED_ROOT"
+
+      - name: Uninstall checkout template
+        if: always()
+        run: dotnet new uninstall . || true

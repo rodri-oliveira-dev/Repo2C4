@@ -1,0 +1,215 @@
+name: SonarQube Cloud
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analisar com SonarQube Cloud
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || format('{0}_{1}', github.repository_owner, github.event.repository.name) }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || github.repository_owner }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+
+    steps:
+      - name: SonarQube Cloud desabilitado
+        if: ${{ env.SONAR_TOKEN == '' }}
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
+            echo "::warning::SONAR_TOKEN não é disponibilizado para pull requests vindos de forks; o Quality Gate do Sonar não foi executado."
+          else
+            echo "SONAR_TOKEN não configurado; análise SonarQube Cloud ignorada."
+          fi
+
+      - name: Checkout
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configurar .NET 10
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validar configuração Sonar
+        if: ${{ env.SONAR_TOKEN != '' }}
+        shell: bash
+        run: |
+          if [ -z "$SONAR_PROJECT_KEY" ]; then
+            echo "SONAR_PROJECT_KEY não pôde ser resolvido. Configure a Repository Variable SONAR_PROJECT_KEY."
+            exit 1
+          fi
+
+          if [ -z "$SONAR_ORGANIZATION" ]; then
+            echo "SONAR_ORGANIZATION não pôde ser resolvida. Configure a Repository Variable SONAR_ORGANIZATION."
+            exit 1
+          fi
+
+          if [ -z "$SONAR_HOST_URL" ]; then
+            echo "SONAR_HOST_URL não pôde ser resolvida. Configure a Repository Variable SONAR_HOST_URL."
+            exit 1
+          fi
+
+          echo "Sonar project key: $SONAR_PROJECT_KEY"
+          echo "Sonar organization: $SONAR_ORGANIZATION"
+          echo "Sonar host: $SONAR_HOST_URL"
+
+      - name: Restaurar ferramentas locais
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: dotnet tool restore
+
+      - name: Restaurar dependências em locked mode
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: dotnet restore Template.Library.slnx --locked-mode
+
+      - name: Resolver versão do projeto para Sonar
+        if: ${{ env.SONAR_TOKEN != '' }}
+        shell: bash
+        run: |
+          project="src/Template.Library/Template.Library.csproj"
+          fallback_version="$(dotnet msbuild "$project" -nologo -getProperty:PackageVersion \
+            | tr -d '\r' \
+            | sed '/^[[:space:]]*$/d' \
+            | tail -n 1)"
+
+          resolution="$(FALLBACK_VERSION="$fallback_version" bash scripts/resolve-sonar-project-version.sh)"
+          version="$(sed -n 's/^version=//p' <<< "$resolution")"
+          version_source="$(sed -n 's/^source=//p' <<< "$resolution")"
+
+          if [ -z "$version" ]; then
+            echo "Versão não pôde ser resolvida para a análise Sonar."
+            exit 1
+          fi
+
+          echo "Sonar project version: $version ($version_source)"
+          echo "SONAR_PROJECT_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Iniciar análise Sonar
+        if: ${{ env.SONAR_TOKEN != '' }}
+        shell: bash
+        run: >-
+          dotnet sonarscanner begin
+          /k:"$SONAR_PROJECT_KEY"
+          /o:"$SONAR_ORGANIZATION"
+          /v:"$SONAR_PROJECT_VERSION"
+          /d:sonar.host.url="$SONAR_HOST_URL"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover*.xml"
+          /d:sonar.exclusions="resources/nuget-icon.png"
+          /d:sonar.coverage.exclusions=".github/scripts/sync-sonar-quality-issues.js,.validation/**"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.timeout=300
+
+      - name: Compilar para análise
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: dotnet build Template.Library.slnx --configuration Release --no-restore --no-incremental
+
+      - name: Executar testes e coletar cobertura OpenCover
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: >-
+          dotnet test Template.Library.slnx
+          --configuration Release
+          --no-build
+          --coverlet
+          --coverlet-output-format opencover
+
+      - name: Finalizar e enviar análise
+        if: ${{ env.SONAR_TOKEN != '' }}
+        shell: bash
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Exibir condições do Quality Gate
+        if: ${{ always() && env.SONAR_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -u
+
+          response_file="$RUNNER_TEMP/sonar-quality-gate.json"
+          curl_args=(
+            --fail-with-body
+            --silent
+            --show-error
+            --user "${SONAR_TOKEN}:"
+            --get
+            "${SONAR_HOST_URL}/api/qualitygates/project_status"
+            --data-urlencode "projectKey=${SONAR_PROJECT_KEY}"
+          )
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            curl_args+=(--data-urlencode "pullRequest=${{ github.event.pull_request.number }}")
+          else
+            curl_args+=(--data-urlencode "branch=${GITHUB_REF_NAME}")
+          fi
+
+          if ! curl "${curl_args[@]}" -o "$response_file"; then
+            echo "::warning::Não foi possível consultar os detalhes do Quality Gate pela API do SonarQube Cloud."
+            exit 0
+          fi
+
+          status="$(jq -r '.projectStatus.status // "UNKNOWN"' "$response_file")"
+          echo "Quality Gate: $status"
+
+          failed_conditions="$(jq -r '
+            .projectStatus.conditions[]?
+            | select(.status != "OK")
+            | "- \(.metricKey): status=\(.status), actual=\(.actualValue // "n/a"), threshold=\(.errorThreshold // "n/a"), comparator=\(.comparator // "n/a")"
+          ' "$response_file")"
+
+          if [ -n "$failed_conditions" ]; then
+            echo "Condições não aprovadas:"
+            printf '%s\n' "$failed_conditions"
+          else
+            echo "Nenhuma condição reprovada foi retornada pela API."
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "$status" != "OK" ]; then
+            issues_file="$RUNNER_TEMP/sonar-pr-issues.json"
+            if curl \
+              --fail-with-body \
+              --silent \
+              --show-error \
+              --user "${SONAR_TOKEN}:" \
+              --get \
+              "${SONAR_HOST_URL}/api/issues/search" \
+              --data-urlencode "componentKeys=${SONAR_PROJECT_KEY}" \
+              --data-urlencode "pullRequest=${{ github.event.pull_request.number }}" \
+              --data-urlencode "resolved=false" \
+              --data-urlencode "ps=100" \
+              -o "$issues_file"; then
+              security_issues="$(jq -r '
+                .issues[]?
+                | select(
+                    .type == "VULNERABILITY"
+                    or (((.impacts // []) | map(.softwareQuality)) | index("SECURITY") != null)
+                  )
+                | "- rule=\(.rule), component=\(.component), line=\(.line // "n/a"), severity=\(.severity // "n/a"), message=\(.message)"
+              ' "$issues_file")"
+
+              if [ -n "$security_issues" ]; then
+                echo "Issues de segurança abertas neste PR:"
+                printf '%s\n' "$security_issues"
+              else
+                echo "Nenhuma issue de segurança aberta foi retornada para este PR."
+              fi
+            else
+              echo "::warning::Não foi possível consultar as issues do PR pela API do SonarQube Cloud."
+            fi
+          fi
