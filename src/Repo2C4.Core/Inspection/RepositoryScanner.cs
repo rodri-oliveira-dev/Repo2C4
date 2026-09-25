@@ -149,7 +149,7 @@ public sealed class RepositoryScanner
                 bool directoryEntry = attributes.HasFlag(FileAttributes.Directory);
                 string name = Path.GetFileName(entry);
 
-                if (IsSensitive(name, directoryEntry) || IsExcluded(relative, state.Options.ExcludePatterns, directoryEntry))
+                if (IsSensitive(name, directoryEntry) || IsExcluded(relative, state.ExcludeGlobs, directoryEntry))
                 {
                     state.Skip("scan.excluded");
                     continue;
@@ -167,7 +167,7 @@ public sealed class RepositoryScanner
                     continue;
                 }
 
-                if (!IsIncluded(relative, state.Options.IncludePatterns))
+                if (!IsIncluded(relative, state.IncludeGlobs))
                 {
                     state.Skip("scan.notIncluded");
                     continue;
@@ -236,6 +236,10 @@ public sealed class RepositoryScanner
                 state.Files.Add(new RepositoryFile(relative, size, null));
                 state.TotalBytes += size;
             }
+            catch (RegexMatchTimeoutException)
+            {
+                state.Skip("scan.patternTimeout");
+            }
             catch (Exception exception) when (IsExpectedFileSystemFailure(exception))
             {
                 // Never include exception.Message or an untrusted filename in diagnostics.
@@ -270,23 +274,37 @@ public sealed class RepositoryScanner
             || lower.EndsWith(".keystore", StringComparison.Ordinal);
     }
 
-    private static bool IsIncluded(string relative, ImmutableArray<string> patterns) =>
-        patterns.IsEmpty || patterns.Any(pattern => Matches(relative, pattern));
+    private static bool IsIncluded(string relative, IReadOnlyList<Glob> patterns) =>
+        patterns.Count == 0 || patterns.Any(pattern => Matches(relative, pattern));
 
-    private static bool IsExcluded(string relative, ImmutableArray<string> patterns, bool isDirectory) =>
+    private static bool IsExcluded(string relative, IReadOnlyList<Glob> patterns, bool isDirectory) =>
         patterns.Any(pattern => Matches(relative, pattern) || (isDirectory && Matches(relative + "/", pattern)));
 
-    private static bool Matches(string relative, string pattern)
+    private static bool Matches(string relative, Glob pattern)
     {
-        // Globs are bounded, anchored and timeout-limited; ** spans paths, * and ? do not.
+        string value = pattern.MatchesFullPath ? relative : Path.GetFileName(relative);
+        return pattern.Regex.IsMatch(value);
+    }
+
+    private static Glob Compile(string pattern)
+    {
+        // Globs are bounded, anchored and compiled once; ** spans paths, * and ? do not.
         string regex = "^" + Regex.Escape(pattern)
             .Replace(@"\*\*/", "(?:.*/)?", StringComparison.Ordinal)
             .Replace(@"\*\*", ".*", StringComparison.Ordinal)
             .Replace(@"\*", "[^/]*", StringComparison.Ordinal)
             .Replace(@"\?", "[^/]", StringComparison.Ordinal) + "$";
-        string value = pattern.Contains('/') ? relative : Path.GetFileName(relative);
-        return Regex.IsMatch(value, regex, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+
+        return new Glob(
+            new Regex(
+                regex,
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.NonBacktracking,
+                TimeSpan.FromMilliseconds(100)),
+            pattern.Contains('/'));
     }
+
+    private static Glob[] CompilePatterns(ImmutableArray<string> patterns) =>
+        [.. patterns.Select(Compile)];
 
     private static void ValidateOptions(RepositoryScanOptions options)
     {
@@ -330,11 +348,17 @@ public sealed class RepositoryScanner
         exception is IOException or UnauthorizedAccessException or SecurityException
             or ArgumentException or NotSupportedException;
 
+    private sealed record Glob(Regex Regex, bool MatchesFullPath);
+
     private sealed class ScanState(RepositoryScanOptions options, CancellationToken cancellationToken)
     {
         public RepositoryScanOptions Options { get; } = options;
 
         public CancellationToken CancellationToken { get; } = cancellationToken;
+
+        public Glob[] IncludeGlobs { get; } = CompilePatterns(options.IncludePatterns);
+
+        public Glob[] ExcludeGlobs { get; } = CompilePatterns(options.ExcludePatterns);
 
         public List<RepositoryFile> Files { get; } = [];
 
