@@ -70,6 +70,32 @@ public sealed class McpLikeC4ToolsTests
     }
 
     [Fact]
+    public async Task WriteCreatesNestedDestinationWithinAuthorizedRoot()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateSnapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        McpGenerateLikeC4Result result = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            CreateModel(snapshot),
+            dryRun: false,
+            write: true,
+            destinationPath: "artifacts/architecture/c1",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Written);
+        Assert.True(File.Exists(Path.Combine(
+            temp.Path,
+            "artifacts",
+            "architecture",
+            "c1",
+            "model.c4")));
+    }
+
+    [Fact]
     public async Task WriteRejectsTraversalAndMissingSnapshot()
     {
         using TempDirectory temp = new();
