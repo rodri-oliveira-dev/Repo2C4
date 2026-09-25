@@ -34,7 +34,8 @@ internal sealed class McpLikeC4Tools
             "dryRun defaults to true and performs no writes. Writing requires dryRun=false, write=true and an explicit " +
             "repository-relative destinationPath inside the authorized root; existing generated files are never overwritten. " +
             "The model snapshot must exactly match snapshotId and unsupported static/candidate evidence cannot be promoted " +
-            "to a confirmed container boundary or runtime relation.",
+            "to a confirmed container boundary or runtime relation. Optional c3ContainerId adds a bounded C3 view only for " +
+            "that existing C2 container; omission preserves C1/C2 behavior.",
             readOnly: false,
             idempotent: false));
 
@@ -95,11 +96,15 @@ internal sealed class McpLikeC4Tools
                 "destination_required: writing requires an explicit repository-relative destinationPath.");
         }
 
-        List<LikeC4GeneratedFile> generated = [.. LikeC4Emitter.Emit(model)];
+        IReadOnlyList<LikeC4GeneratedFile> generated;
         if (!string.IsNullOrWhiteSpace(c3ContainerId))
         {
             ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
-            generated.AddRange(LikeC4Emitter.EmitC3(c3));
+            generated = LikeC4Emitter.EmitWithC3(model, c3);
+        }
+        else
+        {
+            generated = LikeC4Emitter.Emit(model);
         }
         McpLikeC4File[] files =
         [
