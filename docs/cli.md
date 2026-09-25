@@ -1,6 +1,6 @@
-# Repo2C4 offline CLI
+# Repo2C4 CLI
 
-The Phase 2 CLI exposes three local commands. None of them calls an AI provider, opens a pull request, evaluates MSBuild or turns package/project candidates into confirmed runtime architecture.
+The offline commands `inspect`, `generate` and `validate` do not call an AI provider, open a pull request, evaluate MSBuild or turn package/project candidates into confirmed runtime architecture. The optional `infer` command explicitly calls a configurable **local** Ollama model to propose a review-required architecture, without generating C4 files.
 
 ## Commands
 
@@ -15,6 +15,14 @@ repo2c4 inspect --repository PATH --output snapshot.json
 The repository ID is derived deterministically from the selected root directory name. It is a local stable label, not a globally unique repository identity.
 
 The snapshot output file must not already exist. Choose another path if it does.
+
+### Infer (optional, local AI)
+
+```bash
+repo2c4 infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json
+```
+
+The command accepts `--endpoint http://127.0.0.1:11434/` and `--timeout-seconds 90`. Only loopback HTTP endpoints are supported. It transmits a bounded and sanitized snapshot projection, never raw repository content, secrets, original file paths or free-form descriptions. The provider returns a versioned model proposal; the CLI attaches the original local snapshot, validates the v1 contract and marks **every AI-generated assertion as requiring human review**. It refuses invalid JSON, malformed models, timeouts, unavailable local models and existing output files. See [local Ollama inference and the reviewed example](inference.md).
 
 ### Generate
 
@@ -70,17 +78,19 @@ repo2c4 validate --output DIR
 | `3` | Invalid v1 snapshot/model data. |
 | `4` | LikeC4 validation failed or the configured LikeC4 CLI could not validate. |
 | `5` | Local filesystem/path operation failed or overwrite policy blocked the operation. |
+| `6` | Explicit local inference provider unavailable or timed out. |
 
 The underlying LikeC4 exit code is reported as diagnostic context but is mapped to Repo2C4 exit code `4`.
 
 ## Inference boundary
 
-The supported flow is intentionally split:
+The supported flow is intentionally split. The optional inference stage does not change the offline steps:
 
 ```text
 local repository
     -> inspect
     -> evidence snapshot
+    -> optional local infer -> review-required candidate.json
     -> human proposal/review
     -> ArchitectureModel
     -> generate
