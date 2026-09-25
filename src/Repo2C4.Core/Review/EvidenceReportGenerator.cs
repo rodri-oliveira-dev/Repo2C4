@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text;
 using Repo2C4.Core.Contracts;
 
@@ -23,11 +22,7 @@ public static class EvidenceReportGenerator
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        ImmutableArray<ContractError> structuralErrors = ValidateReportModel(model);
-        if (!structuralErrors.IsEmpty)
-        {
-            throw new ContractValidationException(structuralErrors);
-        }
+        _ = ContractJson.SerializeModel(model);
 
         Dictionary<string, Evidence> evidenceById = model.Snapshot.Evidence
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
@@ -106,9 +101,6 @@ public static class EvidenceReportGenerator
                 warnings.Length,
                 missingOrigins.Count));
     }
-
-    private static ImmutableArray<ContractError> ValidateReportModel(ArchitectureModel model) =>
-        ContractValidator.ValidateModel(model);
 
     private static void AppendSection(StringBuilder builder, string title, List<string> items, string emptyMessage)
     {
