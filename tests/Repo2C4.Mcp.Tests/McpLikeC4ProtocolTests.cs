@@ -141,8 +141,13 @@ public sealed class McpLikeC4ProtocolTests
                 write = true,
                 destinationPath = "generated",
             });
-        using JsonDocument conflictResponse = await ReadResponseAsync(process, cancellationToken);
-        AssertToolError(conflictResponse, "destination_exists");
+        using JsonDocument repeatedResponse = await ReadResponseAsync(process, cancellationToken);
+        JsonElement repeated = StructuredResult(repeatedResponse);
+        Assert.True(repeated.GetProperty("written").GetBoolean());
+        Assert.False(repeated.GetProperty("hasConflicts").GetBoolean());
+        Assert.All(
+            repeated.GetProperty("changes").EnumerateArray(),
+            change => Assert.Equal("unchanged", change.GetProperty("kind").GetString(), ignoreCase: true));
 
         ArchitectureModel invalidSchema = model with
         {
