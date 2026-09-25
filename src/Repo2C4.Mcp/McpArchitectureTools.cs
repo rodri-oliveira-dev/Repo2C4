@@ -374,7 +374,7 @@ internal sealed class McpArchitectureTools
         string.Equals(relativePath, pathPrefix, StringComparison.Ordinal) ||
         relativePath.StartsWith(pathPrefix + "/", StringComparison.Ordinal);
 
-    private static string CreateRepositoryId(string fullRepositoryPath)
+    private string CreateRepositoryId(string fullRepositoryPath)
     {
         string trimmed = Path.TrimEndingDirectorySeparator(fullRepositoryPath);
         string name = Path.GetFileName(trimmed);
@@ -383,7 +383,9 @@ internal sealed class McpArchitectureTools
             name = "repository";
         }
 
-        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(name.ToLowerInvariant()));
+        string relative = Path.GetRelativePath(_authorizedRoot, trimmed).Replace('\\', '/');
+        string identity = name.ToLowerInvariant() + "\n" + relative;
+        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         return "repo_" + Convert.ToHexString(digest).ToLowerInvariant()[..24];
     }
 }
