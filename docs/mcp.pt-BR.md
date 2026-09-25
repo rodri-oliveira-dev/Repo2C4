@@ -87,3 +87,8 @@ O projeto MCP referencia o Core; o Core não referencia o SDK MCP. Os contratos 
 O servidor não faz inferência arquitetural. Evidência estática, hipótese e fato arquitetural confirmado continuam distintos. `ProjectReference`, referências de pacotes e categorias terminadas em `.candidate` continuam sendo apenas sinais estáticos e não se tornam relações runtime confirmadas por serem expostas via MCP. A interpretação arquitetural continua sendo responsabilidade do cliente MCP.
 
 A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações Git, push/PR automático ou edição semântica de documentação existente. A #16 adiciona configuração genérica de cliente, prompts reutilizáveis e reprodução determinística C1/C2 com cliente de protocolo. Consulte [fluxo com cliente MCP](mcp-client.pt-BR.md).
+
+
+## C3 seletivo
+
+A issue #18 mantém o modelo C1/C2 estável e adiciona uma extensão C3 compatível, limitada a um único container C2 explicitamente selecionado. `generate_likec4` aceita o parâmetro opcional `c3ContainerId`; sem ele, o comportamento C1/C2 permanece inalterado. Uma seleção válida deriva uma proposta limitada de componentes somente das evidências já associadas ao container selecionado e gera `components.c4` e `c3.views.c4`. Outros containers não recebem C3 automaticamente. Evidências estáticas ou candidatas permanecem `requiresReview`; container inexistente, evidência insuficiente, schema incompatível e limites excedidos geram erros controlados.
