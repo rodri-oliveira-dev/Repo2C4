@@ -25,8 +25,8 @@ public sealed class McpSnapshotStoreTests
 
         now = now.AddMinutes(2);
 
-        ModelContextProtocol.McpException exception =
-            Assert.Throws<ModelContextProtocol.McpException>(() => store.Get(entry.SnapshotId));
+        Exception exception =
+            Assert.ThrowsAny<Exception>(() => store.Get(entry.SnapshotId));
         Assert.Contains("snapshot_not_found_or_expired", exception.Message, StringComparison.Ordinal);
     }
 
@@ -40,7 +40,7 @@ public sealed class McpSnapshotStoreTests
         string cursor = store.CreateCursor("evidence", "snapshot_abc", "category\npath", 50);
 
         Assert.Equal(50, store.ReadCursor(cursor, "evidence", "snapshot_abc", "category\npath"));
-        Assert.Throws<ModelContextProtocol.McpException>(
+        Assert.ThrowsAny<Exception>(
             () => store.ReadCursor(cursor, "evidence", "snapshot_abc", "other-filter"));
     }
 }

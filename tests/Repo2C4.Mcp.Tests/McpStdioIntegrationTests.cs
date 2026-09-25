@@ -19,7 +19,9 @@ public sealed class McpStdioIntegrationTests
 
         await InitializeAsync(process, input, cancellationToken);
 
-        await WriteRequestAsync(input, 2, "tools/list", new { });
+        await WriteRequestAsync(input, 2, "tools/list", new
+        {
+        });
         using JsonDocument toolsResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         JsonElement tools = toolsResponse.RootElement.GetProperty("result").GetProperty("tools");
@@ -39,7 +41,11 @@ public sealed class McpStdioIntegrationTests
             input,
             3,
             "inspect_repository",
-            new { repositoryPath = ".", maxFiles = 1000 });
+            new
+            {
+                repositoryPath = ".",
+                maxFiles = 1000,
+            });
         using JsonDocument inspectResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         JsonElement inspect = StructuredResult(inspectResponse);
@@ -61,7 +67,11 @@ public sealed class McpStdioIntegrationTests
             input,
             4,
             "get_evidence",
-            new { snapshotId, pageSize = 2 });
+            new
+            {
+                snapshotId,
+                pageSize = 2,
+            });
         using JsonDocument firstEvidenceResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         JsonElement firstEvidence = StructuredResult(firstEvidenceResponse);
@@ -74,7 +84,12 @@ public sealed class McpStdioIntegrationTests
             input,
             5,
             "get_evidence",
-            new { snapshotId, pageSize = 2, cursor = nextCursor });
+            new
+            {
+                snapshotId,
+                pageSize = 2,
+                cursor = nextCursor,
+            });
         using JsonDocument secondEvidenceResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         JsonElement secondEvidence = StructuredResult(secondEvidenceResponse);
@@ -84,7 +99,12 @@ public sealed class McpStdioIntegrationTests
             input,
             6,
             "get_snapshot",
-            new { snapshotId, section = "files", pageSize = 2 });
+            new
+            {
+                snapshotId,
+                section = "files",
+                pageSize = 2,
+            });
         using JsonDocument snapshotResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         JsonElement snapshot = StructuredResult(snapshotResponse);
@@ -96,7 +116,12 @@ public sealed class McpStdioIntegrationTests
             input,
             7,
             "get_evidence",
-            new { snapshotId, pageSize = 2, cursor = "not-a-valid-cursor" });
+            new
+            {
+                snapshotId,
+                pageSize = 2,
+                cursor = "not-a-valid-cursor",
+            });
         using JsonDocument invalidCursorResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         Assert.True(invalidCursorResponse.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
@@ -109,7 +134,11 @@ public sealed class McpStdioIntegrationTests
             input,
             8,
             "get_evidence",
-            new { snapshotId = "snapshot_missing", pageSize = 2 });
+            new
+            {
+                snapshotId = "snapshot_missing",
+                pageSize = 2,
+            });
         using JsonDocument missingSnapshotResponse =
             await ReadProtocolDocumentAsync(process, cancellationToken);
         Assert.True(missingSnapshotResponse.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
@@ -161,12 +190,27 @@ public sealed class McpStdioIntegrationTests
             input.NewLine = "\n";
             await InitializeAsync(process, input, cancellationToken);
 
-            await WriteToolCallAsync(input, 2, "inspect_repository", new { repositoryPath = "." });
+            await WriteToolCallAsync(
+                input,
+                2,
+                "inspect_repository",
+                new
+                {
+                    repositoryPath = ".",
+                });
             string inspectLine = await ReadProtocolLineAsync(process, cancellationToken);
             using JsonDocument inspectResponse = JsonDocument.Parse(inspectLine);
             string snapshotId = StructuredResult(inspectResponse).GetProperty("snapshotId").GetString()!;
 
-            await WriteToolCallAsync(input, 3, "get_evidence", new { snapshotId, pageSize = 100 });
+            await WriteToolCallAsync(
+                input,
+                3,
+                "get_evidence",
+                new
+                {
+                    snapshotId,
+                    pageSize = 100,
+                });
             string evidenceLine = await ReadProtocolLineAsync(process, cancellationToken);
 
             Assert.DoesNotContain(secret, inspectLine, StringComparison.Ordinal);
@@ -216,7 +260,10 @@ public sealed class McpStdioIntegrationTests
                 input,
                 2,
                 "inspect_repository",
-                new { repositoryPath = "external" });
+                new
+                {
+                    repositoryPath = "external",
+                });
             using JsonDocument response =
                 await ReadProtocolDocumentAsync(process, cancellationToken);
 
@@ -250,8 +297,14 @@ public sealed class McpStdioIntegrationTests
             new
             {
                 protocolVersion = "2025-11-25",
-                capabilities = new { },
-                clientInfo = new { name = "Repo2C4.Mcp.Tests", version = "1.0.0" },
+                capabilities = new
+                {
+                },
+                clientInfo = new
+                {
+                    name = "Repo2C4.Mcp.Tests",
+                    version = "1.0.0",
+                },
             });
 
         using JsonDocument initialize =
@@ -264,7 +317,9 @@ public sealed class McpStdioIntegrationTests
         {
             jsonrpc = "2.0",
             method = "notifications/initialized",
-            @params = new { },
+            @params = new
+            {
+            },
         });
         await input.WriteLineAsync(notification);
     }
@@ -278,7 +333,11 @@ public sealed class McpStdioIntegrationTests
             input,
             id,
             "tools/call",
-            new { name, arguments });
+            new
+            {
+                name,
+                arguments,
+            });
 
     private static async Task WriteRequestAsync(
         StreamWriter input,
