@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Web/Web.csproj" />
+  <Project Path="src/Shared/Shared.csproj" />
+  <Project Path="src/Worker/Worker.csproj" />
+</Solution>
