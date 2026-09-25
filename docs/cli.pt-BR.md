@@ -1,6 +1,6 @@
 # CLI do Repo2C4
 
-Os comandos offline `inspect`, `generate` e `validate` não chamam IA, abrem pull request, avaliam MSBuild nem transformam candidatos em arquitetura runtime confirmada. O comando opcional `infer` usa explicitamente o provedor local Ollama para propor um modelo que deve passar por revisão humana.
+Os comandos offline `inspect`, `generate` e `validate` não chamam IA, abrem pull request, avaliam MSBuild nem transformam candidatos em arquitetura runtime confirmada. O comando opcional `infer` usa o Ollama local ou, com autorização explícita, o provedor cloud OpenAI para propor um modelo sujeito a revisão humana.
 
 ## Comandos
 
@@ -16,13 +16,13 @@ O identificador do repositório é derivado de forma determinística do nome do 
 
 O arquivo de snapshot não pode existir previamente. Use outro caminho caso exista.
 
-### Infer (IA local opcional)
+### Infer (IA local ou cloud autorizada)
 
 ```bash
 repo2c4 infer --snapshot snapshot.json --provider ollama --model-id IDENTIFICADOR --output candidate.json
 ```
 
-As opções `--endpoint http://127.0.0.1:11434/` e `--timeout-seconds 90` configuram porta local e timeout. São aceitos somente endpoints HTTP loopback. O adaptador envia apenas uma projeção sanitizada e limitada das evidências, nunca arquivos brutos, segredos, caminhos originais ou descrições livres. A CLI valida o contrato v1, anexa localmente o snapshot original e obriga **revisão humana de todas as afirmações propostas pela IA**. Ela recusa respostas inválidas, modelo indisponível, timeout e sobrescrita do arquivo de saída. Veja [o tutorial de inferência local e revisão](inference.pt-BR.md).
+Para usar a OpenAI na nuvem, informe `--provider openai --allow-external-ai` e disponibilize `OPENAI_API_KEY` no ambiente do host. A CLI apresenta a quantidade de arquivos anonimizados e evidências sanitizadas antes do envio ao endpoint HTTPS fixo; sem consentimento ou chave nenhuma requisição externa é realizada. O uso pode gerar custo conforme modelo/tokens e os metadados transmitidos deixam a máquina. Consulte [consentimento, custo e confidencialidade](inference-openai.pt-BR.md).\n\nAs opções `--endpoint http://127.0.0.1:11434/` e `--timeout-seconds 90` configuram porta local e timeout. São aceitos somente endpoints HTTP loopback. O adaptador envia apenas uma projeção sanitizada e limitada das evidências, nunca arquivos brutos, segredos, caminhos originais ou descrições livres. A CLI valida o contrato v1, anexa localmente o snapshot original e obriga **revisão humana de todas as afirmações propostas pela IA**. Ela recusa respostas inválidas, modelo indisponível, timeout e sobrescrita do arquivo de saída. Veja [o tutorial de inferência local e revisão](inference.pt-BR.md).
 
 ### Generate
 
