@@ -53,7 +53,7 @@ internal static class CliApplication
 
         return command switch
         {
-            "infer" => await RunInferAsync(commandArguments, standardOutput, standardError, cancellationToken, inferenceClient)
+            "infer" => await RunInferAsync(commandArguments, standardOutput, standardError, inferenceClient, cancellationToken)
                 .ConfigureAwait(false),
             "inspect" => await RunInspectAsync(commandArguments, standardOutput, standardError, cancellationToken)
                 .ConfigureAwait(false),
@@ -69,8 +69,8 @@ internal static class CliApplication
         string[] args,
         TextWriter standardOutput,
         TextWriter standardError,
-        CancellationToken cancellationToken,
-        HttpClient? inferenceClient)
+        HttpClient? inferenceClient,
+        CancellationToken cancellationToken)
     {
         if (!TryParseOptions(
             args,
