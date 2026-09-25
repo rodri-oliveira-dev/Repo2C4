@@ -3,8 +3,8 @@ using System.Reflection;
 using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
-using Repo2C4.Core.Contracts;
 using Repo2C4.Core.C3;
+using Repo2C4.Core.Contracts;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
 
