@@ -31,11 +31,15 @@ Four files are produced inside the selected directory:
 - `views.c4`
 - `evidence-report.md`
 
-Existing generated files are not replaced by default. To replace the four fixed outputs explicitly:
+Generation is preview-only by default. Repo2C4 reports `added`, `modified`, `unchanged` or `conflict` for each managed output and does not modify the filesystem.
+
+To apply a reviewed preview:
 
 ```bash
-repo2c4 generate --model architecture.json --output DIR --overwrite
+repo2c4 generate --model architecture.json --output DIR --apply
 ```
+
+The first successful apply creates `.repo2c4-manifest.json`, which stores the model schema version and SHA-256 hash of every managed output. Later applies are permitted only when the current file still matches the manifest hash. Manually edited, missing previously-managed, symlinked, or unmanaged colliding files are reported as conflicts and are left untouched.
 
 `evidence-report.md` maps model assertions to evidence IDs and repository-relative locations, lists hypotheses, scan warnings and missing origins, and omits source bodies and sensitive values. See [evidence report and architectural review](evidence-report.md).
 
@@ -47,7 +51,7 @@ repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
 
 Without this option no C3 files are produced. A valid selection nests reviewed component proposals inside the selected container in `model.c4` and adds `c3.views.c4`; the remaining C2 containers do not receive component views automatically. The C3 proposal is bounded, keeps candidate/static signals under review, and fails when the selected container has insufficient evidence.
 
-The output directory and any existing target file must not be a symlink, junction or reparse point. Generated filenames are fixed by Repo2C4 and cannot be supplied by model content.
+The output directory and managed files must remain inside the selected root and must not be symlink, junction or reparse points. Generated filenames are fixed by Repo2C4 and cannot be supplied by model content. Writes are prepared in a transaction directory and the manifest is replaced only after all output files have been prepared; a failed commit restores previously managed files on a best-effort basis and never deletes unknown files.
 
 ### Validate
 
