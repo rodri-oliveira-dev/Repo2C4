@@ -4,6 +4,7 @@ using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.C3;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
 
@@ -69,6 +70,8 @@ internal sealed class McpLikeC4Tools
         bool write = false,
         [Description("Repository-relative destination directory inside the authorized root. Required only for writing.")]
         string? destinationPath = null,
+        [Description("Optional C2 container ID. When supplied, only that container receives an additional C3 component view.")]
+        string? c3ContainerId = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -92,7 +95,12 @@ internal sealed class McpLikeC4Tools
                 "destination_required: writing requires an explicit repository-relative destinationPath.");
         }
 
-        IReadOnlyList<LikeC4GeneratedFile> generated = LikeC4Emitter.Emit(model);
+        List<LikeC4GeneratedFile> generated = [.. LikeC4Emitter.Emit(model)];
+        if (!string.IsNullOrWhiteSpace(c3ContainerId))
+        {
+            ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
+            generated.AddRange(LikeC4Emitter.EmitC3(c3));
+        }
         McpLikeC4File[] files =
         [
             .. generated.Select(file => new McpLikeC4File(
