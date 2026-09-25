@@ -16,8 +16,8 @@ public sealed class RepositoryScannerTests
         repository.Add("Repo2C4.slnx", "<Solution />");
         repository.Add("src/Service/Program.cs", "class Program { }");
 
-        RepositorySnapshot first = scanner.Scan(repository.Options());
-        RepositorySnapshot second = scanner.Scan(repository.Options());
+        RepositorySnapshot first = Scan(repository.Options());
+        RepositorySnapshot second = Scan(repository.Options());
 
         Assert.Equal(ContractJson.SerializeSnapshot(first), ContractJson.SerializeSnapshot(second));
         Assert.Equal(
@@ -44,7 +44,7 @@ public sealed class RepositoryScannerTests
         repository.Add("private.key", "TOP_SECRET_123");
         repository.Add("appsettings.Production.json", "TOP_SECRET_123");
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options() with
+        RepositorySnapshot snapshot = Scan(repository.Options() with
         {
             IncludePatterns = ["**/*"]
         });
@@ -66,7 +66,7 @@ public sealed class RepositoryScannerTests
         repository.Add("src/Allowed/Two.cs", "class Two { }");
         repository.Add("src/Private/Hidden.csproj", "<Project />");
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options() with
+        RepositorySnapshot snapshot = Scan(repository.Options() with
         {
             IncludePatterns = ["**/*.csproj"],
             ExcludePatterns = ["src/Private/**"],
@@ -88,7 +88,7 @@ public sealed class RepositoryScannerTests
         File.CreateSymbolicLink(Path.Combine(repository.Root, "Escape.cs"), Path.Combine(outside.Root, "Outside.cs"));
         Directory.CreateSymbolicLink(Path.Combine(repository.Root, "EscapeFolder"), outside.Root);
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options());
+        RepositorySnapshot snapshot = Scan(repository.Options());
         string json = ContractJson.SerializeSnapshot(snapshot);
 
         Assert.Single(snapshot.Files);
@@ -103,13 +103,13 @@ public sealed class RepositoryScannerTests
     {
         using TemporaryRepository repository = new();
         string traversal = Path.Combine(repository.Root, "..", Path.GetFileName(repository.Root));
-        Assert.Throws<ArgumentException>(() => scanner.Scan(new RepositoryScanOptions(traversal, "repo")));
-        Assert.Throws<ArgumentException>(() => scanner.Scan(new RepositoryScanOptions("relative/path", "repo")));
-        Assert.Throws<ArgumentException>(() => scanner.Scan(repository.Options() with
+        Assert.Throws<ArgumentException>(() => Scan(new RepositoryScanOptions(traversal, "repo")));
+        Assert.Throws<ArgumentException>(() => Scan(new RepositoryScanOptions("relative/path", "repo")));
+        Assert.Throws<ArgumentException>(() => Scan(repository.Options() with
         {
             IncludePatterns = ["../**/*.cs"]
         }));
-        Assert.Throws<ArgumentException>(() => scanner.Scan(repository.Options() with
+        Assert.Throws<ArgumentException>(() => Scan(repository.Options() with
         {
             ExcludePatterns = ["/etc/**"]
         }));
@@ -118,7 +118,7 @@ public sealed class RepositoryScannerTests
         try
         {
             Directory.CreateSymbolicLink(linkedRoot, repository.Root);
-            Assert.Throws<ArgumentException>(() => scanner.Scan(new RepositoryScanOptions(linkedRoot, "repo")));
+            Assert.Throws<ArgumentException>(() => Scan(new RepositoryScanOptions(linkedRoot, "repo")));
         }
         finally
         {
@@ -137,7 +137,7 @@ public sealed class RepositoryScannerTests
         repository.AddBytes("image.png", [1, 2, 3, 0]);
         repository.AddBytes("Fake.cs", [65, 66, 0, 67]);
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options());
+        RepositorySnapshot snapshot = Scan(repository.Options());
 
         Assert.Single(snapshot.Files);
         Assert.Equal("Readme.md", snapshot.Files[0].RelativePath);
@@ -152,7 +152,7 @@ public sealed class RepositoryScannerTests
         repository.Add("Big.cs", new string('x', 256));
         repository.Add("Small.cs", "class Small { }");
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options() with
+        RepositorySnapshot snapshot = Scan(repository.Options() with
         {
             MaxBytesPerFile = 32
         });
@@ -170,7 +170,7 @@ public sealed class RepositoryScannerTests
         repository.Add("b.cs", "1234567890");
         repository.Add("c.cs", "1234567890");
 
-        RepositorySnapshot total = scanner.Scan(repository.Options() with
+        RepositorySnapshot total = Scan(repository.Options() with
         {
             MaxTotalBytes = 15
         });
@@ -178,7 +178,7 @@ public sealed class RepositoryScannerTests
         Assert.Contains(total.Diagnostics, diagnostic => diagnostic.Code == "scan.totalBytesLimit"
             && diagnostic.Message.Contains("2 observed entries", StringComparison.Ordinal));
 
-        RepositorySnapshot count = scanner.Scan(repository.Options() with
+        RepositorySnapshot count = Scan(repository.Options() with
         {
             MaxFiles = 1
         });
@@ -195,7 +195,7 @@ public sealed class RepositoryScannerTests
         repository.Add("b.cs", "class B { }");
         repository.Add("c.cs", "class C { }");
 
-        RepositorySnapshot snapshot = scanner.Scan(repository.Options() with
+        RepositorySnapshot snapshot = Scan(repository.Options() with
         {
             MaxVisitedEntries = 1,
             MaxFiles = 1
@@ -220,7 +220,7 @@ public sealed class RepositoryScannerTests
         try
         {
             File.SetUnixFileMode(inaccessible, UnixFileMode.None);
-            RepositorySnapshot snapshot = scanner.Scan(repository.Options());
+            RepositorySnapshot snapshot = Scan(repository.Options());
             string json = ContractJson.SerializeSnapshot(snapshot);
 
             Assert.Empty(snapshot.Files);
@@ -249,20 +249,23 @@ public sealed class RepositoryScannerTests
     public void InvalidLimitsAndRepositoryIdAreRejected()
     {
         using TemporaryRepository repository = new();
-        Assert.Throws<ArgumentOutOfRangeException>(() => scanner.Scan(repository.Options() with
+        Assert.Throws<ArgumentOutOfRangeException>(() => Scan(repository.Options() with
         {
             MaxFiles = 0
         }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => scanner.Scan(repository.Options() with
+        Assert.Throws<ArgumentOutOfRangeException>(() => Scan(repository.Options() with
         {
             MaxFiles = 2,
             MaxVisitedEntries = 1
         }));
-        Assert.Throws<ArgumentException>(() => scanner.Scan(repository.Options() with
+        Assert.Throws<ArgumentException>(() => Scan(repository.Options() with
         {
             RepositoryId = "/absolute/path"
         }));
     }
+
+    private RepositorySnapshot Scan(RepositoryScanOptions options) =>
+        scanner.Scan(options, TestContext.Current.CancellationToken);
 
     private sealed class TemporaryRepository : IDisposable
     {
@@ -272,7 +275,10 @@ public sealed class RepositoryScannerTests
             Directory.CreateDirectory(Root);
         }
 
-        public string Root { get; }
+        public string Root
+        {
+            get;
+        }
 
         public RepositoryScanOptions Options() => new(Root, "fixture_repo");
 
