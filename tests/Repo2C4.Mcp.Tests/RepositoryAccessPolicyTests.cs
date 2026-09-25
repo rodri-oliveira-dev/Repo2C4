@@ -10,7 +10,10 @@ public sealed class RepositoryAccessPolicyTests
         using TemporaryDirectory repository = new();
 
         Assert.Throws<UnauthorizedAccessException>(
-            () => RepositoryAccessPolicy.ResolveExistingPath(repository.Path, "../outside.txt"));
+            () => RepositoryAccessPolicy.ResolveExistingPath(
+                repository.Path,
+                "../outside.txt",
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -20,7 +23,10 @@ public sealed class RepositoryAccessPolicyTests
         using TemporaryDirectory outside = new();
 
         Assert.Throws<UnauthorizedAccessException>(
-            () => RepositoryAccessPolicy.ResolveExistingPath(repository.Path, outside.Path));
+            () => RepositoryAccessPolicy.ResolveExistingPath(
+                repository.Path,
+                outside.Path,
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -29,7 +35,10 @@ public sealed class RepositoryAccessPolicyTests
         using TemporaryDirectory repository = new();
 
         Assert.Throws<DirectoryNotFoundException>(
-            () => RepositoryAccessPolicy.ResolveExistingPath(repository.Path, "missing"));
+            () => RepositoryAccessPolicy.ResolveExistingPath(
+                repository.Path,
+                "missing",
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -46,7 +55,10 @@ public sealed class RepositoryAccessPolicyTests
         Directory.CreateSymbolicLink(link, outside.Path);
 
         Assert.Throws<UnauthorizedAccessException>(
-            () => RepositoryAccessPolicy.ResolveExistingPath(repository.Path, "external-link"));
+            () => RepositoryAccessPolicy.ResolveExistingPath(
+                repository.Path,
+                "external-link",
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -70,7 +82,10 @@ public sealed class RepositoryAccessPolicyTests
             Directory.CreateDirectory(Path);
         }
 
-        public string Path { get; }
+        public string Path
+        {
+            get;
+        }
 
         public void Dispose()
         {

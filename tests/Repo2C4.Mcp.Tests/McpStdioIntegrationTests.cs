@@ -76,7 +76,10 @@ public sealed class McpStdioIntegrationTests
         startInfo.ArgumentList.Add("--repository-root");
         startInfo.ArgumentList.Add(repositoryRoot);
 
-        Process process = new() { StartInfo = startInfo };
+        Process process = new()
+        {
+            StartInfo = startInfo,
+        };
         Assert.True(process.Start(), "The Repo2C4 MCP process did not start.");
         return process;
     }

@@ -100,7 +100,9 @@ public static class RepositoryAccessPolicy
             return true;
         }
 
-        string rootPrefix = root + Path.DirectorySeparatorChar;
+        string rootPrefix = Path.EndsInDirectorySeparator(root)
+            ? root
+            : root + Path.DirectorySeparatorChar;
         return candidate.StartsWith(rootPrefix, comparison);
     }
 

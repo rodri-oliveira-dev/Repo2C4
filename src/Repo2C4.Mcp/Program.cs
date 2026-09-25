@@ -1,4 +1,3 @@
-using System.Reflection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -94,10 +93,16 @@ public static class Program
 
         try
         {
-            await using StdioServerTransport transport = new(serverOptions);
-            await using McpServer server = McpServer.Create(transport, serverOptions);
-            await server.RunAsync(cancellationToken).ConfigureAwait(false);
-            return 0;
+            StdioServerTransport transport = new(serverOptions);
+            await using (transport.ConfigureAwait(false))
+            {
+                McpServer server = McpServer.Create(transport, serverOptions);
+                await using (server.ConfigureAwait(false))
+                {
+                    await server.RunAsync(cancellationToken).ConfigureAwait(false);
+                    return 0;
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
