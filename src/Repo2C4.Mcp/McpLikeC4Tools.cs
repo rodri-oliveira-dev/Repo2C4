@@ -5,6 +5,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.LikeC4;
+using Repo2C4.Core.Review;
 
 namespace Repo2C4.Mcp;
 
@@ -35,6 +36,15 @@ internal sealed class McpLikeC4Tools
             "to a confirmed container boundary or runtime relation.",
             readOnly: false,
             idempotent: false));
+
+        tools.Add(CreateTool(
+            nameof(GetEvidenceReport),
+            "get_evidence_report",
+            "Return a deterministic metadata-only evidence-report.md for a session-bound v1 ArchitectureModel. " +
+            "The embedded snapshot must exactly match snapshotId. The response includes repository-relative evidence locations, " +
+            "review-required assertions, scan warnings and missing-origin counts without source bodies, secret values or repository writes.",
+            readOnly: true,
+            idempotent: true));
 
         tools.Add(CreateTool(
             nameof(ValidateLikeC4),
@@ -130,6 +140,29 @@ internal sealed class McpLikeC4Tools
             true,
             NormalizeDestinationForResponse(destinationPath),
             files));
+    }
+
+    [Description("Return a metadata-only evidence provenance report for a session-bound v1 model.")]
+    public McpEvidenceReportResult GetEvidenceReport(
+        [Description("Snapshot ID returned by inspect_repository in this stdio session.")]
+        string snapshotId,
+        [Description("Complete ArchitectureModel v1. Its embedded snapshot must exactly match snapshotId.")]
+        ArchitectureModel model,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
+        EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
+
+        return McpResponseGuard.EnsureWithinLimit(new McpEvidenceReportResult(
+            entry.SnapshotId,
+            model.SchemaVersion,
+            report.FileName,
+            report.Content,
+            report.Summary.ConfirmedAssertions,
+            report.Summary.ReviewRequiredAssertions,
+            report.Summary.ScanWarnings,
+            report.Summary.MissingOrigins));
     }
 
     [Description("Validate proposed or previously written LikeC4 using the controlled official LikeC4 CLI adapter.")]
