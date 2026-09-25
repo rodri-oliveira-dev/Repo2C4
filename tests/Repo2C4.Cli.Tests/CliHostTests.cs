@@ -71,9 +71,12 @@ public sealed class CliHostTests
         string specification = Path.Combine(outputDirectory, "specification.c4");
         string generatedModel = Path.Combine(outputDirectory, "model.c4");
         string views = Path.Combine(outputDirectory, "views.c4");
+        string report = Path.Combine(outputDirectory, "evidence-report.md");
         Assert.True(File.Exists(specification));
         Assert.True(File.Exists(generatedModel));
         Assert.True(File.Exists(views));
+        Assert.True(File.Exists(report));
+        Assert.Contains("Hypotheses requiring review", File.ReadAllText(report), StringComparison.Ordinal);
 
         string before = File.ReadAllText(generatedModel);
         int conflictExit = Run(["generate", "--model", model, "--output", outputDirectory]);
