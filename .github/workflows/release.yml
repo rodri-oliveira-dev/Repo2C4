@@ -139,6 +139,14 @@ jobs:
             echo 'Placeholder package identity detected; NuGet publication is blocked.'
           fi
 
+          authors="$(dotnet msbuild "$project" -nologo -getProperty:Authors | tr -d '\r')"
+          description="$(dotnet msbuild "$project" -nologo -getProperty:Description | tr -d '\r')"
+
+          if [[ "${authors^^}" == *TODO* || "${description^^}" == *TODO* ]]; then
+            safe_to_publish=false
+            echo 'Provisional Authors or Description metadata detected; NuGet publication is blocked.'
+          fi
+
           echo "package_id=$package_id" >> "$GITHUB_OUTPUT"
           echo "safe_to_publish=$safe_to_publish" >> "$GITHUB_OUTPUT"
 
