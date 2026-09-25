@@ -1,6 +1,6 @@
 # Repo2C4 CLI
 
-The offline commands `inspect`, `generate` and `validate` do not call an AI provider, open a pull request, evaluate MSBuild or turn package/project candidates into confirmed runtime architecture. The optional `infer` command explicitly calls a configurable **local** Ollama model to propose a review-required architecture, without generating C4 files.
+The offline commands `inspect`, `generate` and `validate` do not call an AI provider, open a pull request, evaluate MSBuild or turn package/project candidates into confirmed runtime architecture. The optional `infer` command proposes a review-required architecture using either local Ollama or explicitly authorized OpenAI cloud inference; it never generates C4 files.
 
 ## Commands
 
@@ -16,13 +16,13 @@ The repository ID is derived deterministically from the selected root directory 
 
 The snapshot output file must not already exist. Choose another path if it does.
 
-### Infer (optional, local AI)
+### Infer (optional, local or explicitly authorized cloud AI)
 
 ```bash
 repo2c4 infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json
 ```
 
-The command accepts `--endpoint http://127.0.0.1:11434/` and `--timeout-seconds 90`. Only loopback HTTP endpoints are supported. It transmits a bounded and sanitized snapshot projection, never raw repository content, secrets, original file paths or free-form descriptions. The provider returns a versioned model proposal; the CLI attaches the original local snapshot, validates the v1 contract and marks **every AI-generated assertion as requiring human review**. It refuses invalid JSON, malformed models, timeouts, unavailable local models and existing output files. See [local Ollama inference and the reviewed example](inference.md).
+For OpenAI cloud inference, add `--provider openai --allow-external-ai` and provide `OPENAI_API_KEY` through the host environment. It reports the number of anonymized files and sanitized evidence records before sending them to the fixed HTTPS Responses API. Without explicit consent or a key no cloud request is made. The selected model and current token-based API pricing determine cost; sanitized metadata still leaves your machine. See [cloud consent, pricing and confidentiality](inference-openai.md).\n\nThe Ollama command accepts `--endpoint http://127.0.0.1:11434/` and `--timeout-seconds 90`. Only loopback HTTP endpoints are supported. It transmits a bounded and sanitized snapshot projection, never raw repository content, secrets, original file paths or free-form descriptions. The provider returns a versioned model proposal; the CLI attaches the original local snapshot, validates the v1 contract and marks **every AI-generated assertion as requiring human review**. It refuses invalid JSON, malformed models, timeouts, unavailable local models and existing output files. See [local Ollama inference and the reviewed example](inference.md).
 
 ### Generate
 
@@ -90,7 +90,7 @@ The supported flow is intentionally split. The optional inference stage does not
 local repository
     -> inspect
     -> evidence snapshot
-    -> optional local infer -> review-required candidate.json
+    -> optional infer (local or explicitly authorized cloud) -> review-required candidate.json
     -> human proposal/review
     -> ArchitectureModel
     -> generate
