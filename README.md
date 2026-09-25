@@ -69,7 +69,7 @@ Before publishing a real package, replace the placeholder package metadata in `s
 dotnet run --file scripts/verify-package.cs -- artifacts/packages
 ```
 
-The verifier checks package identity, metadata, XML documentation, symbols, repository metadata, and Source Link information. When `--expected-version` is supplied, it also validates the NuGet version plus `AssemblyVersion`, `FileVersion`, and `InformationalVersion` contained in the packaged assembly.
+The verifier checks package identity, metadata, XML documentation, symbols, repository metadata, and Source Link information when present. Source Link is optional for the general validation command; use `--require-source-link` to fail validation when Source Link is absent. When `--expected-version` is supplied, the verifier also validates the NuGet version plus `AssemblyVersion`, `FileVersion`, and `InformationalVersion` contained in the packaged assembly.
 
 ## Versioning
 
