@@ -260,7 +260,8 @@ public sealed class ContractTests
     {
         RepositorySnapshot snapshot = new(ContractSchema.Version, "repo2c4", [], [], []);
         Assert.Empty(ContractValidator.ValidateSnapshot(snapshot));
-        Assert.Equal(snapshot, ContractJson.DeserializeSnapshot(ContractJson.SerializeSnapshot(snapshot)));
+        string json = ContractJson.SerializeSnapshot(snapshot);
+        Assert.Equal(json, ContractJson.SerializeSnapshot(ContractJson.DeserializeSnapshot(json)));
     }
 
     private static RepositorySnapshot CreateSnapshot() =>
