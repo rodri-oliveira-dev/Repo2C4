@@ -236,6 +236,26 @@ public sealed class McpLikeC4ToolsTests
     }
 
     [Fact]
+    public void EvidenceReportReturnsSummaryWithoutWriting()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateSnapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        McpEvidenceReportResult result = tools.GetEvidenceReport(
+            entry.SnapshotId,
+            CreateModel(snapshot),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("evidence-report.md", result.FileName);
+        Assert.Contains("Hypotheses requiring review", result.Content, StringComparison.Ordinal);
+        Assert.Equal(1, result.ReviewRequiredAssertions);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
     public async Task CancellationStopsGenerationBeforeFilesystemChanges()
     {
         using TempDirectory temp = new();
