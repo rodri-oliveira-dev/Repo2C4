@@ -46,7 +46,7 @@ A issue #15 adiciona duas ferramentas, mantendo a interpretação arquitetural n
 | Ferramenta | Finalidade | Comportamento de escrita |
 | --- | --- | --- |
 | `generate_likec4` | Recebe um `ArchitectureModel` v1 completo e o `snapshotId` da sessão, confirma que o snapshot embutido é exatamente o snapshot armazenado, preserva os limites de revisão e gera saídas deterministicamente. | O padrão é `dryRun=true`. Com `destinationPath`, a resposta inclui resumo estruturado das mudanças. Escrita exige `dryRun=false`, `write=true`, ausência de conflitos e o mesmo destino explícito. |
-| `validate_likec4` | Executa o adaptador controlado da CLI oficial LikeC4 sobre os arquivos propostos ou sobre um destino autorizado existente. | Somente leitura. Sem `destinationPath`, valida workspace temporário isolado; com destino, valida um diretório existente dentro da raiz autorizada. |
+| `validate_likec4` | Executa o adaptador controlado da CLI oficial LikeC4 sobre os arquivos propostos (incluindo `c3ContainerId` opcional) ou sobre um destino autorizado existente. | Somente leitura. Sem `destinationPath`, valida workspace temporário isolado e permite validar a proposta C3 selecionada com `c3ContainerId` antes da escrita; com destino, valida os arquivos de um diretório existente dentro da raiz autorizada. |
 
 O servidor não confia no snapshot contido no modelo. O `ContractValidator` precisa aceitar o modelo e o snapshot v1 canônico do modelo deve ser idêntico ao snapshot apontado pelo `snapshotId` da sessão. Isso bloqueia evidência fabricada mesmo quando um modelo fabricado é internamente consistente.
 
