@@ -1,4 +1,5 @@
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.Generation;
 
 namespace Repo2C4.Mcp;
 
@@ -49,7 +50,9 @@ public sealed record McpGenerateLikeC4Result(
     bool DryRun,
     bool Written,
     string? DestinationPath,
-    McpLikeC4File[] Files);
+    McpLikeC4File[] Files,
+    GeneratedFileChange[] Changes,
+    bool HasConflicts);
 
 public sealed record McpValidateLikeC4Result(
     string SnapshotId,
