@@ -39,11 +39,19 @@ public static class ArchitectureC3Builder
 
         Dictionary<string, Evidence> evidenceById = baseModel.Snapshot.Evidence
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
-        Evidence[] selectedEvidence =
+        Evidence[] directEvidence =
         [
             .. selected.EvidenceIds
                 .Where(evidenceById.ContainsKey)
-                .Select(id => evidenceById[id])
+                .Select(id => evidenceById[id]),
+        ];
+        HashSet<string> selectedPaths = directEvidence
+            .Select(item => item.RelativePath)
+            .ToHashSet(StringComparer.Ordinal);
+        Evidence[] selectedEvidence =
+        [
+            .. baseModel.Snapshot.Evidence
+                .Where(item => selectedPaths.Contains(item.RelativePath))
                 .OrderBy(item => item.Id, StringComparer.Ordinal),
         ];
 
@@ -77,14 +85,26 @@ public static class ArchitectureC3Builder
                 "Repository evidence supports this responsibility grouping, but C3 component boundaries require architectural review."));
         }
 
-        if (components.Count == 0)
+        List<ArchitectureComponentRelation> relations = [];
+        foreach (ArchitectureRelation baseRelation in baseModel.Relations
+                     .Where(item => item.SourceId == selected.Id && !item.EvidenceIds.IsEmpty)
+                     .OrderBy(item => item.Id, StringComparer.Ordinal))
         {
-            return new ArchitectureC3Model(
-                ContractSchema.Version,
-                baseModel,
-                selected.Id,
-                [],
-                []);
+            ArchitectureComponent? component = components.FirstOrDefault(candidate =>
+                candidate.EvidenceIds.Intersect(baseRelation.EvidenceIds, StringComparer.Ordinal).Any());
+            if (component is null)
+            {
+                continue;
+            }
+
+            relations.Add(new ArchitectureComponentRelation(
+                StableIds.ForRelation(component.Id, baseRelation.DestinationId, "c3|" + baseRelation.Id),
+                component.Id,
+                baseRelation.DestinationId,
+                baseRelation.Description,
+                baseRelation.EvidenceIds,
+                ReviewStatus.RequiresReview,
+                "Repository evidence supports this candidate collaboration, but runtime communication must be reviewed."));
         }
 
         return new ArchitectureC3Model(
@@ -92,6 +112,6 @@ public static class ArchitectureC3Builder
             baseModel,
             selected.Id,
             [.. components.Take(ArchitectureC3Validator.MaxComponents)],
-            []);
+            [.. relations.Take(ArchitectureC3Validator.MaxRelations)]);
     }
 }
