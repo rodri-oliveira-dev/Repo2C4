@@ -20,10 +20,11 @@ public sealed class CliHostTests
     }
 
     [Theory]
-    [InlineData(new string[0])]
-    [InlineData(new[] { "inspect" })]
-    public void UnimplementedCommandsReturnError(string[] arguments)
+    [InlineData(null)]
+    [InlineData("inspect")]
+    public void UnimplementedCommandsReturnError(string? argument)
     {
+        string[] arguments = argument is null ? [] : [argument];
         using StringWriter output = new();
         using StringWriter error = new();
 

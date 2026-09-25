@@ -18,10 +18,11 @@ public sealed class McpHostTests
     }
 
     [Theory]
-    [InlineData(new string[0])]
-    [InlineData(new[] { "--unknown" })]
-    public void HostDoesNotClaimToServeMcpYet(string[] arguments)
+    [InlineData(null)]
+    [InlineData("--unknown")]
+    public void HostDoesNotClaimToServeMcpYet(string? argument)
     {
+        string[] arguments = argument is null ? [] : [argument];
         using StringWriter error = new();
 
         int exitCode = Program.Run(arguments, error);
