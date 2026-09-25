@@ -33,6 +33,12 @@ Issue #14 exposes exactly three read-only tools:
 
 Snapshots live only in the current stdio session and expire after 30 minutes. Snapshot IDs are stable hashes of the canonical v1 snapshot; possession of an ID from another session does not grant access because each session maintains its own store. Pagination cursors are opaque HMAC-authenticated tokens bound to that session, snapshot, tool scope and filters. Modified, cross-filter or out-of-range cursors fail with a controlled `cursor_invalid` error.
 
+## Evidence report tool
+
+Issue #17 adds read-only `get_evidence_report`. It accepts `snapshotId` plus a complete v1 `ArchitectureModel`, verifies the session snapshot binding and returns deterministic `evidence-report.md` content with summary counts for confirmed assertions, review-required assertions, scan warnings and missing origins. The report contains only model/evidence IDs and repository-relative metadata. It does not read source bodies, emit absolute paths, write files or call AI.
+
+See [evidence report and architectural review](evidence-report.md).
+
 ## LikeC4 generation and validation tools
 
 Issue #15 adds two tools while keeping architectural interpretation in the MCP client:
