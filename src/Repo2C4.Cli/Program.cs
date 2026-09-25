@@ -17,7 +17,7 @@ public static class Program
             return 0;
         }
 
-        standardError.WriteLine("No CLI commands are available yet. Run --help for the current status.");
+        standardError.WriteLine("CLI commands are not available yet. Run --help for the current status.");
         return 2;
     }
 }
