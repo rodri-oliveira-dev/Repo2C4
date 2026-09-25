@@ -99,9 +99,20 @@ public static class ArchitectureC3Validator
             {
                 errors.Add(new ContractError("id.required", path + ".id", "Component ID is required."));
             }
-            else if (!componentIds.Add(component.Id))
+            else
             {
-                errors.Add(new ContractError("id.duplicate", path + ".id", "Component IDs must be unique."));
+                if (baseElements.ContainsKey(component.Id))
+                {
+                    errors.Add(new ContractError(
+                        "id.duplicate",
+                        path + ".id",
+                        "C3 component ID must not duplicate an existing C1/C2 element ID."));
+                }
+
+                if (!componentIds.Add(component.Id))
+                {
+                    errors.Add(new ContractError("id.duplicate", path + ".id", "Component IDs must be unique."));
+                }
             }
 
             if (string.IsNullOrWhiteSpace(component.Name) || string.IsNullOrWhiteSpace(component.Responsibility))
