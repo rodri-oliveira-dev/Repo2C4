@@ -1,22 +1,130 @@
+using System.Reflection;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+
 namespace Repo2C4.Mcp;
 
-/// <summary>Minimal stdio-safe entrypoint; MCP transport is added in phase 3.</summary>
+/// <summary>Local MCP server entrypoint using stdio exclusively for protocol traffic.</summary>
 public static class Program
 {
-    public static int Main(string[] args) => Run(args, Console.Error);
+    private const string ServerName = "repo2c4";
 
-    public static int Run(string[] args, TextWriter standardError)
+    public static async Task<int> Main(string[] args)
+    {
+        using CancellationTokenSource shutdown = new();
+        ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            shutdown.Cancel();
+        };
+
+        Console.CancelKeyPress += cancelHandler;
+        try
+        {
+            return await RunAsync(args, Console.Error, shutdown.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= cancelHandler;
+        }
+    }
+
+    public static async Task<int> RunAsync(
+        string[] args,
+        TextWriter standardError,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(standardError);
 
         if (args is ["--help"] or ["-h"])
         {
-            standardError.WriteLine("Repo2C4 MCP host: protocol transport is not available yet.");
+            WriteHelp(standardError);
             return 0;
         }
 
-        standardError.WriteLine("Repo2C4 MCP transport is not implemented yet; refusing to start.");
-        return 2;
+        if (!McpHostOptions.TryParse(
+                args,
+                Environment.GetEnvironmentVariable(McpHostOptions.RepositoryRootEnvironmentVariable),
+                out McpHostOptions? hostOptions,
+                out string? configurationError))
+        {
+            standardError.WriteLine(configurationError);
+            return 2;
+        }
+
+        try
+        {
+            RepositoryAccessPolicy.ValidateAuthorizedRoot(hostOptions.RepositoryRoot);
+        }
+        catch (ArgumentException)
+        {
+            standardError.WriteLine("Repo2C4 MCP configuration error: the authorized repository root is invalid or unavailable.");
+            return 2;
+        }
+        catch (IOException)
+        {
+            standardError.WriteLine("Repo2C4 MCP configuration error: the authorized repository root is invalid or unavailable.");
+            return 2;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            standardError.WriteLine("Repo2C4 MCP configuration error: the authorized repository root cannot be accessed.");
+            return 2;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return 0;
+        }
+
+        McpServerOptions serverOptions = new()
+        {
+            ServerInfo = new Implementation
+            {
+                Name = ServerName,
+                Version = GetServerVersion(),
+                Description = "Local, controlled Repo2C4 architecture-evidence server.",
+            },
+            InitializationTimeout = McpLimits.InitializationTimeout,
+            ToolCollection = [],
+            ServerInstructions = "Operate only within the locally authorized repository root. " +
+                "Architectural interpretation belongs to the MCP client; the server does not embed an AI provider.",
+        };
+
+        try
+        {
+            await using StdioServerTransport transport = new(serverOptions);
+            await using McpServer server = McpServer.Create(transport, serverOptions);
+            await server.RunAsync(cancellationToken).ConfigureAwait(false);
+            return 0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return 0;
+        }
+#pragma warning disable CA1031 // Process boundary must prevent exception details/stack traces from contaminating MCP stdio.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            standardError.WriteLine("Repo2C4 MCP host stopped because of an unexpected local transport error.");
+            return 1;
+        }
+    }
+
+    private static string GetServerVersion() =>
+        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    private static void WriteHelp(TextWriter standardError)
+    {
+        standardError.WriteLine("Repo2C4 MCP server over stdio.");
+        standardError.WriteLine("Usage: Repo2C4.Mcp --repository-root <absolute-path>");
+        standardError.WriteLine(
+            $"Alternatively set {McpHostOptions.RepositoryRootEnvironmentVariable} to an absolute local repository root.");
+        standardError.WriteLine("stdout is reserved exclusively for MCP protocol messages; diagnostics use stderr.");
+        standardError.WriteLine(
+            $"Limits: initialization {McpLimits.InitializationTimeout.TotalSeconds:0}s, " +
+            $"tool execution {McpLimits.ToolExecutionTimeout.TotalSeconds:0}s, " +
+            $"{McpLimits.MaxFilesPerInspection} files, {McpLimits.MaxResponseBytes} response bytes.");
     }
 }

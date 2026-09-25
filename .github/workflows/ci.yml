@@ -290,7 +290,8 @@ jobs:
           stderr_file="$(mktemp)"
           dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll --help >"$stdout_file" 2>"$stderr_file"
           test ! -s "$stdout_file"
-          grep -Fq "not available yet" "$stderr_file"
+          grep -Fq "Repo2C4 MCP server over stdio" "$stderr_file"
+          grep -Fq "stdout is reserved exclusively for MCP protocol messages" "$stderr_file"
           rm -f "$stdout_file" "$stderr_file"
 
       - name: Verificar baseline de governança
