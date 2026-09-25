@@ -45,7 +45,7 @@ To request C3 for exactly one reviewed C2 container, add `--c3-container ID`:
 repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
 ```
 
-Without this option no C3 files are produced. A valid selection adds `components.c4` and `c3.views.c4`; the remaining C2 containers do not receive component views automatically. The C3 proposal is bounded, keeps candidate/static signals under review, and fails when the selected container has insufficient evidence.
+Without this option no C3 files are produced. A valid selection nests reviewed component proposals inside the selected container in `model.c4` and adds `c3.views.c4`; the remaining C2 containers do not receive component views automatically. The C3 proposal is bounded, keeps candidate/static signals under review, and fails when the selected container has insufficient evidence.
 
 The output directory and any existing target file must not be a symlink, junction or reparse point. Generated filenames are fixed by Repo2C4 and cannot be supplied by model content.
 
