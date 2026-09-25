@@ -117,7 +117,11 @@ public sealed class ManagedOutputManagerTests
         string manifestBefore = await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(output, "model.c4"), "manual", TestContext.Current.CancellationToken);
         LikeC4GeneratedFile[] changed = [new("model.c4", "new")];
-        GenerationPlan conflict = await ManagedOutputManager.PreviewAsync(output, "1.0", changed);
+        GenerationPlan conflict = await ManagedOutputManager.PreviewAsync(
+            output,
+            "1.0",
+            changed,
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAnyAsync<IOException>(
             () => ManagedOutputManager.CommitAsync(
@@ -127,7 +131,11 @@ public sealed class ManagedOutputManagerTests
                 conflict,
                 TestContext.Current.CancellationToken));
 
-        Assert.Equal("manual", await File.ReadAllTextAsync(Path.Combine(output, "model.c4"), TestContext.Current.CancellationToken));
+        Assert.Equal(
+            "manual",
+            await File.ReadAllTextAsync(
+                Path.Combine(output, "model.c4"),
+                TestContext.Current.CancellationToken));
         Assert.Equal(manifestBefore, await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken));
     }
 
