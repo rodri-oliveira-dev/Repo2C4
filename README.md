@@ -11,7 +11,7 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 | `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; MCP tools are added incrementally during phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only, and no inspection or LikeC4 MCP tools are exposed yet; those remain scoped to issues #14 and #15.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Bounded inspection/evidence tools are exposed in issue #14; LikeC4 MCP generation/validation remains scoped to issue #15.
 
 ## Prerequisites and verification
 
@@ -30,7 +30,7 @@ The baseline retains Central Package Management, committed SDK-generated package
 
 ## Bounded local inventory (issue #7)
 
-`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. The offline CLI exposes this capability through `inspect`; MCP scanning remains intentionally unexposed until issue #14.
+`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. The offline CLI exposes this capability through `inspect`; MCP exposes the same Core inspection path through bounded `inspect_repository`, `get_evidence` and `get_snapshot` tools.
 
 Default exclusions include `.git`, `bin`, `obj`, `node_modules`, `artifacts` and other generated directories, `.env*`, `appsettings.*`, credentials, keys and names indicative of secrets. Only known text-oriented extensions are considered. A bounded 4 KiB prefix probe rejects files with NUL bytes. Caller-supplied `IncludePatterns` and `ExcludePatterns` accept bounded relative globs (`*`, `?`, `**`), without overriding mandatory safety exclusions.
 
@@ -42,7 +42,7 @@ Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total
 
 `RepositoryFactExtractor.Extract(options, cancellationToken)` inventories an explicitly authorized local checkout with `RepositoryScanner`, then inspects only accepted .NET solution, project and source files to populate `RepositorySnapshot.Evidence`. It recognizes .sln/.slnx project listings, declared executable/library/test characteristics, target frameworks, build-time `ProjectReference`, HTTP/worker host signals, Npgsql/RabbitMQ/Redis integration **candidates**, and Docker/compose manifest presence. Facts retain relative file paths and lines where available. A build-time project dependency is not a runtime relationship; an SDK, package or source signal is not proof of a deployed C4 container or a live network connection.
 
-Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted by inspection. The CLI exposes this path through `inspect`; MCP evidence tools remain intentionally unexposed until issue #14.
+Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted by inspection. The CLI exposes this path through `inspect`; MCP exposes the same v1 evidence through bounded, paginated issue #14 tools.
 
 See [fixtures, v1 snapshot and reproduction](examples/README.md) and [evidence categories](docs/contracts.md).
 
@@ -94,9 +94,11 @@ dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
 
 `REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Future tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
 
-Issue #13 deliberately exposes no domain tools: `tools/list` returns an empty list until issue #14. The server embeds no AI provider and does not select models. Architectural interpretation remains a client responsibility.
+Issue #14 adds exactly three read-only domain tools: `inspect_repository`, `get_evidence` and `get_snapshot`. They reuse the Core v1 contracts, keep snapshots session-scoped with a 30-minute expiry, paginate with authenticated cursors and never return generic file contents. LikeC4 generation/validation remains absent until issue #15.
 
-See [MCP stdio and access policy](docs/mcp.md) for configuration, limits and the security boundary.
+The server embeds no AI provider and does not select models. `.candidate` signals and `ProjectReference` remain unverified/static evidence; architectural interpretation stays with the MCP client.
+
+See [MCP stdio, inspection tools and access policy](docs/mcp.md) for configuration, schemas, limits, controlled errors and the security boundary.
 
 ## Entry point smoke tests
 
@@ -105,7 +107,7 @@ dotnet run --project src/Repo2C4.Cli/Repo2C4.Cli.csproj -- --help
 dotnet run --project src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -- --help
 ```
 
-CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite additionally starts the executable, performs a real stdio initialization handshake and `tools/list`, and verifies that no non-protocol content is written to stdout.
+CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite additionally starts the executable, performs a real stdio handshake, lists/calls the inspection tools, exercises pagination and negative security cases, and verifies that no non-protocol content is written to stdout.
 
 ## CI and distribution
 
