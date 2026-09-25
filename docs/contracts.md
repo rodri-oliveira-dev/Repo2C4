@@ -81,3 +81,21 @@ Use `StableIds.ForEvidence(category, relativePath, line, objectiveDescription)`,
 ## Compatibility policy
 
 Version `1.0` is the only accepted version in the foundation phase. Unknown fields are ignored when reading v1 to accommodate additive producer metadata, but must never weaken required-field, provenance or semantic checks. A future backward-compatible v1 addition must be optional and preserve the meaning of existing fields; use a new major schema version for incompatible changes. Unknown major/minor version strings are rejected until explicitly supported. Do not silently transform a future schema into v1 or strip a `requiresReview` flag.
+
+## v1 .NET evidence extraction categories
+
+`RepositoryFactExtractor.Extract(options, cancellationToken)` returns a valid v1 snapshot that retains accepted file metadata and scan diagnostics while adding factual evidence. It emits no `ArchitectureElement` or `ArchitectureRelation`.
+
+| Category | Observation and proof boundary |
+| --- | --- |
+| `dotnet.solution.project` | A .sln/.slnx lists an inventoried project, not a deployed container. |
+| `dotnet.project` | An MSBuild project manifest exists; no project evaluation is performed. |
+| `dotnet.project.kind` | SDK/output type/test flag indicates executable/library/test; static declarations may be conditional. |
+| `dotnet.project.targetFramework` | A literal declared target framework; properties/imports are not evaluated. |
+| `dotnet.project.reference` | A declared, inventoried build-time `ProjectReference`; not runtime communication. |
+| `dotnet.project.testCandidate` | Test-framework package reference; does not independently establish a test executable. |
+| `dotnet.runtime.http.candidate`, `dotnet.runtime.worker.candidate` | Recognizable Web/Worker SDK or source APIs; the host may never run. |
+| `dotnet.integration.postgresql.candidate`, `dotnet.integration.rabbitmq.candidate`, `dotnet.integration.redis.candidate` | Identifiable package/source mentions; never sufficient to confirm HTTP, broker or database communication. |
+| `deployment.docker.manifest` | Dockerfile or compose manifest presence, not a deployment. |
+
+Every item retains relative path, optional 1-based line and a fixed description without source content. Unsupported model relations must remain `requiresReview` until separately verified. See [local fixtures and illustrative JSON](../examples/README.md).
