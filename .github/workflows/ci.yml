@@ -252,6 +252,8 @@ jobs:
           cmp examples/end-to-end/generated/c1/specification.c4 "$workdir/c1/specification.c4"
           cmp examples/end-to-end/generated/c1/model.c4 "$workdir/c1/model.c4"
           cmp examples/end-to-end/generated/c1/views.c4 "$workdir/c1/views.c4"
+          test -s "$workdir/c1/evidence-report.md"
+          grep -Fq "Hypotheses requiring review" "$workdir/c1/evidence-report.md"
           "${cli[@]}" validate --output "$workdir/c1"
 
           "${cli[@]}" generate \
@@ -260,6 +262,8 @@ jobs:
           cmp examples/end-to-end/generated/c2/specification.c4 "$workdir/c2/specification.c4"
           cmp examples/end-to-end/generated/c2/model.c4 "$workdir/c2/model.c4"
           cmp examples/end-to-end/generated/c2/views.c4 "$workdir/c2/views.c4"
+          test -s "$workdir/c2/evidence-report.md"
+          grep -Fq "Hypotheses requiring review" "$workdir/c2/evidence-report.md"
           "${cli[@]}" validate --output "$workdir/c2"
 
           set +e
@@ -290,7 +294,7 @@ jobs:
           stderr_file="$(mktemp)"
           dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll --help >"$stdout_file" 2>"$stderr_file"
           test ! -s "$stdout_file"
-          grep -Fq "Tools: inspect_repository, get_evidence, get_snapshot, generate_likec4, validate_likec4." "$stderr_file"
+          grep -Fq "Tools: inspect_repository, get_evidence, get_snapshot, get_evidence_report, generate_likec4, validate_likec4." "$stderr_file"
           grep -Fq "stdout is reserved exclusively for MCP protocol messages" "$stderr_file"
           rm -f "$stdout_file" "$stderr_file"
 
