@@ -147,7 +147,9 @@ public sealed class ManagedOutputManagerTests
     {
         public TempDirectory()
         {
-            Path = Directory.CreateTempSubdirectory("repo2c4-managed-output-").FullName;
+            Path = Directory
+                .CreateTempSubdirectory("repo2c4-managed-output-")
+                .FullName;
         }
 
         public string Path { get; }
