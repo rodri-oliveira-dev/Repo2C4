@@ -105,7 +105,7 @@ public sealed class CliHostTests
         ]);
 
         Assert.Equal(CliExitCodes.Success, exitCode);
-        Assert.True(File.Exists(Path.Combine(outputDirectory, "components.c4")));
+        Assert.Contains("component", File.ReadAllText(Path.Combine(outputDirectory, "model.c4")), StringComparison.Ordinal);
         string c3View = File.ReadAllText(Path.Combine(outputDirectory, "c3.views.c4"));
         Assert.Contains("C3 - Web API", c3View, StringComparison.Ordinal);
         Assert.DoesNotContain("el_worker", c3View, StringComparison.Ordinal);
