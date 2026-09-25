@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using Repo2C4.Core.Contracts;
 using Repo2C4.Core.C3;
+using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Inspection;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
