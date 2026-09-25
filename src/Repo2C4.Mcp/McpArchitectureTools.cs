@@ -384,7 +384,9 @@ internal sealed class McpArchitectureTools
         }
 
         string relative = Path.GetRelativePath(_authorizedRoot, trimmed).Replace('\\', '/');
-        string identity = name.ToLowerInvariant() + "\n" + relative;
+        string identity = string.Equals(relative, ".", StringComparison.Ordinal)
+            ? name.ToLowerInvariant()
+            : name.ToLowerInvariant() + "\n" + relative;
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         return "repo_" + Convert.ToHexString(digest).ToLowerInvariant()[..24];
     }
