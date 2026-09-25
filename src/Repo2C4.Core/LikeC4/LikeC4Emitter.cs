@@ -37,6 +37,65 @@ public static class LikeC4Emitter
         ];
     }
 
+
+    public static ImmutableArray<LikeC4GeneratedFile> EmitWithC3(
+        ArchitectureModel baseModel,
+        ArchitectureC3Model c3)
+    {
+        ArgumentNullException.ThrowIfNull(baseModel);
+        ArgumentNullException.ThrowIfNull(c3);
+
+        ImmutableArray<ContractError> baseErrors = ContractValidator.ValidateModel(baseModel);
+        ImmutableArray<ContractError> c3Errors = ArchitectureC3Validator.Validate(c3);
+        if (!baseErrors.IsEmpty || !c3Errors.IsEmpty)
+        {
+            throw new ContractValidationException([.. baseErrors, .. c3Errors]);
+        }
+
+        if (c3.Components.IsEmpty)
+        {
+            throw new ContractValidationException(
+            [
+                new ContractError(
+                    "c3.insufficientEvidence",
+                    "$.components",
+                    "Selected container has insufficient evidence for a C3 proposal."),
+            ]);
+        }
+
+        Dictionary<string, string> localIdentifiers = BuildLocalIdentifiers(baseModel.Elements);
+        Dictionary<string, string> references = BuildReferences(baseModel.Elements, localIdentifiers);
+        Dictionary<string, string> componentIdentifiers = new(StringComparer.Ordinal);
+
+        foreach (ArchitectureComponent component in c3.Components.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            string normalized = NormalizeIdentifier(component.Id);
+            if (componentIdentifiers.Values.Contains(normalized, StringComparer.Ordinal))
+            {
+                throw new ContractValidationException(
+                [
+                    new ContractError(
+                        "likec4.identifierCollision",
+                        "$.components",
+                        "C3 component IDs normalize to the same LikeC4 identifier."),
+                ]);
+            }
+
+            componentIdentifiers.Add(component.Id, normalized);
+            references.Add(component.Id, references[c3.SelectedContainerId] + "." + normalized);
+        }
+
+        return
+        [
+            new LikeC4GeneratedFile(SpecificationFileName, EmitSpecification(includeComponent: true)),
+            new LikeC4GeneratedFile(
+                ModelFileName,
+                EmitModelWithC3(baseModel, c3, localIdentifiers, componentIdentifiers, references)),
+            new LikeC4GeneratedFile(ViewsFileName, EmitViews(baseModel, references)),
+            new LikeC4GeneratedFile("c3.views.c4", EmitC3View(baseModel, c3, references)),
+        ];
+    }
+
     private static Dictionary<string, string> BuildLocalIdentifiers(ImmutableArray<ArchitectureElement> elements)
     {
         Dictionary<string, string> localIdentifiers = new(StringComparer.Ordinal);
@@ -86,7 +145,7 @@ public static class LikeC4Emitter
 
     private static string NormalizeIdentifier(string id) => id.Replace('.', '_');
 
-    private static string EmitSpecification()
+    private static string EmitSpecification(bool includeComponent = false)
     {
         StringBuilder builder = new();
         AppendLine(builder, 0, "specification {");
@@ -97,6 +156,11 @@ public static class LikeC4Emitter
         AppendLine(builder, 1, "}");
         AppendLine(builder, 1, "element softwareSystem");
         AppendLine(builder, 1, "element container");
+        if (includeComponent)
+        {
+            AppendLine(builder, 1, "element component");
+        }
+
         AppendLine(builder, 1, "tag " + RequiresReviewTag + " {");
         AppendLine(builder, 2, "color amber");
         AppendLine(builder, 1, "}");
@@ -247,6 +311,180 @@ public static class LikeC4Emitter
         }
 
         AppendLine(builder, indent, "}");
+    }
+
+    private static string EmitModelWithC3(
+        ArchitectureModel model,
+        ArchitectureC3Model c3,
+        Dictionary<string, string> localIdentifiers,
+        Dictionary<string, string> componentIdentifiers,
+        Dictionary<string, string> references)
+    {
+        StringBuilder builder = new();
+        AppendLine(builder, 0, "model {");
+
+        ArchitectureElement[] roots =
+        [
+            .. model.Elements
+                .Where(element => element.ParentId is null)
+                .OrderBy(element => element.Id, StringComparer.Ordinal),
+        ];
+
+        Dictionary<string, ArchitectureElement[]> children = model.Elements
+            .Where(element => element.ParentId is not null)
+            .GroupBy(element => element.ParentId!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(element => element.Id, StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal);
+
+        foreach (ArchitectureElement root in roots)
+        {
+            EmitElementWithC3(
+                builder,
+                root,
+                c3,
+                localIdentifiers,
+                componentIdentifiers,
+                children,
+                1);
+        }
+
+        if ((roots.Length > 0 && model.Relations.Length > 0) || c3.Relations.Length > 0)
+        {
+            builder.Append('\n');
+        }
+
+        foreach (ArchitectureRelation relation in model.Relations.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            EmitRelation(builder, relation, references, 1);
+        }
+
+        foreach (ArchitectureComponentRelation relation in c3.Relations.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            AppendLine(
+                builder,
+                1,
+                references[relation.SourceId] + " -> " + references[relation.DestinationId]
+                    + " " + Quote(relation.Description) + " {");
+            if (relation.Status == ReviewStatus.RequiresReview)
+            {
+                AppendLine(builder, 2, "#" + RequiresReviewTag);
+            }
+
+            EmitMetadata(
+                builder,
+                relation.Id,
+                relation.EvidenceIds,
+                relation.Status,
+                relation.ReviewReason,
+                2);
+            AppendLine(builder, 1, "}");
+        }
+
+        AppendLine(builder, 0, "}");
+        return builder.ToString();
+    }
+
+    private static void EmitElementWithC3(
+        StringBuilder builder,
+        ArchitectureElement element,
+        ArchitectureC3Model c3,
+        Dictionary<string, string> localIdentifiers,
+        Dictionary<string, string> componentIdentifiers,
+        Dictionary<string, ArchitectureElement[]> children,
+        int indent)
+    {
+        string kind = element.Kind switch
+        {
+            ArchitectureElementKind.Actor => "actor",
+            ArchitectureElementKind.SoftwareSystem => "softwareSystem",
+            ArchitectureElementKind.Container => "container",
+            _ => throw new ArgumentOutOfRangeException(nameof(element), "Unsupported architecture element kind."),
+        };
+
+        AppendLine(
+            builder,
+            indent,
+            localIdentifiers[element.Id] + " = " + kind + " " + Quote(element.Name) + " {");
+
+        if (element.Status == ReviewStatus.RequiresReview)
+        {
+            AppendLine(builder, indent + 1, "#" + RequiresReviewTag);
+        }
+
+        EmitMetadata(
+            builder,
+            element.Id,
+            element.EvidenceIds,
+            element.Status,
+            element.ReviewReason,
+            indent + 1);
+
+        if (element.Id == c3.SelectedContainerId)
+        {
+            builder.Append('\n');
+            foreach (ArchitectureComponent component in c3.Components.OrderBy(item => item.Id, StringComparer.Ordinal))
+            {
+                AppendLine(
+                    builder,
+                    indent + 1,
+                    componentIdentifiers[component.Id] + " = component " + Quote(component.Name) + " {");
+                if (component.Status == ReviewStatus.RequiresReview)
+                {
+                    AppendLine(builder, indent + 2, "#" + RequiresReviewTag);
+                }
+
+                AppendLine(builder, indent + 2, "description " + Quote(component.Responsibility));
+                EmitMetadata(
+                    builder,
+                    component.Id,
+                    component.EvidenceIds,
+                    component.Status,
+                    component.ReviewReason,
+                    indent + 2);
+                AppendLine(builder, indent + 1, "}");
+            }
+        }
+
+        if (children.TryGetValue(element.Id, out ArchitectureElement[]? nested))
+        {
+            builder.Append('\n');
+            foreach (ArchitectureElement child in nested)
+            {
+                EmitElementWithC3(
+                    builder,
+                    child,
+                    c3,
+                    localIdentifiers,
+                    componentIdentifiers,
+                    children,
+                    indent + 1);
+            }
+        }
+
+        AppendLine(builder, indent, "}");
+    }
+
+    private static string EmitC3View(
+        ArchitectureModel model,
+        ArchitectureC3Model c3,
+        Dictionary<string, string> references)
+    {
+        StringBuilder builder = new();
+        ArchitectureElement selected = model.Elements.First(item => item.Id == c3.SelectedContainerId);
+        AppendLine(builder, 0, "views {");
+        AppendLine(builder, 1, "view c3 {");
+        AppendLine(builder, 2, "title " + Quote("C3 - " + selected.Name));
+        AppendLine(builder, 2, "include " + references[selected.Id]);
+        foreach (ArchitectureComponent component in c3.Components.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            AppendLine(builder, 2, "include " + references[component.Id]);
+        }
+
+        AppendLine(builder, 1, "}");
+        AppendLine(builder, 0, "}");
+        return builder.ToString();
     }
 
     private static string EmitViews(ArchitectureModel model, Dictionary<string, string> references)

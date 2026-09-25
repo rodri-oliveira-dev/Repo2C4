@@ -59,32 +59,62 @@ public sealed class CliHostTests
     }
 
     [Fact]
-    public void GenerateWritesFixedFilesAndRequiresExplicitOverwrite()
+    public void GeneratePreviewsThenAppliesManagedFiles()
     {
         string model = Path.Combine(AppContext.BaseDirectory, "EndToEnd", "architecture.c2.v1.json");
         using TempDirectory temp = new();
         string outputDirectory = Path.Combine(temp.Path, "likec4");
 
-        int firstExit = Run(["generate", "--model", model, "--output", outputDirectory]);
+        int previewExit = Run(["generate", "--model", model, "--output", outputDirectory]);
 
-        Assert.Equal(CliExitCodes.Success, firstExit);
+        Assert.Equal(CliExitCodes.Success, previewExit);
+        Assert.False(File.Exists(Path.Combine(outputDirectory, "model.c4")));
+
+        int applyExit = Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]);
+
+        Assert.Equal(CliExitCodes.Success, applyExit);
         string specification = Path.Combine(outputDirectory, "specification.c4");
         string generatedModel = Path.Combine(outputDirectory, "model.c4");
         string views = Path.Combine(outputDirectory, "views.c4");
+        string report = Path.Combine(outputDirectory, "evidence-report.md");
+        string manifest = Path.Combine(outputDirectory, ".repo2c4-manifest.json");
         Assert.True(File.Exists(specification));
         Assert.True(File.Exists(generatedModel));
         Assert.True(File.Exists(views));
+        Assert.True(File.Exists(report));
+        Assert.True(File.Exists(manifest));
 
         string before = File.ReadAllText(generatedModel);
-        int conflictExit = Run(["generate", "--model", model, "--output", outputDirectory]);
-
-        Assert.Equal(CliExitCodes.IoError, conflictExit);
+        int idempotent = Run(["generate", "--model", model, "--output", outputDirectory]);
+        Assert.Equal(CliExitCodes.Success, idempotent);
         Assert.Equal(before, File.ReadAllText(generatedModel));
 
-        int overwriteExit = Run(["generate", "--model", model, "--output", outputDirectory, "--overwrite"]);
+        File.AppendAllText(generatedModel, "// manual edit");
+        int conflict = Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]);
+        Assert.Equal(CliExitCodes.IoError, conflict);
+        Assert.EndsWith("// manual edit", File.ReadAllText(generatedModel), StringComparison.Ordinal);
+    }
 
-        Assert.Equal(CliExitCodes.Success, overwriteExit);
-        Assert.Equal(before, File.ReadAllText(generatedModel));
+    [Fact]
+    public void GenerateSelectedC3WritesOnlyRequestedComponentView()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "acme.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        int exitCode = Run([
+            "generate",
+            "--model", model,
+            "--output", outputDirectory,
+            "--c3-container", "el_web",
+            "--apply",
+        ]);
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.Contains("component", File.ReadAllText(Path.Combine(outputDirectory, "model.c4")), StringComparison.Ordinal);
+        string c3View = File.ReadAllText(Path.Combine(outputDirectory, "c3.views.c4"));
+        Assert.Contains("C3 - Web API", c3View, StringComparison.Ordinal);
+        Assert.DoesNotContain("el_worker", c3View, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,7 +156,7 @@ public sealed class CliHostTests
 
         Assert.Equal(
             CliExitCodes.Success,
-            Run(["generate", "--model", model, "--output", outputDirectory]));
+            Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]));
         Assert.Equal(
             CliExitCodes.Success,
             Run(["validate", "--output", outputDirectory]));

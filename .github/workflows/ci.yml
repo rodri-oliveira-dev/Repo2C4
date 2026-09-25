@@ -248,32 +248,51 @@ jobs:
 
           "${cli[@]}" generate \
             --model examples/end-to-end/architecture.c1.v1.json \
-            --output "$workdir/c1"
+            --output "$workdir/c1" \
+            --apply
           cmp examples/end-to-end/generated/c1/specification.c4 "$workdir/c1/specification.c4"
           cmp examples/end-to-end/generated/c1/model.c4 "$workdir/c1/model.c4"
           cmp examples/end-to-end/generated/c1/views.c4 "$workdir/c1/views.c4"
+          test -s "$workdir/c1/evidence-report.md"
+          grep -Fq "Hypotheses requiring review" "$workdir/c1/evidence-report.md"
           "${cli[@]}" validate --output "$workdir/c1"
 
           "${cli[@]}" generate \
             --model examples/end-to-end/architecture.c2.v1.json \
-            --output "$workdir/c2"
+            --output "$workdir/c2" \
+            --apply
           cmp examples/end-to-end/generated/c2/specification.c4 "$workdir/c2/specification.c4"
           cmp examples/end-to-end/generated/c2/model.c4 "$workdir/c2/model.c4"
           cmp examples/end-to-end/generated/c2/views.c4 "$workdir/c2/views.c4"
+          test -s "$workdir/c2/evidence-report.md"
+          grep -Fq "Hypotheses requiring review" "$workdir/c2/evidence-report.md"
           "${cli[@]}" validate --output "$workdir/c2"
 
+          "${cli[@]}" generate \
+            --model examples/models/acme.c2.v1.json \
+            --output "$workdir/c3" \
+            --c3-container el_web \
+            --apply
+          test -s "$workdir/c3/c3.views.c4"
+          grep -Fq "C3 - Web API" "$workdir/c3/c3.views.c4"
+          grep -Fq "component" "$workdir/c3/model.c4"
+          "${cli[@]}" validate --output "$workdir/c3"
+
+          preview="$("${cli[@]}" generate \
+            --model examples/end-to-end/architecture.c2.v1.json \
+            --output "$workdir/c2")"
+          [[ "$preview" == *"unchanged model.c4"* ]]
+
+          printf '\n// human edit\n' >> "$workdir/c2/model.c4"
           set +e
           "${cli[@]}" generate \
             --model examples/end-to-end/architecture.c2.v1.json \
-            --output "$workdir/c2"
+            --output "$workdir/c2" \
+            --apply
           conflict_exit="$?"
           set -e
           test "$conflict_exit" -eq 5
-
-          "${cli[@]}" generate \
-            --model examples/end-to-end/architecture.c2.v1.json \
-            --output "$workdir/c2" \
-            --overwrite
+          grep -Fq "// human edit" "$workdir/c2/model.c4"
 
       - name: Smoke test da CLI
         shell: bash
@@ -290,7 +309,7 @@ jobs:
           stderr_file="$(mktemp)"
           dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll --help >"$stdout_file" 2>"$stderr_file"
           test ! -s "$stdout_file"
-          grep -Fq "Tools: inspect_repository, get_evidence, get_snapshot, generate_likec4, validate_likec4." "$stderr_file"
+          grep -Fq "Tools: inspect_repository, get_evidence, get_snapshot, get_evidence_report, generate_likec4, validate_likec4." "$stderr_file"
           grep -Fq "stdout is reserved exclusively for MCP protocol messages" "$stderr_file"
           rm -f "$stdout_file" "$stderr_file"
 
