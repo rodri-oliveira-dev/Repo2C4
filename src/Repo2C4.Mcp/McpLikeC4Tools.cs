@@ -40,9 +40,9 @@ internal sealed class McpLikeC4Tools
         tools.Add(CreateTool(
             nameof(GetEvidenceReport),
             "get_evidence_report",
-            "Return a deterministic metadata-only evidence-report.md for a session-bound v1 ArchitectureModel. " +
-            "The embedded snapshot must exactly match snapshotId. The response includes repository-relative evidence locations, " +
-            "review-required assertions, scan warnings and missing-origin counts without source bodies, secret values or repository writes.",
+            "Return a bounded summary of the deterministic evidence-report.md for a session-bound v1 ArchitectureModel. " +
+            "The embedded snapshot must exactly match snapshotId. The response contains counts plus bounded review-required IDs " +
+            "and warning codes without source bodies, configuration values, absolute paths or repository writes.",
             readOnly: true,
             idempotent: true));
 
@@ -154,15 +154,37 @@ internal sealed class McpLikeC4Tools
         McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
         EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
 
+        string[] reviewRequiredIds =
+        [
+            .. model.Elements
+                .Where(item => item.Status == ReviewStatus.RequiresReview)
+                .Select(item => item.Id)
+                .Concat(model.Relations
+                    .Where(item => item.Status == ReviewStatus.RequiresReview)
+                    .Select(item => item.Id))
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .Take(McpLimits.MaxSummaryItems),
+        ];
+        string[] warningCodes =
+        [
+            .. model.Snapshot.Diagnostics
+                .Where(item => item.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+                .Select(item => item.Code)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .Take(McpLimits.MaxSummaryItems),
+        ];
+
         return McpResponseGuard.EnsureWithinLimit(new McpEvidenceReportResult(
             entry.SnapshotId,
             model.SchemaVersion,
             report.FileName,
-            report.Content,
             report.Summary.ConfirmedAssertions,
             report.Summary.ReviewRequiredAssertions,
             report.Summary.ScanWarnings,
-            report.Summary.MissingOrigins));
+            report.Summary.MissingOrigins,
+            reviewRequiredIds,
+            warningCodes));
     }
 
     [Description("Validate proposed or previously written LikeC4 using the controlled official LikeC4 CLI adapter.")]
