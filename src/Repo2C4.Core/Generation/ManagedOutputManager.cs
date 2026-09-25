@@ -61,6 +61,16 @@ public static class ManagedOutputManager
             string target = ResolveTarget(root, file.FileName);
             string newHash = ComputeHash(file.Content);
 
+            if (Directory.Exists(target))
+            {
+                changes.Add(new GeneratedFileChange(
+                    file.FileName,
+                    GeneratedFileChangeKind.Conflict,
+                    prior.TryGetValue(file.FileName, out GenerationManifestEntry? directory) ? directory.Sha256 : null,
+                    newHash));
+                continue;
+            }
+
             if (!File.Exists(target))
             {
                 changes.Add(new GeneratedFileChange(
@@ -123,6 +133,16 @@ public static class ManagedOutputManager
         }
 
         string root = Path.GetFullPath(outputRoot);
+        GenerationPlan currentPlan = await PreviewAsync(
+            root,
+            modelSchemaVersion,
+            files,
+            cancellationToken).ConfigureAwait(false);
+        if (currentPlan.HasConflicts)
+        {
+            throw new IOException("managed_output_conflict");
+        }
+
         Directory.CreateDirectory(root);
         if (IsReparsePoint(root))
         {
@@ -180,10 +200,12 @@ public static class ManagedOutputManager
                     cancellationToken.ThrowIfCancellationRequested();
                     if (File.Exists(target))
                     {
-                        File.Delete(target);
+                        File.Move(temp, target, overwrite: true);
                     }
-
-                    File.Move(temp, target);
+                    else
+                    {
+                        File.Move(temp, target);
+                    }
                     committed.Add((target, backup));
                 }
             }
