@@ -24,7 +24,8 @@ Generate and validate C1:
 ```bash
 $CLI generate \
   --model examples/end-to-end/architecture.c1.v1.json \
-  --output artifacts/e2e/c1
+  --output artifacts/e2e/c1 \
+  --apply
 
 $CLI validate --output artifacts/e2e/c1
 ```
@@ -34,7 +35,8 @@ Generate and validate C2:
 ```bash
 $CLI generate \
   --model examples/end-to-end/architecture.c2.v1.json \
-  --output artifacts/e2e/c2
+  --output artifacts/e2e/c2 \
+  --apply
 
 $CLI validate --output artifacts/e2e/c2
 ```
@@ -52,9 +54,15 @@ The multi-project checked-in model at `examples/models/acme.c2.v1.json` contains
 $CLI generate \
   --model examples/models/acme.c2.v1.json \
   --output artifacts/e2e/acme-web-c3 \
-  --c3-container el_web
+  --c3-container el_web \
+  --apply
 
 $CLI validate --output artifacts/e2e/acme-web-c3
 ```
 
 This nests the C3 component proposals for `el_web` in `model.c4` and adds `c3.views.c4`. No C3 view is created for `el_worker` or other containers. The generated components remain review-required because static repository evidence does not independently prove component boundaries or runtime calls.
+
+
+## Regeneration review
+
+Omit `--apply` to preview changes only. Review `added`, `modified`, `unchanged` and `conflict` entries before applying. After the first successful apply, `.repo2c4-manifest.json` records the SHA-256 of each generated output. If a generated file is edited manually, a later apply is blocked and the human-edited file remains untouched.
