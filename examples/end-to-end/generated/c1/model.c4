@@ -1,0 +1,11 @@
+model {
+  el_library_repo = softwareSystem "Library-only repository" {
+    #requires-review
+    metadata {
+      architectureId "el_library_repo"
+      evidenceIds ["ev_1d5d5849e8163d2cd54b7d77", "ev_cd4e2d70e36c097535a8395e"]
+      reviewStatus "requiresReview"
+      reviewReason "No executable or host candidate exists; the focal system boundary requires human review."
+    }
+  }
+}

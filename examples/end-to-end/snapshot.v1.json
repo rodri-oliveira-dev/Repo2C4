@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "repositoryId": "repo_dc7f1e8bfb906a72d6b45f77",
+  "files": [
+    {
+      "relativePath": "OnlyLib.csproj",
+      "sizeBytes": 121
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_1d5d5849e8163d2cd54b7d77",
+      "category": "dotnet.project.kind",
+      "relativePath": "OnlyLib.csproj",
+      "line": 1,
+      "sourceType": "projectFile",
+      "description": "Project declaration indicates kind: Library."
+    },
+    {
+      "id": "ev_6595af3b309bfc1c3cb9e683",
+      "category": "dotnet.project.targetFramework",
+      "relativePath": "OnlyLib.csproj",
+      "line": 2,
+      "sourceType": "projectFile",
+      "description": "Project declares target framework: net10.0."
+    },
+    {
+      "id": "ev_cd4e2d70e36c097535a8395e",
+      "category": "dotnet.project",
+      "relativePath": "OnlyLib.csproj",
+      "line": 1,
+      "sourceType": "projectFile",
+      "description": "MSBuild project manifest is present."
+    }
+  ],
+  "diagnostics": []
+}

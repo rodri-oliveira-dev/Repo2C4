@@ -233,6 +233,48 @@ jobs:
           REPO2C4_LIKEC4_INTEGRATION: '1'
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
+      - name: Smoke test end-to-end da CLI offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli=(dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll)
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+
+          "${cli[@]}" inspect \
+            --repository examples/fixtures/library-only \
+            --output "$workdir/snapshot.v1.json"
+          cmp examples/end-to-end/snapshot.v1.json "$workdir/snapshot.v1.json"
+
+          "${cli[@]}" generate \
+            --model examples/end-to-end/architecture.c1.v1.json \
+            --output "$workdir/c1"
+          cmp examples/end-to-end/generated/c1/specification.c4 "$workdir/c1/specification.c4"
+          cmp examples/end-to-end/generated/c1/model.c4 "$workdir/c1/model.c4"
+          cmp examples/end-to-end/generated/c1/views.c4 "$workdir/c1/views.c4"
+          "${cli[@]}" validate --output "$workdir/c1"
+
+          "${cli[@]}" generate \
+            --model examples/end-to-end/architecture.c2.v1.json \
+            --output "$workdir/c2"
+          cmp examples/end-to-end/generated/c2/specification.c4 "$workdir/c2/specification.c4"
+          cmp examples/end-to-end/generated/c2/model.c4 "$workdir/c2/model.c4"
+          cmp examples/end-to-end/generated/c2/views.c4 "$workdir/c2/views.c4"
+          "${cli[@]}" validate --output "$workdir/c2"
+
+          set +e
+          "${cli[@]}" generate \
+            --model examples/end-to-end/architecture.c2.v1.json \
+            --output "$workdir/c2"
+          conflict_exit="$?"
+          set -e
+          test "$conflict_exit" -eq 5
+
+          "${cli[@]}" generate \
+            --model examples/end-to-end/architecture.c2.v1.json \
+            --output "$workdir/c2" \
+            --overwrite
+
       - name: Smoke test da CLI
         shell: bash
         run: |
