@@ -20,12 +20,20 @@ public sealed class ArchitectureC3Tests
         Assert.DoesNotContain(c3.Components, item => item.Name.Contains("Worker", StringComparison.OrdinalIgnoreCase));
 
         IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.EmitC3(c3);
-        Assert.Contains(files, file => file.FileName == "components.c4");
         Assert.Contains(files, file => file.FileName == "c3.views.c4");
+        Assert.Contains("component", files.Single(file => file.FileName == "model.c4").Content, StringComparison.Ordinal);
         Assert.DoesNotContain(
             files.Single(file => file.FileName == "c3.views.c4").Content,
             "el_worker",
             StringComparison.Ordinal);
+
+        ArchitectureC3Model repeated = ArchitectureC3Builder.Build(c2, "el_web");
+        Assert.Equal(
+            c3.Components.Select(item => item.Id),
+            repeated.Components.Select(item => item.Id));
+        Assert.DoesNotContain(
+            c3.Relations,
+            relation => relation.Description.Contains("billing", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
