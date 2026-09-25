@@ -20,6 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Template.Library/Template.Library.csproj" />
+    <ProjectReference Include="../../src/Repo2C4/Repo2C4.csproj" />
   </ItemGroup>
 </Project>
