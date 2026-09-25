@@ -27,5 +27,8 @@
     <None Include="../../examples/end-to-end/*.json"
           Link="EndToEnd/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/models/*.json"
+          Link="Models/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
