@@ -137,12 +137,19 @@ internal static class CliApplication
                 ? new HttpClientHandler
                 {
                     UseProxy = false,
+                    UseCookies = false,
+                    AllowAutoRedirect = false,
                     CheckCertificateRevocationList = true,
                 }
                 : null;
             using HttpClient? ownedClient = ownedHandler is null
                 ? null
                 : new HttpClient(ownedHandler, disposeHandler: false);
+            if (ownedClient is not null)
+            {
+                ownedClient.Timeout = Timeout.InfiniteTimeSpan;
+            }
+
             IArchitectureInferenceProvider provider = new OllamaInferenceProvider(
                 inferenceClient ?? ownedClient!,
                 endpoint,
@@ -152,6 +159,12 @@ internal static class CliApplication
                 snapshot,
                 provider,
                 cancellationToken).ConfigureAwait(false);
+
+            string candidateJson = NormalizeText(ContractJson.SerializeModel(candidate));
+            if (Encoding.UTF8.GetByteCount(candidateJson) > MaxModelBytes)
+            {
+                throw new InferenceException(InferenceFailure.PayloadTooLarge, "Candidate exceeds the 4 MiB CLI model limit.");
+            }
 
             string? outputDirectory = Path.GetDirectoryName(fullOutput);
             if (outputDirectory is null)
@@ -166,9 +179,10 @@ internal static class CliApplication
             {
                 await WriteTextFileAsync(
                     temporary,
-                    NormalizeText(ContractJson.SerializeModel(candidate)),
+                    candidateJson,
                     overwrite: false,
                     cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 File.Move(temporary, fullOutput);
             }
             finally
