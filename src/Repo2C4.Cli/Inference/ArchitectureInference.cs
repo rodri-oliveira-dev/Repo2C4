@@ -79,7 +79,7 @@ public static class InferenceSnapshotSanitizer
                 aliases[item.RelativePath],
                 null,
                 item.SourceType,
-                description));
+                description!));
         }
 
         return new RepositorySnapshot(snapshot.SchemaVersion, OpaqueId("repo", snapshot.RepositoryId), files.ToImmutable(), evidence.ToImmutable(), []);
