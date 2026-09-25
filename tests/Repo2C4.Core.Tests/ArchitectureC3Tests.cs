@@ -19,7 +19,7 @@ public sealed class ArchitectureC3Tests
         Assert.All(c3.Components, item => Assert.Equal("el_web", item.ContainerId));
         Assert.DoesNotContain(c3.Components, item => item.Name.Contains("Worker", StringComparison.OrdinalIgnoreCase));
 
-        IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.EmitC3(c3);
+        IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.EmitWithC3(c2, c3);
         Assert.Contains(files, file => file.FileName == "c3.views.c4");
         Assert.Contains("component", files.Single(file => file.FileName == "model.c4").Content, StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -45,6 +45,29 @@ public sealed class ArchitectureC3Tests
             () => ArchitectureC3Builder.Build(c2, "el_missing"));
 
         Assert.Contains(error.Errors, item => item.Code == "c3.containerMissing");
+    }
+
+    [Fact]
+    public void DependencyWithoutEvidenceOriginIsRejected()
+    {
+        ArchitectureModel c2 = LoadModel("acme.c2.v1.json");
+        ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_web");
+        ArchitectureComponent first = c3.Components[0] with
+        {
+            EvidenceIds = ["ev_missing"],
+        };
+        ArchitectureC3Model invalid = c3 with
+        {
+            Components =
+            [
+                first,
+                .. c3.Components.Skip(1),
+            ],
+        };
+
+        Assert.Contains(
+            ArchitectureC3Validator.Validate(invalid),
+            item => item.Code == "evidence.referenceMissing");
     }
 
     [Fact]
