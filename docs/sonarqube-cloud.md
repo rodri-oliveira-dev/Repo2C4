@@ -2,7 +2,7 @@
 
 [Português](sonarqube-cloud.pt-BR.md) | **English**
 
-This repository includes an optional SonarQube Cloud workflow at `.github/workflows/sonar.yml`. The integration is designed for .NET libraries generated from this template and remains disabled until `SONAR_TOKEN` is configured.
+This repository includes an optional SonarQube Cloud workflow at `.github/workflows/sonar.yml`. The integration is configured for the Repo2C4 multi-project solution and remains disabled until `SONAR_TOKEN` is configured.
 
 ## What the workflow does
 
@@ -14,12 +14,12 @@ It:
 - restores NuGet dependencies in locked mode;
 - performs a non-incremental Release build under Sonar analysis;
 - runs the test suite and produces OpenCover coverage for Sonar;
-- keeps repository and release-governance scripts available to Sonar analysis;
+- keeps repository maintenance scripts available to Sonar analysis;
 - waits for the Sonar Quality Gate and fails the workflow when the gate fails;
 - reports a `sonar.projectVersion` that follows the highest reachable release tag by SemVer precedence;
-- falls back to the project's `PackageVersion` before the first release tag exists.
+- falls back to the project's `Version` before the first release tag exists.
 
-The primary CI workflow remains responsible for the repository's normal build, warnings-as-errors policy, package validation, and CI artifacts. SonarQube Cloud complements that baseline instead of replacing it.
+The primary CI workflow remains responsible for the repository's normal build, warnings-as-errors policy, CLI/MCP startup validation, and CI artifacts. SonarQube Cloud complements that baseline instead of replacing it.
 
 ## 1. Create or import the SonarQube Cloud project
 
@@ -104,7 +104,7 @@ Its version resolution is:
 1. enumerate reachable Git tags matching `v*.*.*`;
 2. compare valid candidates using SemVer precedence, including prerelease identifiers;
 3. remove the leading `v` from the highest version and use it as `sonar.projectVersion`;
-4. before the first release tag exists, use the MSBuild `PackageVersion` as a fallback.
+4. before the first release tag exists, use the MSBuild `Version` as a fallback.
 
 Example:
 
@@ -132,7 +132,7 @@ When the scanner actually runs, a failed Quality Gate fails the Sonar GitHub Act
 
 The built-in **Sonar way** gate is a reasonable starting point. A custom gate can be used when the project has an explicit quality policy, but do not weaken thresholds merely to make CI green.
 
-For a small deterministic library, coverage targets can be stricter than for a typical application, but exclusions should represent genuinely non-product code rather than metric manipulation.
+For a small deterministic tool, coverage targets can be stricter than for a typical application, but exclusions should represent genuinely non-product code rather than metric manipulation.
 
 ## 7. Coverage behavior
 
@@ -155,7 +155,7 @@ Production code should not be excluded from coverage solely to increase the repo
 
 ## 8. Analysis scope
 
-The baseline does **not** exclude `scripts/**` from Sonar analysis. Repository helpers such as package verification, release request resolution, release candidate verification, and generated-repository initialization are engineering-critical code and should remain visible to reliability, security, and text/secrets analysis where supported by Sonar.
+The baseline does **not** exclude `scripts/**` from Sonar analysis. Repository maintenance scripts, including Sonar version resolution, are engineering-critical code and should remain visible to reliability, security, and text/secrets analysis where supported by Sonar.
 
 If a future file should not contribute to coverage, prefer the narrowest applicable coverage exclusion instead of removing it from the whole analysis. Do not add broad `sonar.exclusions` patterns merely to improve metrics.
 
@@ -223,7 +223,7 @@ Confirm the test step generated an OpenCover file and look for the Sonar log ent
 
 ### Project version never advances
 
-Confirm releases create valid SemVer Git tags matching:
+After the distribution phase enables releases, confirm that releases create valid SemVer Git tags matching:
 
 ```text
 v*.*.*

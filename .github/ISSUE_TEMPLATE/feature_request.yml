@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose an improvement or new capability for the library.
+description: Propose an improvement or new capability for Repo2C4.
 title: "[Feature]: "
 body:
   - type: textarea

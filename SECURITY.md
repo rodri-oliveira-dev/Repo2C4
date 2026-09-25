@@ -17,7 +17,7 @@ Preferred reporting channels are:
 
 Include enough detail to help maintainers reproduce and assess the issue:
 
-- affected package version or commit;
+- affected project version or commit;
 - affected platform or runtime, when relevant;
 - a minimal reproduction or proof of concept;
 - expected impact and any known mitigations.
