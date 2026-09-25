@@ -459,15 +459,16 @@ internal static class CliApplication
         CancellationToken cancellationToken)
     {
         FileMode mode = overwrite ? FileMode.Create : FileMode.CreateNew;
-        await using FileStream stream = new(
+        byte[] bytes = new UTF8Encoding(false).GetBytes(content);
+        using FileStream stream = new(
             path,
             mode,
             FileAccess.Write,
             FileShare.None,
             bufferSize: 4096,
             FileOptions.Asynchronous);
-        await using StreamWriter writer = new(stream, new UTF8Encoding(false));
-        await writer.WriteAsync(content.AsMemory(), cancellationToken).ConfigureAwait(false);
+        await stream.WriteAsync(bytes.AsMemory(), cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string NormalizeText(string content)
