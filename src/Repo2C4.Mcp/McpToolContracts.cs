@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Generation;
@@ -45,9 +46,35 @@ public sealed record McpLikeC4File(
     string Content,
     int Utf8Bytes);
 
+public sealed class CamelCaseGeneratedChangeKindConverter : JsonConverter<GeneratedFileChangeKind>
+{
+    public override GeneratedFileChangeKind Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        string? name = reader.GetString();
+        if (Enum.TryParse(name, ignoreCase: true, out GeneratedFileChangeKind kind) &&
+            Enum.IsDefined(kind))
+        {
+            return kind;
+        }
+
+        throw new JsonException("Unknown managed output change kind.");
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        GeneratedFileChangeKind value,
+        JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString().ToLowerInvariant());
+    }
+}
+
 public sealed record McpGeneratedFileChange(
     string FileName,
-    [property: JsonConverter(typeof(JsonStringEnumConverter<GeneratedFileChangeKind>))]
+    [property: JsonConverter(typeof(CamelCaseGeneratedChangeKindConverter))]
     GeneratedFileChangeKind Kind,
     string? PreviousHash,
     string NewHash);
