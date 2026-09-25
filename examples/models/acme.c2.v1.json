@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "level": "C2",
+  "snapshot": {
+    "schemaVersion": "1.0",
+    "repositoryId": "acme_fixture",
+    "files": [
+      {"relativePath": "Acme.slnx", "sizeBytes": 155},
+      {"relativePath": "src/Shared/Shared.csproj", "sizeBytes": 121},
+      {"relativePath": "src/Web/Program.cs", "sizeBytes": 112},
+      {"relativePath": "src/Web/Web.csproj", "sizeBytes": 410},
+      {"relativePath": "src/Worker/Program.cs", "sizeBytes": 45},
+      {"relativePath": "src/Worker/Worker.csproj", "sizeBytes": 156}
+    ],
+    "evidence": [
+      {"id":"ev_postgresql_candidate","category":"dotnet.integration.postgresql.candidate","relativePath":"src/Web/Web.csproj","line":5,"sourceType":"projectFile","description":"PackageReference suggests postgresql integration; no runtime connection is proven."},
+      {"id":"ev_project_reference_shared","category":"dotnet.project.reference","relativePath":"src/Web/Web.csproj","line":4,"sourceType":"projectFile","description":"Project declares build-time ProjectReference to: src/Shared/Shared.csproj."},
+      {"id":"ev_rabbitmq_candidate","category":"dotnet.integration.rabbitmq.candidate","relativePath":"src/Web/Web.csproj","line":6,"sourceType":"projectFile","description":"PackageReference suggests rabbitmq integration; no runtime connection is proven."},
+      {"id":"ev_redis_candidate","category":"dotnet.integration.redis.candidate","relativePath":"src/Web/Web.csproj","line":7,"sourceType":"projectFile","description":"PackageReference suggests redis integration; no runtime connection is proven."},
+      {"id":"ev_shared_kind","category":"dotnet.project.kind","relativePath":"src/Shared/Shared.csproj","line":1,"sourceType":"projectFile","description":"Project declaration indicates kind: Library."},
+      {"id":"ev_shared_project","category":"dotnet.project","relativePath":"src/Shared/Shared.csproj","line":1,"sourceType":"projectFile","description":"MSBuild project manifest is present."},
+      {"id":"ev_solution_shared","category":"dotnet.solution.project","relativePath":"Acme.slnx","line":3,"sourceType":"manifest","description":"Solution declares an inventoried project: src/Shared/Shared.csproj."},
+      {"id":"ev_solution_web","category":"dotnet.solution.project","relativePath":"Acme.slnx","line":2,"sourceType":"manifest","description":"Solution declares an inventoried project: src/Web/Web.csproj."},
+      {"id":"ev_solution_worker","category":"dotnet.solution.project","relativePath":"Acme.slnx","line":4,"sourceType":"manifest","description":"Solution declares an inventoried project: src/Worker/Worker.csproj."},
+      {"id":"ev_web_http_project","category":"dotnet.runtime.http.candidate","relativePath":"src/Web/Web.csproj","line":1,"sourceType":"projectFile","description":"Web SDK declaration is an HTTP-host candidate, not proof of a running endpoint."},
+      {"id":"ev_web_http_source","category":"dotnet.runtime.http.candidate","relativePath":"src/Web/Program.cs","line":1,"sourceType":"sourceCode","description":"Source contains a recognizable HTTP host or route API call; runtime usage is unverified."},
+      {"id":"ev_web_kind","category":"dotnet.project.kind","relativePath":"src/Web/Web.csproj","line":1,"sourceType":"projectFile","description":"Project declaration indicates kind: Executable."},
+      {"id":"ev_web_project","category":"dotnet.project","relativePath":"src/Web/Web.csproj","line":1,"sourceType":"projectFile","description":"MSBuild project manifest is present."},
+      {"id":"ev_worker_host_project","category":"dotnet.runtime.worker.candidate","relativePath":"src/Worker/Worker.csproj","line":1,"sourceType":"projectFile","description":"Worker SDK declaration is a worker-host candidate, not proof of execution."},
+      {"id":"ev_worker_host_source","category":"dotnet.runtime.worker.candidate","relativePath":"src/Worker/Program.cs","line":1,"sourceType":"sourceCode","description":"Source contains a recognizable worker-host API or type; runtime execution is unverified."},
+      {"id":"ev_worker_kind","category":"dotnet.project.kind","relativePath":"src/Worker/Worker.csproj","line":2,"sourceType":"projectFile","description":"Project declaration indicates kind: Executable."},
+      {"id":"ev_worker_project","category":"dotnet.project","relativePath":"src/Worker/Worker.csproj","line":1,"sourceType":"projectFile","description":"MSBuild project manifest is present."}
+    ],
+    "diagnostics": []
+  },
+  "elements": [
+    {"id":"el_acme","kind":"softwareSystem","name":"Acme system","evidenceIds":["ev_solution_web","ev_solution_worker"],"status":"requiresReview","reviewReason":"Selecting one focal software system from repository structure is an architectural decision."},
+    {"id":"el_billing","kind":"softwareSystem","name":"Billing system","evidenceIds":[],"status":"requiresReview","reviewReason":"External system is a review-only proposal; no repository evidence identifies it."},
+    {"id":"el_postgresql","kind":"container","name":"PostgreSQL","parentId":"el_acme","evidenceIds":["ev_postgresql_candidate"],"status":"requiresReview","reviewReason":"A package reference is only a PostgreSQL integration candidate and does not prove an owned or deployed database container."},
+    {"id":"el_rabbitmq","kind":"container","name":"RabbitMQ","parentId":"el_acme","evidenceIds":["ev_rabbitmq_candidate"],"status":"requiresReview","reviewReason":"A package reference is only a RabbitMQ integration candidate and does not prove an owned or deployed broker container."},
+    {"id":"el_web","kind":"container","name":"Web API","parentId":"el_acme","evidenceIds":["ev_web_http_project","ev_web_http_source","ev_web_kind","ev_web_project"],"status":"requiresReview","reviewReason":"Executable and HTTP signals make Web a container candidate; the deployment boundary must be confirmed."},
+    {"id":"el_worker","kind":"container","name":"Worker","parentId":"el_acme","evidenceIds":["ev_worker_host_project","ev_worker_host_source","ev_worker_kind","ev_worker_project"],"status":"requiresReview","reviewReason":"Executable and worker-host signals make Worker a container candidate; the deployment boundary must be confirmed."}
+  ],
+  "relations": [
+    {"id":"rel_web_billing","sourceId":"el_web","destinationId":"el_billing","description":"Uses billing capabilities","evidenceIds":[],"status":"requiresReview","reviewReason":"No repository evidence confirms a runtime relation or protocol."},
+    {"id":"rel_web_postgresql","sourceId":"el_web","destinationId":"el_postgresql","description":"Reads and writes application data","evidenceIds":["ev_postgresql_candidate"],"status":"requiresReview","reviewReason":"Package presence does not prove runtime database communication."},
+    {"id":"rel_worker_rabbitmq","sourceId":"el_worker","destinationId":"el_rabbitmq","description":"Publishes background messages","evidenceIds":["ev_rabbitmq_candidate"],"status":"requiresReview","reviewReason":"Package presence does not prove runtime broker communication."}
+  ]
+}

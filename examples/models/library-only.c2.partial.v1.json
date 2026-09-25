@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "level": "C2",
+  "snapshot": {
+    "schemaVersion": "1.0",
+    "repositoryId": "library_only_fixture",
+    "files": [
+      {"relativePath": "OnlyLib.csproj", "sizeBytes": 121}
+    ],
+    "evidence": [
+      {"id":"ev_library_kind","category":"dotnet.project.kind","relativePath":"OnlyLib.csproj","line":1,"sourceType":"projectFile","description":"Project declaration indicates kind: Library."},
+      {"id":"ev_library_project","category":"dotnet.project","relativePath":"OnlyLib.csproj","line":1,"sourceType":"projectFile","description":"MSBuild project manifest is present."},
+      {"id":"ev_library_tfm","category":"dotnet.project.targetFramework","relativePath":"OnlyLib.csproj","line":2,"sourceType":"projectFile","description":"Project declares target framework: net10.0."}
+    ],
+    "diagnostics": []
+  },
+  "elements": [
+    {
+      "id": "el_library_repo",
+      "kind": "softwareSystem",
+      "name": "Library-only repository",
+      "evidenceIds": ["ev_library_kind", "ev_library_project"],
+      "status": "requiresReview",
+      "reviewReason": "No executable or host candidate exists; the focal system boundary is unresolved and no C2 container is proposed."
+    }
+  ],
+  "relations": []
+}
