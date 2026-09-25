@@ -30,7 +30,9 @@ public sealed class McpStdioIntegrationTests
             .. tools.EnumerateArray()
                 .Select(tool => tool.GetProperty("name").GetString()!),
         ];
-        Assert.Equal(["get_evidence", "get_snapshot", "inspect_repository"], toolNames.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ["generate_likec4", "get_evidence", "get_snapshot", "inspect_repository", "validate_likec4"],
+            toolNames.Order(StringComparer.Ordinal));
         Assert.All(tools.EnumerateArray(), tool =>
         {
             Assert.False(string.IsNullOrWhiteSpace(tool.GetProperty("description").GetString()));
