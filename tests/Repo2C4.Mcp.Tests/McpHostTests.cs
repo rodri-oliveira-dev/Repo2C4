@@ -2,13 +2,13 @@ using Xunit;
 
 namespace Repo2C4.Mcp.Tests;
 
-[CollectionDefinition(EnvironmentVariableCollection.Name, DisableParallelization = true)]
-public sealed class EnvironmentVariableCollection
+[CollectionDefinition(EnvironmentVariableTestGroup.Name, DisableParallelization = true)]
+public sealed class EnvironmentVariableTestGroup
 {
     internal const string Name = "EnvironmentVariable";
 }
 
-[Collection(EnvironmentVariableCollection.Name)]
+[Collection(EnvironmentVariableTestGroup.Name)]
 public sealed class McpHostTests
 {
     [Theory]
