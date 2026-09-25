@@ -215,7 +215,7 @@ public sealed class OpenAiInferenceProvider : IArchitectureInferenceProvider
         HttpStatusCode.Unauthorized => "OpenAI authentication failed (HTTP 401). Check OPENAI_API_KEY.",
         HttpStatusCode.Forbidden => "OpenAI access denied (HTTP 403). Check model and project permissions.",
         HttpStatusCode.TooManyRequests => "OpenAI request was rate-limited (HTTP 429). Check quota and retry later.",
-        >= HttpStatusCode.InternalServerError => "OpenAI service is unavailable (HTTP " + (int)code + ").",
+        _ when (int)code >= 500 => "OpenAI service is unavailable (HTTP " + (int)code + ").",
         _ => "OpenAI inference request failed (HTTP " + (int)code + ").",
     };
 }
