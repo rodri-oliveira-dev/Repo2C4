@@ -6,6 +6,7 @@ internal static class McpLimits
     internal static readonly TimeSpan ToolExecutionTimeout = TimeSpan.FromSeconds(30);
     internal static readonly TimeSpan SnapshotLifetime = TimeSpan.FromMinutes(30);
     internal const int MaxFilesPerInspection = 1_000;
+    internal const int MaxSnapshots = 16;
     internal const int MaxPageSize = 100;
     internal const int DefaultPageSize = 50;
     internal const int MaxSummaryItems = 20;
