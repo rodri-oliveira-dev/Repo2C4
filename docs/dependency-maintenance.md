@@ -1,6 +1,6 @@
 # Dependency maintenance baseline
 
-Repositories generated from this template include a versioned Dependabot baseline for the three parts of the .NET build supply chain that can drift independently:
+Repo2C4 includes a versioned Dependabot baseline for the three parts of the .NET build supply chain that can drift independently:
 
 - NuGet packages;
 - the .NET SDK selected by `global.json`;
@@ -16,7 +16,7 @@ Major updates should be reviewed as compatibility changes. An automated pull req
 
 `global.json` remains the source of truth for the SDK version, roll-forward behavior, and prerelease policy. Dependabot updates that file; it does not override those policies.
 
-A generated repository should run its normal CI, CodeQL, Dependency Review, package validation, and any additional project-specific gates on SDK update pull requests before merge.
+Repo2C4 should run its normal CI, CodeQL, Dependency Review, CLI/MCP smoke tests, and any additional project-specific gates on SDK update pull requests before merge.
 
 ## Template drift protection
 

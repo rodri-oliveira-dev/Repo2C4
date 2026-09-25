@@ -2,7 +2,7 @@
 
 **Português** | [English](sonarqube-cloud.md)
 
-Este repositório inclui uma integração opcional com SonarQube Cloud em `.github/workflows/sonar.yml`. Ela foi pensada para bibliotecas .NET geradas a partir deste template e permanece desabilitada até que `SONAR_TOKEN` seja configurado.
+Este repositório inclui uma integração opcional com SonarQube Cloud em `.github/workflows/sonar.yml`. Ela foi configurada para a solução multi-projetos Repo2C4 e permanece desabilitada até que `SONAR_TOKEN` seja configurado.
 
 ## O que o workflow faz
 
@@ -14,12 +14,12 @@ Ele:
 - restaura dependências NuGet em `--locked-mode`;
 - executa build Release não incremental dentro da análise Sonar;
 - executa os testes e gera cobertura OpenCover;
-- mantém scripts de governança, release e administração disponíveis para análise do Sonar;
+- mantém scripts de manutenção do repositório disponíveis para análise do Sonar;
 - aguarda o Quality Gate e falha quando o gate reprova;
 - envia um `sonar.projectVersion` baseado no maior release tag alcançável segundo precedência SemVer;
-- usa o `PackageVersion` como fallback enquanto ainda não existir release tag.
+- usa o `Version` como fallback enquanto ainda não existir release tag.
 
-O CI principal continua sendo responsável pelo build normal do repositório, warnings como erros, validação do pacote e artefatos de CI. O SonarQube Cloud complementa essa baseline; ele não a substitui.
+O CI principal continua sendo responsável pelo build normal do repositório, warnings como erros, validação de inicialização dos hosts CLI/MCP e artefatos de CI. O SonarQube Cloud complementa essa baseline; ele não a substitui.
 
 ## 1. Criar ou importar o projeto no SonarQube Cloud
 
@@ -104,7 +104,7 @@ A versão é resolvida nesta ordem:
 1. enumera os Git tags alcançáveis pelo `HEAD` no padrão `v*.*.*`;
 2. compara os candidatos válidos usando precedência SemVer, inclusive identificadores de prerelease;
 3. remove o prefixo `v` da maior versão e usa o resultado como `sonar.projectVersion`;
-4. enquanto não houver release tag, usa o `PackageVersion` resolvido pelo MSBuild como fallback.
+4. enquanto não houver release tag, usa o `Version` resolvido pelo MSBuild como fallback.
 
 Exemplo:
 
@@ -132,7 +132,7 @@ Quando o scanner realmente é executado, se o Quality Gate reprovar, o job do So
 
 O gate padrão **Sonar way** é uma boa baseline inicial. Um Quality Gate customizado pode ser usado quando houver uma política explícita de qualidade, mas não reduza thresholds apenas para deixar o CI verde.
 
-Em bibliotecas pequenas e determinísticas, metas de cobertura podem ser mais rigorosas que em aplicações comuns. Ainda assim, exclusões devem representar código realmente fora do escopo do produto, e não manipulação de métrica.
+Em ferramentas pequenas e determinísticas, metas de cobertura podem ser mais rigorosas que em aplicações comuns. Ainda assim, exclusões devem representar código realmente fora do escopo do produto, e não manipulação de métrica.
 
 ## 7. Cobertura
 
@@ -155,7 +155,7 @@ Não exclua código de produção da cobertura apenas para elevar o percentual e
 
 ## 8. Escopo da análise
 
-A baseline **não exclui `scripts/**` da análise Sonar**. Helpers como validação do pacote, guards de release, manipulação de tags e inicialização de repositórios gerados fazem parte da governança técnica do projeto e devem continuar visíveis para análises de confiabilidade, segurança e text/secrets quando suportadas pelo Sonar.
+A baseline **não exclui `scripts/**` da análise Sonar**. Scripts de manutenção, incluindo resolução de versão do Sonar, fazem parte da governança técnica do projeto e devem continuar visíveis para análises de confiabilidade, segurança e text/secrets quando suportadas pelo Sonar.
 
 Se algum arquivo futuro não deva contribuir para cobertura, prefira a exclusão de cobertura mais específica possível em vez de removê-lo de toda a análise. Não adicione padrões amplos de `sonar.exclusions` apenas para melhorar métricas.
 
@@ -223,7 +223,7 @@ Confirme que o passo de testes gerou um arquivo OpenCover e procure no log do So
 
 ### A versão do projeto nunca avança
 
-Confirme que os releases geram Git tags SemVer válidos no padrão:
+Após a fase de distribuição habilitar releases, confirme que eles geram Git tags SemVer válidos no padrão:
 
 ```text
 v*.*.*

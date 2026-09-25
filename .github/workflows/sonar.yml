@@ -84,8 +84,8 @@ jobs:
         if: ${{ env.SONAR_TOKEN != '' }}
         shell: bash
         run: |
-          project="src/Repo2C4/Repo2C4.csproj"
-          fallback_version="$(dotnet msbuild "$project" -nologo -getProperty:PackageVersion \
+          project="src/Repo2C4.Core/Repo2C4.Core.csproj"
+          fallback_version="$(dotnet msbuild "$project" -nologo -getProperty:Version \
             | tr -d '\r' \
             | sed '/^[[:space:]]*$/d' \
             | tail -n 1)"

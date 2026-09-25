@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Este repositório contém uma biblioteca .NET reutilizável. O trabalho deve ser pequeno, correto, reproduzível e alinhado ao estado real do repositório.
+Este repositório contém a ferramenta .NET Repo2C4, com Core reutilizável e hosts CLI/MCP independentes. O trabalho deve ser pequeno, correto, reproduzível e alinhado ao estado real do repositório.
 
 Não trate roadmap, workflow, ferramenta ou convenção como existente sem confirmar o arquivo correspondente na árvore atual.
 
@@ -14,8 +14,7 @@ Leia somente o necessário para a tarefa, priorizando:
 2. a solution e os projetos em `/src` e `/tests`;
 3. `Directory.Build.props`, `Directory.Packages.props` e `.editorconfig`;
 4. `.github/workflows/`;
-5. `.template.config/template.json`, quando aplicável;
-6. `.agents/skills/` para procedimentos especializados.
+5. `.agents/skills/` para procedimentos especializados.
 
 ## Gerenciamento de contexto
 
@@ -97,18 +96,7 @@ Quando a mudança afetar cobertura ou testes de forma relevante:
 dotnet test --configuration Release --no-build --coverlet --coverlet-output-format cobertura
 ```
 
-Quando afetar API pública, metadados, símbolos ou empacotamento:
-
-```bash
-dotnet pack --configuration Release --no-build --output artifacts/packages
-dotnet run --file scripts/verify-package.cs -- artifacts/packages
-```
-
-Quando Source Link precisar ser comprovado em checkout Git com remote configurado:
-
-```bash
-dotnet run --file scripts/verify-package.cs -- artifacts/packages --require-source-link
-```
+Até a Fase 5, todos os projetos são não empacotáveis e o release herdado do template permanece desativado. Não executar `dotnet pack` nem publicar pacotes/tags/releases nesta fase.
 
 Ao alterar `.github/workflows/`, execute também `actionlint` conforme `authoring-github-workflows` e confirme o gate `Agent governance validation`.
 
