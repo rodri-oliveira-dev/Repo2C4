@@ -87,7 +87,10 @@ public sealed class ArchitectureC3Tests
             Components =
             [
                 .. Enumerable.Range(0, ArchitectureC3Validator.MaxComponents + 1)
-                    .Select(index => seed with { Id = "cmp_" + index }),
+                    .Select(index => seed with
+                    {
+                        Id = "cmp_" + index,
+                    }),
             ],
         };
 
