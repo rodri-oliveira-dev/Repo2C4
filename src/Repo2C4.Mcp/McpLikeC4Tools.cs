@@ -5,6 +5,7 @@ using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Repo2C4.Core.C3;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.Generation;
 using Repo2C4.Core.LikeC4;
 using Repo2C4.Core.Review;
 
@@ -32,7 +33,7 @@ internal sealed class McpLikeC4Tools
             "generate_likec4",
             "Generate deterministic LikeC4 from a v1 ArchitectureModel bound to a snapshot in this MCP session. " +
             "dryRun defaults to true and performs no writes. Writing requires dryRun=false, write=true and an explicit " +
-            "repository-relative destinationPath inside the authorized root; existing generated files are never overwritten. " +
+            "repository-relative destinationPath inside the authorized root; managed outputs use a manifest, preview/diff and conflict protection. " +
             "The model snapshot must exactly match snapshotId and unsupported static/candidate evidence cannot be promoted " +
             "to a confirmed container boundary or runtime relation. Optional c3ContainerId adds a bounded C3 view only for " +
             "that existing C2 container; omission preserves C1/C2 behavior.",
@@ -114,37 +115,65 @@ internal sealed class McpLikeC4Tools
                 Encoding.UTF8.GetByteCount(file.Content))),
         ];
 
+        GenerationPlan? plan = null;
+        string? outputRoot = null;
+        if (!string.IsNullOrWhiteSpace(destinationPath))
+        {
+            try
+            {
+                outputRoot = RepositoryAccessPolicy.ResolveWritableDirectoryPath(
+                    _authorizedRoot,
+                    destinationPath,
+                    cancellationToken);
+                plan = await ManagedOutputManager.PreviewAsync(
+                    outputRoot,
+                    model.SchemaVersion,
+                    generated,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException
+                    or IOException
+                    or UnauthorizedAccessException
+                    or NotSupportedException
+                    or PathTooLongException)
+            {
+                throw new McpException(
+                    "destination_invalid: destinationPath must be a safe child directory inside the authorized root.");
+            }
+        }
+
         if (!write)
         {
+            GeneratedFileChange[] changes = plan?.Changes ?? [];
             return McpResponseGuard.EnsureWithinLimit(new McpGenerateLikeC4Result(
                 entry.SnapshotId,
                 model.SchemaVersion,
                 true,
                 false,
                 NormalizeDestinationForResponse(destinationPath),
-                files));
+                files,
+                changes,
+                plan?.HasConflicts ?? false));
         }
 
-        string outputRoot;
-        try
+        if (plan is null || outputRoot is null)
         {
-            outputRoot = RepositoryAccessPolicy.ResolveWritableDirectoryPath(
-                _authorizedRoot,
-                destinationPath!,
-                cancellationToken);
+            throw new McpException("destination_required: writing requires destinationPath.");
         }
-        catch (Exception exception) when (
-            exception is ArgumentException
-                or IOException
-                or UnauthorizedAccessException
-                or NotSupportedException
-                or PathTooLongException)
+
+        if (plan.HasConflicts)
         {
             throw new McpException(
-                "destination_invalid: destinationPath must be a safe child directory inside the authorized root.");
+                "managed_output_conflict: manually edited or unmanaged generated files were not changed.");
         }
 
-        await WriteGeneratedFilesAsync(outputRoot, generated, cancellationToken).ConfigureAwait(false);
+        await ManagedOutputManager.CommitAsync(
+            outputRoot,
+            model.SchemaVersion,
+            generated,
+            plan,
+            cancellationToken).ConfigureAwait(false);
 
         return McpResponseGuard.EnsureWithinLimit(new McpGenerateLikeC4Result(
             entry.SnapshotId,
@@ -152,7 +181,9 @@ internal sealed class McpLikeC4Tools
             false,
             true,
             NormalizeDestinationForResponse(destinationPath),
-            files));
+            files,
+            plan.Changes,
+            false));
     }
 
     [Description("Return a metadata-only evidence provenance report for a session-bound v1 model.")]
