@@ -49,7 +49,7 @@ public static class RepositoryFactExtractor
         HashSet<string> inventoried = snapshot.Files
             .Select(file => file.RelativePath)
             .ToHashSet(StringComparer.Ordinal);
-        List<Evidence> evidence = [];
+        EvidenceAccumulator evidence = new();
         List<RepositoryDiagnostic> diagnostics = [.. snapshot.Diagnostics];
 
         foreach (RepositoryFile file in snapshot.Files)
@@ -57,11 +57,7 @@ public static class RepositoryFactExtractor
             cancellationToken.ThrowIfCancellationRequested();
             if (evidence.Count >= MaxEvidence)
             {
-                diagnostics.Add(new RepositoryDiagnostic(
-                    "extract.evidenceLimit",
-                    DiagnosticSeverity.Warning,
-                    null,
-                    "Evidence budget reached; remaining files were not examined."));
+                evidence.MarkLimitReached();
                 break;
             }
 
@@ -113,9 +109,18 @@ public static class RepositoryFactExtractor
             }
         }
 
+        if (evidence.LimitReached)
+        {
+            diagnostics.Add(new RepositoryDiagnostic(
+                "extract.evidenceLimit",
+                DiagnosticSeverity.Warning,
+                null,
+                "Evidence budget reached; some evidence or remaining files were omitted."));
+        }
+
         RepositorySnapshot result = snapshot with
         {
-            Evidence = [.. evidence.OrderBy(item => item.Id, StringComparer.Ordinal)],
+            Evidence = [.. evidence.Items.OrderBy(item => item.Id, StringComparer.Ordinal)],
             Diagnostics =
             [
                 .. diagnostics
@@ -139,7 +144,7 @@ public static class RepositoryFactExtractor
         string root,
         bool isProject,
         HashSet<string> inventoried,
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         List<RepositoryDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -193,7 +198,7 @@ public static class RepositoryFactExtractor
         string relative,
         string root,
         HashSet<string> inventoried,
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         List<RepositoryDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -233,7 +238,11 @@ public static class RepositoryFactExtractor
                 foreach (string framework in node.Value.Split(';'))
                 {
                     string normalized = framework.Trim();
-                    if (Regex.IsMatch(normalized, @"^net(?:standard|coreapp)?[0-9]+(?:\.[0-9]+)*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)))
+                    if (Regex.IsMatch(
+                        normalized,
+                        @"^net(?:standard|coreapp)?[0-9]+(?:\.[0-9]+)*(?:-[a-z][a-z0-9]*(?:\.[0-9]+)*)?$",
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                        TimeSpan.FromMilliseconds(100)))
                     {
                         Add(evidence, "dotnet.project.targetFramework", relative, Line(node),
                             EvidenceSourceType.ProjectFile, "Project declares target framework: " + normalized.ToLowerInvariant() + ".", cancellationToken);
@@ -278,7 +287,7 @@ public static class RepositoryFactExtractor
         string relative,
         string root,
         HashSet<string> inventoried,
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         List<RepositoryDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -308,7 +317,7 @@ public static class RepositoryFactExtractor
     private static void ExtractSourceSignals(
         string content,
         string relative,
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         List<RepositoryDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -373,7 +382,7 @@ public static class RepositoryFactExtractor
         string source,
         string root,
         HashSet<string> inventoried,
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         List<RepositoryDiagnostic> diagnostics,
         string category,
         string prefix,
@@ -425,7 +434,7 @@ public static class RepositoryFactExtractor
             : null;
 
     private static void Add(
-        List<Evidence> evidence,
+        EvidenceAccumulator evidence,
         string category,
         string path,
         int? line,
@@ -434,15 +443,41 @@ public static class RepositoryFactExtractor
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (evidence.Count >= MaxEvidence)
+        string id = StableIds.ForEvidence(category, path, line, description);
+        evidence.TryAdd(new Evidence(id, category, path, line, sourceType, description));
+    }
+
+    private sealed class EvidenceAccumulator
+    {
+        private readonly HashSet<string> ids = new(StringComparer.Ordinal);
+
+        public List<Evidence> Items { get; } = [];
+
+        public int Count => Items.Count;
+
+        public bool LimitReached
         {
-            return;
+            get;
+            private set;
         }
 
-        string id = StableIds.ForEvidence(category, path, line, description);
-        if (evidence.All(item => item.Id != id))
+        public void MarkLimitReached() => LimitReached = true;
+
+        public void TryAdd(Evidence evidence)
         {
-            evidence.Add(new Evidence(id, category, path, line, sourceType, description));
+            if (ids.Contains(evidence.Id))
+            {
+                return;
+            }
+
+            if (Items.Count >= MaxEvidence)
+            {
+                LimitReached = true;
+                return;
+            }
+
+            ids.Add(evidence.Id);
+            Items.Add(evidence);
         }
     }
 }
