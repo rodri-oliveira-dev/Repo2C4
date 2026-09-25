@@ -47,7 +47,7 @@ public sealed class McpLikeC4ToolsTests
             cancellationToken: TestContext.Current.CancellationToken);
 
         string modelPath = Path.Combine(temp.Path, "architecture", "model.c4");
-        await File.AppendAllTextAsync(modelPath, "// human");
+        await File.AppendAllTextAsync(modelPath, "// human", TestContext.Current.CancellationToken);
 
         McpGenerateLikeC4Result preview = await tools.GenerateLikeC4(
             entry.SnapshotId,
@@ -67,7 +67,7 @@ public sealed class McpLikeC4ToolsTests
                 destinationPath: "architecture",
                 cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("managed_output_conflict", conflict.Message, StringComparison.Ordinal);
-        Assert.EndsWith("// human", await File.ReadAllTextAsync(modelPath), StringComparison.Ordinal);
+        Assert.EndsWith("// human", await File.ReadAllTextAsync(modelPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
 
     [Fact]
