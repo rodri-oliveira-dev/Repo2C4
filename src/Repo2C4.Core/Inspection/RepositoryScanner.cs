@@ -173,7 +173,9 @@ public sealed class RepositoryScanner
                     continue;
                 }
 
-                if (!TextExtensions.Contains(Path.GetExtension(name)) && !TextExtensions.Contains(name))
+                if (!TextExtensions.Contains(Path.GetExtension(name)) && !TextExtensions.Contains(name)
+                    && !name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase)
+                    && !name.StartsWith("Dockerfile.", StringComparison.OrdinalIgnoreCase))
                 {
                     state.Skip("scan.binary");
                     continue;
