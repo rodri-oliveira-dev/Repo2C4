@@ -54,8 +54,9 @@ internal sealed class McpLikeC4Tools
             "validate_likec4",
             "Validate deterministic LikeC4 with the controlled official LikeC4 CLI adapter. " +
             "When destinationPath is omitted, the supplied v1 ArchitectureModel is emitted into an isolated temporary workspace " +
-            "and validated without repository writes. When destinationPath is supplied, it must be an existing directory inside " +
-            "the authorized root. Validation failures are returned as structured bounded diagnostics.",
+            "and validated without repository writes; optional c3ContainerId selects the same C3 proposal as generate_likec4. " +
+            "When destinationPath is supplied, it must be an existing directory inside the authorized root and its existing files " +
+            "are validated. Validation failures are returned as structured bounded diagnostics.",
             readOnly: true,
             idempotent: true));
     }
@@ -97,26 +98,7 @@ internal sealed class McpLikeC4Tools
                 "destination_required: writing requires an explicit repository-relative destinationPath.");
         }
 
-        IReadOnlyList<LikeC4GeneratedFile> generated;
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(c3ContainerId))
-            {
-                ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
-                generated = LikeC4Emitter.EmitWithC3(model, c3);
-            }
-            else
-            {
-                generated = LikeC4Emitter.Emit(model);
-            }
-        }
-        catch (ContractValidationException exception)
-        {
-            string safeErrors = string.Join(
-                ", ",
-                exception.Errors.Take(8).Select(error => error.Code + " at " + error.Path));
-            throw new McpException("model_invalid: " + safeErrors);
-        }
+        IReadOnlyList<LikeC4GeneratedFile> generated = EmitForSelection(model, c3ContainerId);
         McpLikeC4File[] files =
         [
             .. generated.Select(file => new McpLikeC4File(
@@ -266,6 +248,8 @@ internal sealed class McpLikeC4Tools
         ArchitectureModel model,
         [Description("Optional existing repository-relative LikeC4 directory. Omit to validate the proposed model in a temporary workspace.")]
         string? destinationPath = null,
+        [Description("Optional C2 container ID to include the same proposed C3 output as generate_likec4 when validating without destinationPath.")]
+        string? c3ContainerId = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -277,7 +261,7 @@ internal sealed class McpLikeC4Tools
 
         if (string.IsNullOrWhiteSpace(destinationPath))
         {
-            IReadOnlyList<LikeC4GeneratedFile> generated = LikeC4Emitter.Emit(model);
+            IReadOnlyList<LikeC4GeneratedFile> generated = EmitForSelection(model, c3ContainerId);
             temporaryWorkspace = Directory.CreateTempSubdirectory("repo2c4-mcp-likec4-").FullName;
             workspace = temporaryWorkspace;
             workspaceLabel = "proposed";
@@ -341,6 +325,29 @@ internal sealed class McpLikeC4Tools
             {
                 TryDeleteDirectory(temporaryWorkspace);
             }
+        }
+    }
+
+    private static IReadOnlyList<LikeC4GeneratedFile> EmitForSelection(
+        ArchitectureModel model,
+        string? c3ContainerId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(c3ContainerId))
+            {
+                return LikeC4Emitter.Emit(model);
+            }
+
+            ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
+            return LikeC4Emitter.EmitWithC3(model, c3);
+        }
+        catch (ContractValidationException exception)
+        {
+            string safeErrors = string.Join(
+                ", ",
+                exception.Errors.Take(8).Select(error => error.Code + " at " + error.Path));
+            throw new McpException("model_invalid: " + safeErrors);
         }
     }
 
