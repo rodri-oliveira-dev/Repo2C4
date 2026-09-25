@@ -266,6 +266,15 @@ jobs:
           grep -Fq "Hypotheses requiring review" "$workdir/c2/evidence-report.md"
           "${cli[@]}" validate --output "$workdir/c2"
 
+          "${cli[@]}" generate \
+            --model examples/models/acme.c2.v1.json \
+            --output "$workdir/c3" \
+            --c3-container el_web
+          test -s "$workdir/c3/c3.views.c4"
+          grep -Fq "C3 - Web API" "$workdir/c3/c3.views.c4"
+          grep -Fq "component" "$workdir/c3/model.c4"
+          "${cli[@]}" validate --output "$workdir/c3"
+
           set +e
           "${cli[@]}" generate \
             --model examples/end-to-end/architecture.c2.v1.json \
