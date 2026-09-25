@@ -22,7 +22,7 @@ public sealed class EvidenceReportGeneratorTests
     }
 
     [Fact]
-    public void ReportListsWarningsAndMissingEvidenceReferences()
+    public void ReportListsWarningsAndUnsupportedReviewItemsWithoutDiagnosticValues()
     {
         RepositorySnapshot snapshot = new(
             ContractSchema.Version,
@@ -35,7 +35,7 @@ public sealed class EvidenceReportGeneratorTests
             ArchitectureElementKind.SoftwareSystem,
             "App",
             null,
-            ["ev_removed"],
+            [],
             ReviewStatus.RequiresReview,
             "Deployment boundary needs review.");
         ArchitectureModel model = new(
@@ -48,7 +48,8 @@ public sealed class EvidenceReportGeneratorTests
         EvidenceReportResult result = EvidenceReportGenerator.Generate(model);
 
         Assert.Contains("scan.limit", result.Content, StringComparison.Ordinal);
-        Assert.Contains("ev_removed", result.Content, StringComparison.Ordinal);
+        Assert.Contains("el_app", result.Content, StringComparison.Ordinal);
+        Assert.Contains("no supporting evidence", result.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("should-not-leak", result.Content, StringComparison.Ordinal);
         Assert.Equal(1, result.Summary.MissingOrigins);
     }
