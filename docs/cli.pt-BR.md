@@ -31,11 +31,15 @@ São produzidos quatro arquivos dentro do diretório escolhido:
 - `views.c4`
 - `evidence-report.md`
 
-Arquivos existentes não são substituídos por padrão. Para substituir explicitamente as quatro saídas fixas:
+A geração é somente preview por padrão. O Repo2C4 informa `added`, `modified`, `unchanged` ou `conflict` para cada saída gerenciada e não altera o filesystem.
+
+Para aplicar um preview já revisado:
 
 ```bash
-repo2c4 generate --model architecture.json --output DIR --overwrite
+repo2c4 generate --model architecture.json --output DIR --apply
 ```
+
+A primeira aplicação bem-sucedida cria `.repo2c4-manifest.json`, contendo a versão de schema do modelo e o SHA-256 de cada saída gerenciada. Aplicações posteriores só são permitidas quando o arquivo atual ainda corresponde ao hash do manifesto. Arquivos editados manualmente, ausentes apesar de previamente gerenciados, linkados ou arquivos não gerenciados que colidem com uma saída são conflitos e permanecem intocados.
 
 `evidence-report.md` relaciona as afirmações do modelo aos IDs de evidência e às localizações relativas do repositório, separa hipóteses pendentes, avisos de varredura e itens sem suporte, sem copiar corpos de código nem valores sensíveis. Consulte [relatório de evidências e revisão arquitetural](evidence-report.md).
 
@@ -47,7 +51,7 @@ repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
 
 Sem essa opção nenhum arquivo C3 é gerado. Uma seleção válida aninha as propostas de componentes revisáveis dentro do container selecionado em `model.c4` e adiciona `c3.views.c4`; os demais containers C2 não recebem vistas de componentes automaticamente. A proposta C3 é limitada, mantém sinais estáticos/candidatos sob revisão e falha quando o container selecionado não possui evidência suficiente.
 
-O diretório de saída e qualquer arquivo de destino já existente não podem ser symlink, junction ou reparse point. Os nomes gerados são fixos pelo Repo2C4 e não podem ser definidos pelo conteúdo do modelo.
+O diretório de saída e os arquivos gerenciados precisam permanecer dentro da raiz escolhida e não podem ser symlink, junction ou reparse point. Os nomes gerados são fixos pelo Repo2C4 e não podem ser definidos pelo conteúdo do modelo. As escritas são preparadas em um diretório transacional; o manifesto só é substituído após a preparação das saídas. Em caso de falha, arquivos previamente gerenciados são restaurados em best effort e arquivos desconhecidos nunca são excluídos.
 
 ### Validate
 
