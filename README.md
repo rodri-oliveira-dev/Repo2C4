@@ -52,7 +52,15 @@ See [fixtures, v1 snapshot and reproduction](examples/README.md) and [evidence c
 
 LikeC4 local identifiers are derived from v1 architecture IDs by replacing `.` with `_`; collisions in the same LikeC4 scope are rejected instead of receiving arbitrary suffixes. Names, relation descriptions and review reasons are quoted/escaped so DSL-looking text cannot introduce new statements. The emitter performs no repository I/O, process execution, AI/network calls or PR operations.
 
-See [deterministic LikeC4 generation](docs/likec4-generation.md) and the checked-in golden files under `examples/likec4-golden/`. Real validation with the official LikeC4 CLI is delivered separately by issue #11.
+See [deterministic LikeC4 generation](docs/likec4-generation.md) and the checked-in golden files under `examples/likec4-golden/`.
+
+## Official LikeC4 validation (issue #11)
+
+`LikeC4CliValidator.ValidateAsync(workspace)` invokes only the official `likec4 validate` command in the selected workspace. It returns a structured result for success, validation failure, timeout, missing workspace or unavailable CLI, without returning raw LikeC4 stdout/stderr or source lines.
+
+Runtime code does **not** install Node.js or LikeC4. The CI integration baseline explicitly pins Node.js `22.23.3` and `likec4@1.59.4`, then validates the generated C1/C2 golden workspaces plus controlled syntax/reference failures. Ordinary Core tests still require only .NET and no network.
+
+See [LikeC4 CLI validation](docs/likec4-validation.md) for installation, command, exit codes, diagnostic safety and integration-test boundaries.
 
 ## Entry point smoke tests
 
