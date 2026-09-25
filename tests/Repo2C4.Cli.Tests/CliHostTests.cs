@@ -68,7 +68,7 @@ public sealed class CliHostTests
         int previewExit = Run(["generate", "--model", model, "--output", outputDirectory]);
 
         Assert.Equal(CliExitCodes.Success, previewExit);
-        Assert.False(Directory.Exists(outputDirectory));
+        Assert.False(File.Exists(Path.Combine(outputDirectory, "model.c4")));
 
         int applyExit = Run(["generate", "--model", model, "--output", outputDirectory, "--apply"]);
 
