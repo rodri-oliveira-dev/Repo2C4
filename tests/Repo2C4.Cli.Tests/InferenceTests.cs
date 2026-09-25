@@ -76,6 +76,45 @@ public sealed class InferenceTests
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "likec4")));
     }
 
+    [Fact]
+    public async Task LocalFixtureCandidateSupportsReviewedGenerateAndOptionalOfficialValidation()
+    {
+        RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(File.ReadAllText(SnapshotPath));
+        using TempFolder temp = new();
+        using HttpClient client = CreateClient((_, _) =>
+            Task.FromResult(Success(ValidProposal(OpaqueEvidenceId(snapshot.Evidence[0].Id)))));
+        string candidate = Path.Combine(temp.Path, "candidate.json");
+        string generated = Path.Combine(temp.Path, "likec4");
+
+        (int inferExit, _, _) = await RunAsync(
+            ["infer", "--snapshot", SnapshotPath, "--provider", "ollama", "--model-id", "local", "--output", candidate],
+            client);
+
+        Assert.Equal(CliExitCodes.Success, inferExit);
+        ArchitectureModel proposed = ContractJson.DeserializeModel(File.ReadAllText(candidate));
+        Assert.All(proposed.Elements, element => Assert.Equal(ReviewStatus.RequiresReview, element.Status));
+
+        // Inference does not apply architectural decisions. The fixture's system proposal is
+        // explicitly reviewed before applying LikeC4 output, and no source file is changed.
+        int generateExit = Program.Run(
+            ["generate", "--model", candidate, "--output", generated, "--apply"],
+            TextWriter.Null,
+            TextWriter.Null);
+
+        Assert.Equal(CliExitCodes.Success, generateExit);
+        Assert.True(File.Exists(Path.Combine(generated, "model.c4")));
+        Assert.True(File.Exists(Path.Combine(generated, "evidence-report.md")));
+
+        if (string.Equals(Environment.GetEnvironmentVariable("REPO2C4_LIKEC4_INTEGRATION"), "1", StringComparison.Ordinal))
+        {
+            int validateExit = Program.Run(
+                ["validate", "--output", generated],
+                TextWriter.Null,
+                TextWriter.Null);
+            Assert.Equal(CliExitCodes.Success, validateExit);
+        }
+    }
+
     [Theory]
     [InlineData("not-json")]
     [InlineData("{}")]
