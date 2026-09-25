@@ -13,6 +13,7 @@ public static class LikeC4Emitter
     public const string SpecificationFileName = "specification.c4";
     public const string ModelFileName = "model.c4";
     public const string ViewsFileName = "views.c4";
+    public const string ComponentsFileName = "components.c4";
 
     private const string RequiresReviewTag = "requires-review";
 
@@ -34,6 +35,110 @@ public static class LikeC4Emitter
             new LikeC4GeneratedFile(SpecificationFileName, EmitSpecification()),
             new LikeC4GeneratedFile(ModelFileName, EmitModel(model, localIdentifiers, references)),
             new LikeC4GeneratedFile(ViewsFileName, EmitViews(model, references)),
+        ];
+    }
+
+
+    public static ImmutableArray<LikeC4GeneratedFile> EmitC3(ArchitectureC3Model model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        ImmutableArray<ContractError> errors = ArchitectureC3Validator.Validate(model);
+        if (!errors.IsEmpty)
+        {
+            throw new ContractValidationException(errors);
+        }
+
+        if (model.Components.IsEmpty)
+        {
+            throw new ContractValidationException(
+            [
+                new ContractError(
+                    "c3.insufficientEvidence",
+                    "$.components",
+                    "Selected container has insufficient evidence for a C3 proposal."),
+            ]);
+        }
+
+        Dictionary<string, string> baseIdentifiers = BuildLocalIdentifiers(model.BaseModel.Elements);
+        Dictionary<string, string> baseReferences = BuildReferences(model.BaseModel.Elements, baseIdentifiers);
+        Dictionary<string, string> componentReferences = model.Components.ToDictionary(
+            item => item.Id,
+            item => baseReferences[model.SelectedContainerId] + "." + NormalizeIdentifier(item.Id),
+            StringComparer.Ordinal);
+
+        Dictionary<string, string> references = new(baseReferences, StringComparer.Ordinal);
+        foreach ((string id, string reference) in componentReferences)
+        {
+            references.Add(id, reference);
+        }
+
+        StringBuilder components = new();
+        AppendLine(components, 0, "model {");
+        foreach (ArchitectureComponent component in model.Components.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            AppendLine(
+                components,
+                1,
+                componentReferences[component.Id] + " = component " + Quote(component.Name) + " {");
+            if (component.Status == ReviewStatus.RequiresReview)
+            {
+                AppendLine(components, 2, "#" + RequiresReviewTag);
+            }
+
+            AppendLine(components, 2, "description " + Quote(component.Responsibility));
+            EmitMetadata(
+                components,
+                component.Id,
+                component.EvidenceIds,
+                component.Status,
+                component.ReviewReason,
+                2);
+            AppendLine(components, 1, "}");
+        }
+
+        foreach (ArchitectureComponentRelation relation in model.Relations.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            AppendLine(
+                components,
+                1,
+                references[relation.SourceId] + " -> " + references[relation.DestinationId] +
+                " " + Quote(relation.Description) + " {");
+            if (relation.Status == ReviewStatus.RequiresReview)
+            {
+                AppendLine(components, 2, "#" + RequiresReviewTag);
+            }
+
+            EmitMetadata(
+                components,
+                relation.Id,
+                relation.EvidenceIds,
+                relation.Status,
+                relation.ReviewReason,
+                2);
+            AppendLine(components, 1, "}");
+        }
+
+        AppendLine(components, 0, "}");
+
+        StringBuilder views = new();
+        AppendLine(views, 0, "views {");
+        AppendLine(views, 1, "view c3 {");
+        AppendLine(views, 2, "title " + Quote("C3 - " +
+            model.BaseModel.Elements.First(item => item.Id == model.SelectedContainerId).Name));
+        AppendLine(views, 2, "include " + baseReferences[model.SelectedContainerId]);
+        foreach (ArchitectureComponent component in model.Components.OrderBy(item => item.Id, StringComparer.Ordinal))
+        {
+            AppendLine(views, 2, "include " + componentReferences[component.Id]);
+        }
+
+        AppendLine(views, 1, "}");
+        AppendLine(views, 0, "}");
+
+        return
+        [
+            new LikeC4GeneratedFile(ComponentsFileName, components.ToString()),
+            new LikeC4GeneratedFile("c3.views.c4", views.ToString()),
         ];
     }
 
@@ -97,6 +202,7 @@ public static class LikeC4Emitter
         AppendLine(builder, 1, "}");
         AppendLine(builder, 1, "element softwareSystem");
         AppendLine(builder, 1, "element container");
+        AppendLine(builder, 1, "element component");
         AppendLine(builder, 1, "tag " + RequiresReviewTag + " {");
         AppendLine(builder, 2, "color amber");
         AppendLine(builder, 1, "}");
