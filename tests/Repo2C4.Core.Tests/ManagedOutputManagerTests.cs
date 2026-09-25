@@ -119,6 +119,98 @@ public sealed class ManagedOutputManagerTests
     }
 
     [Fact]
+    public async Task RemovedManagedOutputIsDeletedAndCanBeRegenerated()
+    {
+        using TempDirectory temp = new();
+        string output = Path.Combine(temp.Path, "out");
+        LikeC4GeneratedFile[] initial =
+        [
+            new("model.c4", "model { }"),
+            new("c3.views.c4", "views { }"),
+        ];
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(
+            output, "1.0", initial, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(
+            output, "1.0", initial, first, TestContext.Current.CancellationToken);
+
+        LikeC4GeneratedFile[] withoutC3 = [new("model.c4", "model { }")];
+        GenerationPlan removal = await ManagedOutputManager.PreviewAsync(
+            output, "1.0", withoutC3, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            GeneratedFileChangeKind.Removed,
+            Assert.Single(removal.Changes, change => change.FileName == "c3.views.c4").Kind);
+        Assert.True(File.Exists(Path.Combine(output, "c3.views.c4")));
+
+        await ManagedOutputManager.CommitAsync(
+            output, "1.0", withoutC3, removal, TestContext.Current.CancellationToken);
+        Assert.False(File.Exists(Path.Combine(output, "c3.views.c4")));
+
+        GenerationPlan next = await ManagedOutputManager.PreviewAsync(
+            output, "1.0", initial, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            GeneratedFileChangeKind.Added,
+            Assert.Single(next.Changes, change => change.FileName == "c3.views.c4").Kind);
+    }
+
+    [Fact]
+    public async Task EditedStaleOutputBlocksRemovalAndLeavesManifestIntact()
+    {
+        using TempDirectory temp = new();
+        string output = Path.Combine(temp.Path, "out");
+        LikeC4GeneratedFile[] initial =
+        [
+            new("model.c4", "model { }"),
+            new("c3.views.c4", "original"),
+        ];
+        GenerationPlan first = await ManagedOutputManager.PreviewAsync(
+            output, "1.0", initial, TestContext.Current.CancellationToken);
+        await ManagedOutputManager.CommitAsync(
+            output, "1.0", initial, first, TestContext.Current.CancellationToken);
+
+        string manifest = Path.Combine(output, ManagedOutputManager.ManifestFileName);
+        string previous = await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken);
+        string c3File = Path.Combine(output, "c3.views.c4");
+        await File.WriteAllTextAsync(c3File, "human edit", TestContext.Current.CancellationToken);
+
+        LikeC4GeneratedFile[] next = [new("model.c4", "updated")];
+        GenerationPlan conflict = await ManagedOutputManager.PreviewAsync(
+            output, "1.0", next, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            GeneratedFileChangeKind.Conflict,
+            Assert.Single(conflict.Changes, change => change.FileName == "c3.views.c4").Kind);
+        await Assert.ThrowsAnyAsync<IOException>(
+            () => ManagedOutputManager.CommitAsync(
+                output, "1.0", next, conflict, TestContext.Current.CancellationToken));
+        Assert.Equal("human edit", await File.ReadAllTextAsync(c3File, TestContext.Current.CancellationToken));
+        Assert.Equal(previous, await File.ReadAllTextAsync(manifest, TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("{not valid")]
+    [InlineData("{}")]
+    [InlineData("{\"SchemaVersion\":\"1.0\",\"ModelSchemaVersion\":\"1.0\"}")]
+    [InlineData("{\"SchemaVersion\":\"1.0\",\"ModelSchemaVersion\":\"1.0\",\"Files\":[null]}")]
+    [InlineData("{\"SchemaVersion\":\"1.0\",\"ModelSchemaVersion\":\"1.0\",\"Files\":[{\"FileName\":\"model.c4\",\"Sha256\":\"\"}]}")]
+    public async Task InvalidManifestProducesControlledIOException(string json)
+    {
+        using TempDirectory temp = new();
+        string output = Path.Combine(temp.Path, "out");
+        Directory.CreateDirectory(output);
+        await File.WriteAllTextAsync(
+            Path.Combine(output, ManagedOutputManager.ManifestFileName),
+            json,
+            TestContext.Current.CancellationToken);
+
+        IOException exception = await Assert.ThrowsAsync<IOException>(
+            () => ManagedOutputManager.PreviewAsync(
+                output,
+                "1.0",
+                [new LikeC4GeneratedFile("model.c4", "model { }")],
+                TestContext.Current.CancellationToken));
+        Assert.Equal("managed_output_manifest_invalid", exception.Message);
+    }
+
+    [Fact]
     public async Task InvalidPathIsRejected()
     {
         using TempDirectory temp = new();
