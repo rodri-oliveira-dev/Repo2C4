@@ -204,7 +204,7 @@ public static class RepositoryFactExtractor
         string? sdk = project.Attribute("Sdk")?.Value;
         bool webSdk = sdk is not null && sdk.Split(';').Any(item => item.Trim() == "Microsoft.NET.Sdk.Web");
         bool workerSdk = sdk is not null && sdk.Split(';').Any(item => item.Trim() == "Microsoft.NET.Sdk.Worker");
-        IEnumerable<XElement> nodes = project.Descendants();
+        XElement[] nodes = [.. project.Descendants()];
         bool test = nodes.Any(element => element.Name.LocalName == "IsTestProject"
             && element.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase));
         XElement? outputType = nodes.FirstOrDefault(element => element.Name.LocalName == "OutputType");
