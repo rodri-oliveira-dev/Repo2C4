@@ -8,7 +8,7 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 | --- | --- |
 | `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
 | `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate` commands; no AI calls or automatic architecture inference. |
-| `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; MCP tools are added incrementally during phase 3. |
+| `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; exposes `inspect_repository`, `get_evidence`, `get_snapshot`, `generate_likec4` and `validate_likec4`. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
 CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection and interpretation remain client responsibilities.
@@ -92,7 +92,7 @@ dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
   --repository-root /absolute/path/to/repository
 ```
 
-`REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Future tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
+`REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
 
 Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snapshot` tools. Issue #15 adds `generate_likec4` and `validate_likec4`: generation is dry-run by default, writing requires explicit dual authorization plus a relative destination, and existing generated files are never overwritten. Validation reuses the controlled official LikeC4 CLI adapter.
 
