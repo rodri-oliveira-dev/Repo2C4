@@ -71,7 +71,10 @@ public sealed class ContractTests
     public void DuplicateEvidenceIdsAreRejected()
     {
         RepositorySnapshot snapshot = CreateSnapshot();
-        snapshot = snapshot with { Evidence = [snapshot.Evidence[0], snapshot.Evidence[0]] };
+        snapshot = snapshot with
+        {
+            Evidence = [snapshot.Evidence[0], snapshot.Evidence[0]]
+        };
 
         AssertHasError(ContractValidator.ValidateSnapshot(snapshot), "id.duplicate");
         Assert.Throws<ContractValidationException>(() => ContractJson.SerializeSnapshot(snapshot));
@@ -82,12 +85,18 @@ public sealed class ContractTests
     {
         ArchitectureModel model = CreateModel();
         AssertHasError(
-            ContractValidator.ValidateModel(model with { Elements = [model.Elements[0], model.Elements[0]] }),
+            ContractValidator.ValidateModel(model with
+            {
+                Elements = [model.Elements[0], model.Elements[0]]
+            }),
             "id.duplicate");
 
         ArchitectureRelation relation = model.Relations[0];
         AssertHasError(
-            ContractValidator.ValidateModel(model with { Relations = [relation, relation] }),
+            ContractValidator.ValidateModel(model with
+            {
+                Relations = [relation, relation]
+            }),
             "id.duplicate");
     }
 
@@ -95,17 +104,29 @@ public sealed class ContractTests
     public void MissingRelationDestinationIsRejected()
     {
         ArchitectureModel model = CreateModel();
-        ArchitectureRelation relation = model.Relations[0] with { DestinationId = "el_missing" };
-        AssertHasError(ContractValidator.ValidateModel(model with { Relations = [relation] }), "relation.destinationMissing");
+        ArchitectureRelation relation = model.Relations[0] with
+        {
+            DestinationId = "el_missing"
+        };
+        AssertHasError(ContractValidator.ValidateModel(model with
+        {
+            Relations = [relation]
+        }), "relation.destinationMissing");
     }
 
     [Fact]
     public void MissingEvidenceReferenceIsRejected()
     {
         ArchitectureModel model = CreateModel();
-        ArchitectureElement element = model.Elements[0] with { EvidenceIds = ["ev_unknown"] };
+        ArchitectureElement element = model.Elements[0] with
+        {
+            EvidenceIds = ["ev_unknown"]
+        };
         AssertHasError(
-            ContractValidator.ValidateModel(model with { Elements = [element, .. model.Elements.Skip(1)] }),
+            ContractValidator.ValidateModel(model with
+            {
+                Elements = [element, .. model.Elements.Skip(1)]
+            }),
             "evidence.referenceMissing");
     }
 
@@ -119,7 +140,10 @@ public sealed class ContractTests
             ReviewReason = null,
         };
 
-        AssertHasError(ContractValidator.ValidateModel(model with { Relations = [unsupported] }), "review.unsubstantiated");
+        AssertHasError(ContractValidator.ValidateModel(model with
+        {
+            Relations = [unsupported]
+        }), "review.unsubstantiated");
         Assert.Throws<ContractValidationException>(() => ContractJson.SerializeModel(model with { Relations = [unsupported] }));
     }
 
@@ -127,18 +151,33 @@ public sealed class ContractTests
     public void InferenceRequiresAnExplicitReviewReason()
     {
         ArchitectureModel model = CreateModel();
-        ArchitectureRelation relation = model.Relations[0] with { ReviewReason = null };
-        AssertHasError(ContractValidator.ValidateModel(model with { Relations = [relation] }), "review.reason");
+        ArchitectureRelation relation = model.Relations[0] with
+        {
+            ReviewReason = null
+        };
+        AssertHasError(ContractValidator.ValidateModel(model with
+        {
+            Relations = [relation]
+        }), "review.reason");
     }
 
     [Fact]
     public void CyclicContainmentIsRejected()
     {
         ArchitectureModel model = CreateModel();
-        ArchitectureElement system = model.Elements[0] with { ParentId = "el_container" };
-        ArchitectureElement container = model.Elements[2] with { ParentId = "el_system" };
+        ArchitectureElement system = model.Elements[0] with
+        {
+            ParentId = "el_container"
+        };
+        ArchitectureElement container = model.Elements[2] with
+        {
+            ParentId = "el_system"
+        };
         AssertHasError(
-            ContractValidator.ValidateModel(model with { Elements = [system, model.Elements[1], container] }),
+            ContractValidator.ValidateModel(model with
+            {
+                Elements = [system, model.Elements[1], container]
+            }),
             "containment.cycle");
     }
 
@@ -146,7 +185,10 @@ public sealed class ContractTests
     public void ContainerCannotAppearInC1()
     {
         ArchitectureModel model = CreateModel();
-        AssertHasError(ContractValidator.ValidateModel(model with { Level = ArchitectureLevel.C1 }), "level.container");
+        AssertHasError(ContractValidator.ValidateModel(model with
+        {
+            Level = ArchitectureLevel.C1
+        }), "level.container");
     }
 
     [Theory]
@@ -166,16 +208,25 @@ public sealed class ContractTests
     public void EvidenceMustReferToInventoriedFile()
     {
         RepositorySnapshot snapshot = CreateSnapshot();
-        Evidence evidence = snapshot.Evidence[0] with { RelativePath = "not-in-snapshot.cs" };
+        Evidence evidence = snapshot.Evidence[0] with
+        {
+            RelativePath = "not-in-snapshot.cs"
+        };
         AssertHasError(
-            ContractValidator.ValidateSnapshot(snapshot with { Evidence = [evidence, snapshot.Evidence[1]] }),
+            ContractValidator.ValidateSnapshot(snapshot with
+            {
+                Evidence = [evidence, snapshot.Evidence[1]]
+            }),
             "evidence.fileMissing");
     }
 
     [Fact]
     public void IncompatibleSchemaIsRejected()
     {
-        RepositorySnapshot snapshot = CreateSnapshot() with { SchemaVersion = "2.0" };
+        RepositorySnapshot snapshot = CreateSnapshot() with
+        {
+            SchemaVersion = "2.0"
+        };
         AssertHasError(ContractValidator.ValidateSnapshot(snapshot), "schema.unsupported");
         Assert.Throws<ContractValidationException>(() => ContractJson.SerializeSnapshot(snapshot));
     }
@@ -183,10 +234,16 @@ public sealed class ContractTests
     [Fact]
     public void DefaultCollectionsAreReportedInsteadOfThrowing()
     {
-        RepositorySnapshot snapshot = CreateSnapshot() with { Evidence = default };
+        RepositorySnapshot snapshot = CreateSnapshot() with
+        {
+            Evidence = default
+        };
         AssertHasError(ContractValidator.ValidateSnapshot(snapshot), "collection.missing");
 
-        ArchitectureModel model = CreateModel() with { Elements = default };
+        ArchitectureModel model = CreateModel() with
+        {
+            Elements = default
+        };
         AssertHasError(ContractValidator.ValidateModel(model), "collection.missing");
     }
 
