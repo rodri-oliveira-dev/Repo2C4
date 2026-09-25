@@ -88,7 +88,7 @@ public sealed class ArchitectureC3Tests
 
         ArchitectureC3Model c3 = ArchitectureC3Builder.Build(c2, "el_worker");
         ContractValidationException error = Assert.Throws<ContractValidationException>(
-            () => LikeC4Emitter.EmitC3(c3));
+            () => LikeC4Emitter.EmitWithC3(c2, c3));
 
         Assert.Contains(error.Errors, item => item.Code == "c3.insufficientEvidence");
     }
