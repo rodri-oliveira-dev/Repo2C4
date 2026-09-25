@@ -79,7 +79,7 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
   --output artifacts/likec4
 ```
 
-`inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Existing generated files, including `evidence-report.md`, are not replaced unless `--overwrite` is supplied.
+`inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Generation is preview-only by default. `--apply` writes only Repo2C4-managed files whose current SHA-256 still matches `.repo2c4-manifest.json`; manual edits and unmanaged collisions become conflicts and remain untouched.
 
 Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
@@ -94,7 +94,7 @@ dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
 
 `REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
 
-Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snapshot` tools. Issue #15 adds `generate_likec4` and `validate_likec4`: generation is dry-run by default, writing requires explicit dual authorization plus a relative destination, and existing generated files are never overwritten. Validation reuses the controlled official LikeC4 CLI adapter.
+Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snapshot` tools. Issue #15 adds `generate_likec4` and `validate_likec4`: generation is dry-run by default, writing requires explicit dual authorization plus a relative destination, and managed regeneration uses a manifest/hash diff so manual edits are not overwritten. Validation reuses the controlled official LikeC4 CLI adapter.
 
 The server embeds no AI provider and does not select models. The supplied `ArchitectureModel` must match the session snapshot exactly; fabricated evidence is rejected. Repository-static/candidate evidence cannot be promoted by the MCP server into a confirmed container boundary or runtime relation; architectural interpretation stays with the client.
 
@@ -123,3 +123,8 @@ See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 
 ## Selective C3
 
 C1/C2 generation remains the default. To derive a reviewable C3 proposal for exactly one existing C2 container, pass `--c3-container <container-id>` to the CLI or `c3ContainerId` to `generate_likec4` over MCP. The generated component boundaries are evidence-linked, bounded, and kept under review when repository-static signals cannot prove runtime behavior. Other containers are not expanded automatically.
+
+
+## Managed regeneration
+
+Phase 4 issue #19 adds review-first regeneration. CLI `generate` previews file-level changes by default and `--apply` is required to persist them. MCP `generate_likec4` returns the same structured change summary when a destination is supplied. Repo2C4 records only its generated outputs in `.repo2c4-manifest.json`, never deletes unknown files, and blocks apply when a managed file was edited or removed outside Repo2C4.
