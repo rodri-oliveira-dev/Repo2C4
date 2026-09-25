@@ -27,4 +27,4 @@ Repository-static or candidate signals are not upgraded to confirmed runtime rel
 
 ## MCP
 
-The read-only `get_evidence_report` tool accepts a session `snapshotId` and complete v1 model. The server verifies that the embedded snapshot matches the session snapshot and returns `evidence-report.md` plus bounded summary counts. It performs no repository write and no AI inference.
+The read-only `get_evidence_report` tool accepts a session `snapshotId` and complete v1 model. The server verifies that the embedded snapshot matches the session snapshot and returns a bounded summary of the report: counts, review-required assertion IDs and warning codes. The Markdown body remains a CLI artifact; MCP does not return source bodies, configuration values, absolute paths, or write to the repository.
