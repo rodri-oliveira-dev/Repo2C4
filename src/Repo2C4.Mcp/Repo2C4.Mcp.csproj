@@ -5,6 +5,9 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Repo2C4.Core/Repo2C4.Core.csproj" />
   </ItemGroup>
 </Project>

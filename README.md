@@ -8,10 +8,10 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 | --- | --- |
 | `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
 | `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate` commands; no AI calls or automatic architecture inference. |
-| `src/Repo2C4.Mcp` | Stdio-safe MCP host scaffold; protocol transport arrives in phase 3. |
+| `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; exposes `inspect_repository`, `get_evidence`, `get_snapshot`, `generate_likec4` and `validate_likec4`. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers, rendering and live MCP transport are not yet implemented.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection and interpretation remain client responsibilities.
 
 ## Prerequisites and verification
 
@@ -30,7 +30,7 @@ The baseline retains Central Package Management, committed SDK-generated package
 
 ## Bounded local inventory (issue #7)
 
-`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. The offline CLI exposes this capability through `inspect`; MCP scanning remains unimplemented until a later phase.
+`RepositoryScanner.Scan(new RepositoryScanOptions(absoluteRoot, "stable_repo_id"), cancellationToken)` inspects **one explicitly authorized local directory**. The root must exist, be absolute without `..` and not be a symlink/junction. Child symlinks, junctions and reparse points are skipped rather than followed. Snapshot paths are normalized and relative to the authorized root. This scanner performs no writes, build, code execution, shell calls, network requests or external transmission. The offline CLI exposes this capability through `inspect`; MCP exposes the same Core inspection path through bounded `inspect_repository`, `get_evidence` and `get_snapshot` tools.
 
 Default exclusions include `.git`, `bin`, `obj`, `node_modules`, `artifacts` and other generated directories, `.env*`, `appsettings.*`, credentials, keys and names indicative of secrets. Only known text-oriented extensions are considered. A bounded 4 KiB prefix probe rejects files with NUL bytes. Caller-supplied `IncludePatterns` and `ExcludePatterns` accept bounded relative globs (`*`, `?`, `**`), without overriding mandatory safety exclusions.
 
@@ -42,7 +42,7 @@ Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total
 
 `RepositoryFactExtractor.Extract(options, cancellationToken)` inventories an explicitly authorized local checkout with `RepositoryScanner`, then inspects only accepted .NET solution, project and source files to populate `RepositorySnapshot.Evidence`. It recognizes .sln/.slnx project listings, declared executable/library/test characteristics, target frameworks, build-time `ProjectReference`, HTTP/worker host signals, Npgsql/RabbitMQ/Redis integration **candidates**, and Docker/compose manifest presence. Facts retain relative file paths and lines where available. A build-time project dependency is not a runtime relationship; an SDK, package or source signal is not proof of a deployed C4 container or a live network connection.
 
-Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted by inspection. The CLI exposes this path through `inspect`; MCP transport remains unimplemented.
+Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted by inspection. The CLI exposes this path through `inspect`; MCP exposes the same v1 evidence through bounded, paginated issue #14 tools.
 
 See [fixtures, v1 snapshot and reproduction](examples/README.md) and [evidence categories](docs/contracts.md).
 
@@ -83,6 +83,23 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
 
 Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
+## MCP stdio foundation (issue #13)
+
+The Phase 3 MCP host now runs locally over stdio using the maintained MCP .NET SDK. Starting the server requires one explicitly authorized absolute repository root:
+
+```bash
+dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
+  --repository-root /absolute/path/to/repository
+```
+
+`REPO2C4_REPOSITORY_ROOT` is the local configuration fallback when the command-line option is not supplied. The root must already exist and must not be a symbolic link, junction or reparse point. Tool paths are constrained to this root; absolute paths, parent traversal and linked path components are rejected. `stdout` is exclusively MCP protocol traffic, while help and diagnostics use `stderr`.
+
+Issue #14 adds the read-only `inspect_repository`, `get_evidence` and `get_snapshot` tools. Issue #15 adds `generate_likec4` and `validate_likec4`: generation is dry-run by default, writing requires explicit dual authorization plus a relative destination, and existing generated files are never overwritten. Validation reuses the controlled official LikeC4 CLI adapter.
+
+The server embeds no AI provider and does not select models. The supplied `ArchitectureModel` must match the session snapshot exactly; fabricated evidence is rejected. Repository-static/candidate evidence cannot be promoted by the MCP server into a confirmed container boundary or runtime relation; architectural interpretation stays with the client.
+
+See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for tool semantics and [MCP client workflow](docs/mcp-client.md) for generic client configuration, the reusable evidence-first prompt and deterministic C1/C2 reproduction.
+
 ## Entry point smoke tests
 
 ```bash
@@ -90,12 +107,12 @@ dotnet run --project src/Repo2C4.Cli/Repo2C4.Cli.csproj -- --help
 dotnet run --project src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -- --help
 ```
 
-CLI help is written to stdout. MCP help and diagnostics are written **only to stderr** to reserve stdout for future MCP JSON-RPC traffic. Unsupported commands exit with code 2; a successful MCP handshake is never simulated. CI additionally validates both executable entrypoints with process-level smoke tests.
+CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite starts the executable through a vendor-neutral JSON-RPC stdio client, performs real handshakes/tool calls, exercises pagination/security failures, reproduces both versioned C1 and C2 models, compares preview/written `.c4` files with goldens, and verifies that no non-protocol content is written to stdout.
 
 ## CI and distribution
 
-`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration and the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`). CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
+`.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
 **Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
 
-See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 2 issues #9–#12 share `phase/02-likec4-offline` and are delivered in one pull request after the complete offline flow is validated.
+See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 3 issues #13–#16 share `phase/03-mcp`; the single phase pull request is opened only after the last issue is implemented.
