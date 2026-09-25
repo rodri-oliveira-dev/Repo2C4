@@ -311,16 +311,12 @@ internal sealed class McpLikeC4Tools
         IReadOnlyList<LikeC4GeneratedFile> files,
         CancellationToken cancellationToken)
     {
-        bool directoryExisted = Directory.Exists(outputRoot);
         List<string> createdFiles = [];
+        List<string> createdDirectories = [];
 
         try
         {
-            Directory.CreateDirectory(outputRoot);
-            _ = RepositoryAccessPolicy.ResolveExistingPath(
-                _authorizedRoot,
-                Path.GetRelativePath(_authorizedRoot, outputRoot),
-                cancellationToken);
+            CreateDestinationDirectories(outputRoot, createdDirectories, cancellationToken);
 
             foreach (LikeC4GeneratedFile file in files)
             {
@@ -332,6 +328,11 @@ internal sealed class McpLikeC4Tools
                         "destination_exists: generated LikeC4 files are never overwritten.");
                 }
             }
+
+            _ = RepositoryAccessPolicy.ResolveExistingPath(
+                _authorizedRoot,
+                Path.GetRelativePath(_authorizedRoot, outputRoot),
+                cancellationToken);
 
             foreach (LikeC4GeneratedFile file in files)
             {
@@ -362,12 +363,12 @@ internal sealed class McpLikeC4Tools
         }
         catch (McpException)
         {
-            CleanupPartialWrite(createdFiles, outputRoot, directoryExisted);
+            CleanupPartialWrite(createdFiles, createdDirectories);
             throw;
         }
         catch (OperationCanceledException)
         {
-            CleanupPartialWrite(createdFiles, outputRoot, directoryExisted);
+            CleanupPartialWrite(createdFiles, createdDirectories);
             throw;
         }
         catch (Exception exception) when (
@@ -377,9 +378,47 @@ internal sealed class McpLikeC4Tools
                 or NotSupportedException
                 or PathTooLongException)
         {
-            CleanupPartialWrite(createdFiles, outputRoot, directoryExisted);
+            CleanupPartialWrite(createdFiles, createdDirectories);
             throw new McpException(
                 "write_failed: LikeC4 files could not be created safely without overwrite.");
+        }
+    }
+
+    private void CreateDestinationDirectories(
+        string outputRoot,
+        ICollection<string> createdDirectories,
+        CancellationToken cancellationToken)
+    {
+        string relative = Path.GetRelativePath(_authorizedRoot, outputRoot);
+        string current = _authorizedRoot;
+
+        foreach (string segment in relative.Split(
+                     Path.DirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            current = Path.Combine(current, segment);
+
+            if (File.Exists(current) && !Directory.Exists(current))
+            {
+                throw new IOException("Destination path contains an existing file.");
+            }
+
+            if (!Directory.Exists(current))
+            {
+                Directory.CreateDirectory(current);
+                createdDirectories.Add(current);
+            }
+
+            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
+            {
+                throw new UnauthorizedAccessException("Linked destination paths are not allowed.");
+            }
+
+            _ = RepositoryAccessPolicy.ResolveExistingPath(
+                _authorizedRoot,
+                Path.GetRelativePath(_authorizedRoot, current),
+                cancellationToken);
         }
     }
 
@@ -417,8 +456,7 @@ internal sealed class McpLikeC4Tools
 
     private static void CleanupPartialWrite(
         IReadOnlyList<string> createdFiles,
-        string outputRoot,
-        bool directoryExisted)
+        IReadOnlyList<string> createdDirectories)
     {
         foreach (string path in createdFiles)
         {
@@ -435,13 +473,13 @@ internal sealed class McpLikeC4Tools
             }
         }
 
-        if (!directoryExisted)
+        foreach (string directory in createdDirectories.Reverse())
         {
             try
             {
-                if (Directory.Exists(outputRoot) && !Directory.EnumerateFileSystemEntries(outputRoot).Any())
+                if (Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any())
                 {
-                    Directory.Delete(outputRoot);
+                    Directory.Delete(directory);
                 }
             }
             catch (Exception exception) when (
@@ -449,7 +487,7 @@ internal sealed class McpLikeC4Tools
                     or UnauthorizedAccessException
                     or NotSupportedException)
             {
-                // Best-effort cleanup of a directory created by this call.
+                // Best-effort rollback of directories created by this call.
             }
         }
     }
