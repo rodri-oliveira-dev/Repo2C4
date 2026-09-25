@@ -122,7 +122,7 @@ public static class Program
 
     private static void WriteHelp(TextWriter standardError)
     {
-        standardError.WriteLine("Repo2C4 MCP server over stdio.");
+        standardError.WriteLine("Repo2C4 MCP server over stdio; domain tools are not available yet in issue #13.");
         standardError.WriteLine("Usage: Repo2C4.Mcp --repository-root <absolute-path>");
         standardError.WriteLine(
             $"Alternatively set {McpHostOptions.RepositoryRootEnvironmentVariable} to an absolute local repository root.");
