@@ -37,6 +37,11 @@ public static class ManagedOutputManager
     public const string ManifestFileName = ".repo2c4-manifest.json";
     private const string ManifestSchemaVersion = "1.0";
 
+    private static readonly JsonSerializerOptions ManifestJsonOptions = new()
+    {
+        WriteIndented = true,
+    };
+
     public static async Task<GenerationPlan> PreviewAsync(
         string outputRoot,
         string modelSchemaVersion,
@@ -177,7 +182,7 @@ public static class ManagedOutputManager
                 modelSchemaVersion,
                 [.. files.OrderBy(item => item.FileName, StringComparer.Ordinal)
                     .Select(file => new GenerationManifestEntry(file.FileName, ComputeHash(file.Content)))]);
-            string manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+            string manifestJson = JsonSerializer.Serialize(manifest, ManifestJsonOptions) + Environment.NewLine;
             string manifestTarget = ResolveTarget(root, ManifestFileName);
             string manifestTemp = Path.Combine(transactionRoot, ManifestFileName + ".tmp");
             string? manifestBackup = File.Exists(manifestTarget)
