@@ -59,7 +59,7 @@ public sealed class InferenceTests
         Assert.NotNull(transmitted);
         Assert.DoesNotContain("SECRET_VALUE_DO_NOT_SEND", transmitted, StringComparison.Ordinal);
         Assert.DoesNotContain(sensitivePath, transmitted, StringComparison.Ordinal);
-        Assert.DoesNotContain("diagnostics", transmitted, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sensitive", transmitted, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("files/file_0001", transmitted, StringComparison.Ordinal);
 
         ArchitectureModel candidate = ContractJson.DeserializeModel(File.ReadAllText(output));
@@ -67,7 +67,7 @@ public sealed class InferenceTests
         Assert.Equal(sensitivePath, candidate.Snapshot.Files[0].RelativePath);
         Assert.Single(candidate.Elements);
         Assert.Equal(ReviewStatus.RequiresReview, candidate.Elements[0].Status);
-        Assert.Contains("AI-generated", candidate.Elements[0].ReviewReason, StringComparison.Ordinal);
+        Assert.Contains("AI-generated", candidate.Elements[0].ReviewReason!, StringComparison.Ordinal);
         Assert.Equal(snapshot.Evidence[0].Id, candidate.Elements[0].EvidenceIds[0]);
         Assert.Empty(candidate.Relations);
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "likec4")));
