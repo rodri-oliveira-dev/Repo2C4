@@ -98,14 +98,24 @@ internal sealed class McpLikeC4Tools
         }
 
         IReadOnlyList<LikeC4GeneratedFile> generated;
-        if (!string.IsNullOrWhiteSpace(c3ContainerId))
+        try
         {
-            ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
-            generated = LikeC4Emitter.EmitWithC3(model, c3);
+            if (!string.IsNullOrWhiteSpace(c3ContainerId))
+            {
+                ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
+                generated = LikeC4Emitter.EmitWithC3(model, c3);
+            }
+            else
+            {
+                generated = LikeC4Emitter.Emit(model);
+            }
         }
-        else
+        catch (ContractValidationException exception)
         {
-            generated = LikeC4Emitter.Emit(model);
+            string safeErrors = string.Join(
+                ", ",
+                exception.Errors.Take(8).Select(error => error.Code + " at " + error.Path));
+            throw new McpException("model_invalid: " + safeErrors);
         }
         McpLikeC4File[] files =
         [
@@ -168,12 +178,29 @@ internal sealed class McpLikeC4Tools
                 "managed_output_conflict: manually edited or unmanaged generated files were not changed.");
         }
 
-        await ManagedOutputManager.CommitAsync(
-            outputRoot,
-            model.SchemaVersion,
-            generated,
-            plan,
-            cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ManagedOutputManager.CommitAsync(
+                outputRoot,
+                model.SchemaVersion,
+                generated,
+                plan,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception) when (exception.Message == "managed_output_conflict")
+        {
+            throw new McpException(
+                "managed_output_conflict: generated files changed since preview and were not modified.");
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+        {
+            throw new McpException("write_failed: managed LikeC4 outputs could not be committed safely.");
+        }
 
         return McpResponseGuard.EnsureWithinLimit(new McpGenerateLikeC4Result(
             entry.SnapshotId,
@@ -405,122 +432,6 @@ internal sealed class McpLikeC4Tools
         evidence.Category.StartsWith("dotnet.", StringComparison.Ordinal) ||
         evidence.Category.StartsWith("deployment.", StringComparison.Ordinal);
 
-    private async Task WriteGeneratedFilesAsync(
-        string outputRoot,
-        IReadOnlyList<LikeC4GeneratedFile> files,
-        CancellationToken cancellationToken)
-    {
-        List<string> createdFiles = [];
-        List<string> createdDirectories = [];
-
-        try
-        {
-            CreateDestinationDirectories(outputRoot, createdDirectories, cancellationToken);
-
-            foreach (LikeC4GeneratedFile file in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string target = ResolveGeneratedTarget(outputRoot, file.FileName);
-                if (File.Exists(target) || Directory.Exists(target))
-                {
-                    throw new McpException(
-                        "destination_exists: generated LikeC4 files are never overwritten.");
-                }
-            }
-
-            _ = RepositoryAccessPolicy.ResolveExistingPath(
-                _authorizedRoot,
-                Path.GetRelativePath(_authorizedRoot, outputRoot),
-                cancellationToken);
-
-            foreach (LikeC4GeneratedFile file in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string target = ResolveGeneratedTarget(outputRoot, file.FileName);
-                FileStream stream = new(
-                    target,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    4096,
-                    useAsync: true);
-                await using (stream.ConfigureAwait(false))
-                {
-                    createdFiles.Add(target);
-                    StreamWriter writer = new(
-                        stream,
-                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                        bufferSize: 1_024,
-                        leaveOpen: true);
-                    await using (writer.ConfigureAwait(false))
-                    {
-                        await writer.WriteAsync(file.Content.AsMemory(), cancellationToken).ConfigureAwait(false);
-                        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-                    }
-                }
-            }
-        }
-        catch (McpException)
-        {
-            CleanupPartialWrite(createdFiles, createdDirectories);
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            CleanupPartialWrite(createdFiles, createdDirectories);
-            throw;
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException
-                or IOException
-                or UnauthorizedAccessException
-                or NotSupportedException
-                or PathTooLongException)
-        {
-            CleanupPartialWrite(createdFiles, createdDirectories);
-            throw new McpException(
-                "write_failed: LikeC4 files could not be created safely without overwrite.");
-        }
-    }
-
-    private void CreateDestinationDirectories(
-        string outputRoot,
-        ICollection<string> createdDirectories,
-        CancellationToken cancellationToken)
-    {
-        string relative = Path.GetRelativePath(_authorizedRoot, outputRoot);
-        string current = _authorizedRoot;
-
-        foreach (string segment in relative.Split(
-                     Path.DirectorySeparatorChar,
-                     StringSplitOptions.RemoveEmptyEntries))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            current = Path.Combine(current, segment);
-
-            if (File.Exists(current) && !Directory.Exists(current))
-            {
-                throw new IOException("Destination path contains an existing file.");
-            }
-
-            if (!Directory.Exists(current))
-            {
-                Directory.CreateDirectory(current);
-                createdDirectories.Add(current);
-            }
-
-            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
-            {
-                throw new UnauthorizedAccessException("Linked destination paths are not allowed.");
-            }
-
-            _ = RepositoryAccessPolicy.ResolveExistingPath(
-                _authorizedRoot,
-                Path.GetRelativePath(_authorizedRoot, current),
-                cancellationToken);
-        }
-    }
-
     private static async Task WriteTemporaryFilesAsync(
         string workspace,
         IReadOnlyList<LikeC4GeneratedFile> files,
@@ -551,44 +462,6 @@ internal sealed class McpLikeC4Tools
         }
 
         return target;
-    }
-
-    private static void CleanupPartialWrite(
-        IReadOnlyList<string> createdFiles,
-        IReadOnlyList<string> createdDirectories)
-    {
-        foreach (string path in createdFiles)
-        {
-            try
-            {
-                File.Delete(path);
-            }
-            catch (Exception exception) when (
-                exception is IOException
-                    or UnauthorizedAccessException
-                    or NotSupportedException)
-            {
-                // Best-effort rollback after a failed protected write.
-            }
-        }
-
-        foreach (string directory in createdDirectories.Reverse())
-        {
-            try
-            {
-                if (Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any())
-                {
-                    Directory.Delete(directory);
-                }
-            }
-            catch (Exception exception) when (
-                exception is IOException
-                    or UnauthorizedAccessException
-                    or NotSupportedException)
-            {
-                // Best-effort rollback of directories created by this call.
-            }
-        }
     }
 
     private static void TryDeleteDirectory(string path)
