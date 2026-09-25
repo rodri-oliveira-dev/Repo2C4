@@ -33,6 +33,12 @@ A issue #14 expõe exatamente três ferramentas somente leitura:
 
 Snapshots existem somente na sessão stdio atual e expiram após 30 minutos. O ID do snapshot é um hash estável do snapshot v1 canônico; possuir um ID obtido em outra sessão não concede acesso, porque cada sessão mantém seu próprio armazenamento. Cursores de paginação são tokens HMAC opacos vinculados à sessão, snapshot, ferramenta e filtros. Cursores alterados, usados com filtros diferentes ou fora de faixa falham com `cursor_invalid`.
 
+## Relatório de evidências
+
+A issue #17 adiciona a ferramenta somente leitura `get_evidence_report`. Ela recebe `snapshotId` e um `ArchitectureModel` v1 completo, valida o vínculo com o snapshot da sessão e devolve apenas um resumo limitado: contagens, IDs de afirmações que exigem revisão e códigos de aviso. O Markdown completo permanece como artefato da CLI. A resposta MCP não inclui corpos de código, valores de configuração ou caminhos absolutos, não escreve arquivos e não chama IA.
+
+Consulte [relatório de evidências e revisão arquitetural](evidence-report.md).
+
 ## Ferramentas de geração e validação LikeC4
 
 A issue #15 adiciona duas ferramentas, mantendo a interpretação arquitetural no cliente MCP:
