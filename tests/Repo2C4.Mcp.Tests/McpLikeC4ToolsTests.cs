@@ -6,6 +6,28 @@ namespace Repo2C4.Mcp.Tests;
 public sealed class McpLikeC4ToolsTests
 {
     [Fact]
+    public async Task ValidateSelectedC3ProposalReportsControlledErrorBeforeWriting()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateSnapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+        ArchitectureModel model = CreateModel(snapshot);
+
+        Exception invalidSelection = await Assert.ThrowsAnyAsync<Exception>(
+            () => tools.ValidateLikeC4(
+                entry.SnapshotId,
+                model,
+                c3ContainerId: "el_missing",
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("model_invalid", invalidSelection.Message, StringComparison.Ordinal);
+        Assert.Contains("c3.containerMissing", invalidSelection.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
     public async Task DryRunPreviewsFilesWithoutWriting()
     {
         using TempDirectory temp = new();
