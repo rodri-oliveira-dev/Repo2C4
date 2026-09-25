@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Repo2C4.Mcp;
 
 internal sealed record McpHostOptions(string RepositoryRoot)
@@ -7,8 +9,8 @@ internal sealed record McpHostOptions(string RepositoryRoot)
     internal static bool TryParse(
         string[] args,
         string? configuredRoot,
-        out McpHostOptions? options,
-        out string? error)
+        [NotNullWhen(true)] out McpHostOptions? options,
+        [NotNullWhen(false)] out string? error)
     {
         ArgumentNullException.ThrowIfNull(args);
 
