@@ -65,6 +65,66 @@ public static class RepositoryAccessPolicy
         return candidate;
     }
 
+    /// <summary>
+    /// Resolves a relative destination directory that may not exist yet while validating every existing path component.
+    /// </summary>
+    public static string ResolveWritableDirectoryPath(
+        string authorizedRoot,
+        string relativePath,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string root = GetAuthorizedRoot(authorizedRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+        if (Path.IsPathRooted(relativePath) || HasParentTraversal(relativePath))
+        {
+            throw new UnauthorizedAccessException("Destination must remain relative to the authorized repository root.");
+        }
+
+        string platformRelativePath = relativePath
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
+        string candidate = Path.GetFullPath(Path.Combine(root, platformRelativePath));
+        if (!IsWithinRoot(root, candidate))
+        {
+            throw new UnauthorizedAccessException("Destination resolves outside the authorized repository root.");
+        }
+
+        string normalizedRelative = Path.GetRelativePath(root, candidate);
+        if (string.Equals(normalizedRelative, ".", StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException("Destination must be an explicit child directory.");
+        }
+
+        string current = root;
+        foreach (string segment in normalizedRelative.Split(
+                     Path.DirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            current = Path.Combine(current, segment);
+
+            if (File.Exists(current) && !Directory.Exists(current))
+            {
+                throw new IOException("Destination path contains an existing file.");
+            }
+
+            if (!Directory.Exists(current))
+            {
+                continue;
+            }
+
+            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
+            {
+                throw new UnauthorizedAccessException("Linked destination paths are not allowed.");
+            }
+        }
+
+        return candidate;
+    }
+
     private static string GetAuthorizedRoot(string rootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);

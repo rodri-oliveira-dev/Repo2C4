@@ -37,3 +37,25 @@ public sealed record McpSnapshotPageResult(
     RepositoryFile[] Files,
     RepositoryDiagnostic[] Diagnostics,
     string? NextCursor);
+
+public sealed record McpLikeC4File(
+    string FileName,
+    string Content,
+    int Utf8Bytes);
+
+public sealed record McpGenerateLikeC4Result(
+    string SnapshotId,
+    string SchemaVersion,
+    bool DryRun,
+    bool Written,
+    string? DestinationPath,
+    McpLikeC4File[] Files);
+
+public sealed record McpValidateLikeC4Result(
+    string SnapshotId,
+    string SchemaVersion,
+    string Workspace,
+    bool IsValid,
+    int ExitCode,
+    bool TimedOut,
+    Repo2C4.Core.LikeC4.LikeC4ValidationDiagnostic[] Diagnostics);

@@ -19,6 +19,12 @@ internal static class McpToolJson
         };
 
         options.Converters.Add(
+            new JsonStringEnumConverter<ArchitectureElementKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(
+            new JsonStringEnumConverter<ArchitectureLevel>(allowIntegerValues: false));
+        options.Converters.Add(
+            new JsonStringEnumConverter<ReviewStatus>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(
             new JsonStringEnumConverter<EvidenceSourceType>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         options.Converters.Add(
             new JsonStringEnumConverter<DiagnosticSeverity>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
