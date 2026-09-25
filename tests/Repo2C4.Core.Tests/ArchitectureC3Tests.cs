@@ -132,14 +132,20 @@ public sealed class ArchitectureC3Tests
         ArchitectureC3Model valid = ArchitectureC3Builder.Build(c2, "el_web");
         ArchitectureC3Model invalidBase = valid with
         {
-            BaseModel = c2 with { Elements = default },
+            BaseModel = c2 with
+            {
+                Elements = default,
+            },
         };
 
         Assert.Contains(
             ArchitectureC3Validator.Validate(invalidBase),
             error => error.Path.StartsWith("$.baseModel", StringComparison.Ordinal));
 
-        ArchitectureC3Model missingContainer = valid with { SelectedContainerId = null! };
+        ArchitectureC3Model missingContainer = valid with
+        {
+            SelectedContainerId = null!,
+        };
         Assert.Contains(
             ArchitectureC3Validator.Validate(missingContainer),
             error => error.Code == "c3.containerMissing");
@@ -152,7 +158,10 @@ public sealed class ArchitectureC3Tests
             [],
             ReviewStatus.RequiresReview,
             "Missing endpoint IDs.");
-        ArchitectureC3Model invalidIds = valid with { Relations = [invalidRelation] };
+        ArchitectureC3Model invalidIds = valid with
+        {
+            Relations = [invalidRelation],
+        };
         IReadOnlyList<ContractError> errors = ArchitectureC3Validator.Validate(invalidIds);
         Assert.Contains(errors, error => error.Code == "relation.sourceMissing");
         Assert.Contains(errors, error => error.Code == "relation.destinationMissing");
