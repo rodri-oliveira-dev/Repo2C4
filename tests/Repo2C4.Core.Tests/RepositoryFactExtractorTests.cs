@@ -241,6 +241,47 @@ public sealed class RepositoryFactExtractorTests
     }
 
     [Fact]
+    public void PlatformSpecificTargetFrameworksRemainEvidence()
+    {
+        using Fixture fixture = new();
+        fixture.Add("Platforms.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net8.0-windows;net10.0-android;net9.0-ios18.0</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        RepositorySnapshot snapshot = Extract(fixture.Options());
+        string[] frameworks = snapshot.Evidence
+            .Where(item => item.Category == "dotnet.project.targetFramework")
+            .Select(item => item.Description)
+            .ToArray();
+
+        Assert.Contains(frameworks, item => item.Contains("net8.0-windows", StringComparison.Ordinal));
+        Assert.Contains(frameworks, item => item.Contains("net10.0-android", StringComparison.Ordinal));
+        Assert.Contains(frameworks, item => item.Contains("net9.0-ios18.0", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void GlobalEvidenceLimitAlwaysProducesExplicitDiagnostic()
+    {
+        using Fixture fixture = new();
+        for (int file = 0; file < 40; file++)
+        {
+            string content = string.Join(
+                Environment.NewLine,
+                Enumerable.Range(0, 256).Select(line => $"client.ConnectToRedis(); // {line}"));
+            fixture.Add($"src/Signal{file:D2}.cs", content);
+        }
+
+        RepositorySnapshot snapshot = Extract(fixture.Options());
+
+        Assert.Equal(10_000, snapshot.Evidence.Length);
+        Assert.Single(snapshot.Diagnostics, item => item.Code == "extract.evidenceLimit");
+    }
+
+    [Fact]
     public void ExtractHonorsCancellation()
     {
         using Fixture fixture = new();

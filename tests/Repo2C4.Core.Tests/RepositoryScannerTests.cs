@@ -233,6 +233,26 @@ public sealed class RepositoryScannerTests
     }
 
     [Fact]
+    public void MaximumPatternSetScansWithoutRegexCacheThrashingBehavior()
+    {
+        using TemporaryRepository repository = new();
+        repository.Add("src/Match.cs", "class Match { }");
+
+        RepositorySnapshot snapshot = Scan(repository.Options() with
+        {
+            IncludePatterns =
+            [
+                .. Enumerable.Range(0, 63).Select(index => $"never-{index}.cs"),
+                "**/*.cs",
+            ],
+        });
+
+        Assert.Single(snapshot.Files);
+        Assert.Equal("src/Match.cs", snapshot.Files[0].RelativePath);
+        Assert.DoesNotContain(snapshot.Diagnostics, diagnostic => diagnostic.Code == "scan.patternTimeout");
+    }
+
+    [Fact]
     public void CancellationPropagatesRatherThanReturningPartialSuccess()
     {
         using TemporaryRepository repository = new();
