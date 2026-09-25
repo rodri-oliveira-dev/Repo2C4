@@ -6,7 +6,7 @@ Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evid
 
 | Project | Responsibility |
 | --- | --- |
-| `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory and evidence-backed .NET declaration extraction. |
+| `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
 | `src/Repo2C4.Cli` | Offline CLI host; feature commands are not yet implemented. |
 | `src/Repo2C4.Mcp` | Stdio-safe MCP host scaffold; protocol transport arrives in phase 3. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
@@ -45,6 +45,14 @@ Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total
 Extraction reads at most **512 KiB per accepted file**, rechecks the authorized root and symlinks, rejects invalid UTF-8/XML DTDs and external entities, and reports changed, inaccessible or unresolvable files via bounded `extract.*` diagnostics. Source text, connection strings, exception text and other potential secrets never enter the output. Managed path checks are not atomic against malicious concurrent filesystem mutations; use a trusted, stable read-only checkout. No external services are contacted. The CLI `inspect` command and MCP transport are not yet implemented.
 
 See [fixtures, v1 snapshot and reproduction](examples/README.md) and [evidence categories](docs/contracts.md).
+
+## Deterministic LikeC4 emission (issue #10)
+
+`LikeC4Emitter.Emit(model)` converts a validated `ArchitectureModel` into `specification.c4`, `model.c4` and `views.c4` entirely in memory. Generation is deterministic, emits LF line endings, preserves C1/C2 containment and keeps `requiresReview` visible in LikeC4 tags/metadata rather than promoting hypotheses to confirmed architecture.
+
+LikeC4 local identifiers are derived from v1 architecture IDs by replacing `.` with `_`; collisions in the same LikeC4 scope are rejected instead of receiving arbitrary suffixes. Names, relation descriptions and review reasons are quoted/escaped so DSL-looking text cannot introduce new statements. The emitter performs no repository I/O, process execution, AI/network calls or PR operations.
+
+See [deterministic LikeC4 generation](docs/likec4-generation.md) and the checked-in golden files under `examples/likec4-golden/`. Real validation with the official LikeC4 CLI is delivered separately by issue #11.
 
 ## Entry point smoke tests
 
