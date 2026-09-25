@@ -180,11 +180,15 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
-            List<LikeC4GeneratedFile> files = [.. LikeC4Emitter.Emit(model)];
+            IReadOnlyList<LikeC4GeneratedFile> files;
             if (values.TryGetValue("--c3-container", out string? selectedContainer))
             {
                 ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, selectedContainer);
-                files.AddRange(LikeC4Emitter.EmitC3(c3));
+                files = LikeC4Emitter.EmitWithC3(model, c3);
+            }
+            else
+            {
+                files = LikeC4Emitter.Emit(model);
             }
 
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
