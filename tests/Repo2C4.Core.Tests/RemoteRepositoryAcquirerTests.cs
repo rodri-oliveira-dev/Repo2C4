@@ -10,6 +10,8 @@ public sealed class RemoteRepositoryAcquirerTests
     [InlineData("ssh://example.com/repo.git", "remote_url_invalid")]
     [InlineData("file:///tmp/repo", "remote_url_invalid")]
     [InlineData("https://user:secret@example.com/repo.git", "remote_credentials_rejected")]
+    [InlineData("https://example.com/repo.git?token=secret", "remote_credentials_rejected")]
+    [InlineData("https://127.0.0.1/repo.git", "remote_host_not_public")]
     public async Task RejectsUnsafeRemoteUrls(string url, string code)
     {
         RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
