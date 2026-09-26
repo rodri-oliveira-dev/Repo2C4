@@ -157,3 +157,13 @@ Phase 4 issue #19 adds review-first regeneration. CLI `generate` previews file-l
 ## Manually triggered review-only LikeC4 PR (issue #22)
 
 The [Reviewable LikeC4 documentation PR](.github/workflows/architecture-pr.yml) workflow is manually dispatched **only on the trusted default `main`**. It accepts this repository's authorized inspection root and either an existing, human-reviewed v1 model matching a fresh snapshot or explicitly consented, sanitized OpenAI cloud inference. It performs locked restore, format/build/test, guarded managed generation, official LikeC4 validation and a bounded diff. A dedicated short-lived write-permission job proposes a PR **only if validated managed files changed**; it never pushes to `main`, approves or merges a PR, or turns AI hypotheses into confirmed architecture. For input examples, security/permission configuration, confidentiality, caveats and fixture tests, see [workflow guide](docs/architecture-pr.md). Publication of this workflow through Actions requires the Phase 5 branch to be merged to default `main`; its script and test fixtures run in the branch CI before then.
+
+### Optional remote Git inspection
+
+Local paths remain the primary and most private source. For a public HTTPS Git repository, Repo2C4 can acquire a selected ref in an isolated temporary workspace and feed that workspace into the same bounded evidence scanner:
+
+```bash
+repo2c4 inspect --remote-url https://github.com/OWNER/REPOSITORY.git --remote-ref refs/heads/main --output snapshot.json
+```
+
+The resolved URL, requested ref and concrete commit are written separately to `snapshot.json.acquisition.json`; they are acquisition provenance, not architectural evidence. Remote acquisition requires network access and Git, rejects embedded credentials, SSH/file URLs, submodules and symbolic links, applies file/size/time limits, never runs repository builds, hooks or scripts, and deletes the temporary workspace after inspection. Private/authenticated repositories and Git LFS-dependent analysis are intentionally unsupported. Review the confidentiality and trust implications before acquiring third-party code.
