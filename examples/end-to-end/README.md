@@ -66,3 +66,26 @@ This nests the C3 component proposals for `el_web` in `model.c4` and adds `c3.vi
 ## Regeneration review
 
 Omit `--apply` to preview changes only. Review `added`, `modified`, `unchanged` and `conflict` entries before applying. After the first successful apply, `.repo2c4-manifest.json` records the SHA-256 of each generated output. If a generated file is edited manually, a later apply is blocked and the human-edited file remains untouched.
+
+
+## Installed CLI and MCP quickstart (Phase 5)
+
+After `dotnet build Repo2C4.slnx --configuration Release` and installing the official `likec4@1.59.4` CLI, execute `bash scripts/verify-distribution.sh artifacts/distribution 1.0.0` from the Repo2C4 root to package, install and smoke-test the two version-matched tools from a NuGet feed with no external sources. No public package or cloud credential is required. See [English distribution guide](../../docs/distribution.md) or [Português](../../docs/distribution.pt-BR.md) for persistent local installation.
+
+With the installed `repo2c4` command on PATH and while in this repository checkout, inspect the **authorized local** example and compare against the deterministic fixture:
+
+```bash
+repo2c4 inspect --repository examples/fixtures/library-only --output artifacts/e2e/inspect.json
+cmp examples/end-to-end/snapshot.v1.json artifacts/e2e/inspect.json
+repo2c4 generate --model examples/end-to-end/architecture.c1.v1.json --output artifacts/e2e/c1
+repo2c4 generate --model examples/end-to-end/architecture.c1.v1.json --output artifacts/e2e/c1 --apply
+repo2c4 validate --output artifacts/e2e/c1
+repo2c4 generate --model examples/end-to-end/architecture.c2.v1.json --output artifacts/e2e/c2 --apply
+repo2c4 validate --output artifacts/e2e/c2
+repo2c4 generate --model examples/models/acme.c2.v1.json --output artifacts/e2e/acme-web-c3 --c3-container el_web --apply
+repo2c4 validate --output artifacts/e2e/acme-web-c3
+```
+
+The checked-in C1/C2/C3 inputs represent **reviewed architectural choices**, not automatic claims that each project is a deployed container. To propose a candidate optionally, run `repo2c4 infer --snapshot artifacts/e2e/inspect.json --provider ollama --model-id YOUR_LOCAL_MODEL --output artifacts/e2e/candidate.json`, inspect its evidence references, and save a separately reviewed model before generating. OpenAI needs explicit `--allow-external-ai` and a host-supplied `OPENAI_API_KEY`; it transmits sanitized metadata to a cloud service and may incur charges.
+
+The installed MCP tool starts with `repo2c4-mcp --repository-root /absolute/path/to/the/authorized/repository`; configure that exact executable and args in your MCP client. It does not call a hosted AI itself, writes protocol messages only to stdout, and requires explicit authorization for generated writes. The [client walkthrough](../../docs/mcp-client.md) covers request order and evidence-first model review.

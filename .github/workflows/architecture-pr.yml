@@ -1,0 +1,190 @@
+name: Reviewable LikeC4 documentation PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Exact owner/repo authorized for the manual run (must be this repository)'
+        required: true
+        type: string
+      source_ref:
+        description: 'Trusted source branch (main only; no forks or untrusted feature branches)'
+        required: true
+        type: choice
+        options:
+          - main
+      repository_root:
+        description: 'Repository-relative local .NET root to inspect (use . for the checked-out repository)'
+        required: true
+        default: '.'
+        type: string
+      mode:
+        description: 'Use an existing human-reviewed JSON model or explicitly authorized cloud inference'
+        required: true
+        type: choice
+        options:
+          - reviewed
+          - infer
+      model_path:
+        description: 'Repository-relative reviewed v1 ArchitectureModel JSON path (reviewed mode only)'
+        required: false
+        type: string
+      provider:
+        description: 'Set openai for hosted inference; leave blank in reviewed mode'
+        required: false
+        type: string
+      model_id:
+        description: 'Explicit model ID supported by the OpenAI Responses API (infer mode only)'
+        required: false
+        type: string
+      allow_external_ai:
+        description: 'I authorize sending only bounded sanitized evidence metadata to the OpenAI API'
+        required: true
+        default: false
+        type: boolean
+      output_id:
+        description: 'Lowercase slug for docs/generated/<slug>, maximum 40 characters'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo2c4-docs-${{ inputs.output_id }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate reviewed model and LikeC4 diff
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.prepare.outputs.has_changes }}
+    steps:
+      - name: Guard trusted manual dispatch
+        shell: bash
+        env:
+          TARGET_REPOSITORY: ${{ inputs.repository }}
+          ACTUAL_REPOSITORY: ${{ github.repository }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          ACTUAL_REF: ${{ github.ref }}
+          IS_FORK: ${{ github.event.repository.fork }}
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_REPOSITORY" != "$ACTUAL_REPOSITORY" ||
+                "$SOURCE_REF" != main || "$ACTUAL_REF" != refs/heads/main ||
+                "$IS_FORK" != false ]]; then
+            echo "::error::Run this workflow on this repository's trusted main branch; forks and other source refs are not allowed."
+            exit 1
+          fi
+
+      - name: Checkout trusted source commit without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools and locked dependencies
+        run: |
+          dotnet tool restore
+          dotnet restore Repo2C4.slnx --locked-mode
+
+      - name: Verify format, build and tests
+        run: |
+          dotnet format Repo2C4.slnx --verify-no-changes --no-restore
+          dotnet build Repo2C4.slnx --configuration Release --no-restore
+          dotnet test Repo2C4.slnx --configuration Release --no-build
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Install official LikeC4 CLI
+        run: |
+          npm install --global --no-audit --no-fund --ignore-scripts likec4@1.59.4
+          likec4 --version
+
+      - name: Prepare validated managed outputs
+        id: prepare
+        shell: bash
+        env:
+          TARGET_REPOSITORY: ${{ inputs.repository }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_SHA: ${{ github.sha }}
+          REPOSITORY_ROOT: ${{ inputs.repository_root }}
+          EXECUTION_MODE: ${{ inputs.mode }}
+          MODEL_PATH: ${{ inputs.model_path }}
+          PROVIDER: ${{ inputs.provider }}
+          MODEL_ID: ${{ inputs.model_id }}
+          EXTERNAL_CONSENT: ${{ inputs.allow_external_ai }}
+          OUTPUT_ID: ${{ inputs.output_id }}
+          REPO2C4_EVENT_FORK: ${{ github.event.repository.fork }}
+          OPENAI_API_KEY: ${{ inputs.mode == 'infer' && inputs.allow_external_ai && secrets.OPENAI_API_KEY || '' }}
+        run: |
+          set -euo pipefail
+          args=(prepare --repository "$TARGET_REPOSITORY"
+                --source-ref "$SOURCE_REF" --source-sha "$SOURCE_SHA"
+                --repository-root "$REPOSITORY_ROOT" --mode "$EXECUTION_MODE"
+                --model-path "$MODEL_PATH" --provider "$PROVIDER" --model-id "$MODEL_ID"
+                --output-id "$OUTPUT_ID" --artifact-dir "$RUNNER_TEMP/repo2c4-docs-artifact")
+          if [[ "$EXTERNAL_CONSENT" == true ]]; then
+            args+=(--allow-external-ai)
+          fi
+          python3 scripts/architecture-pr.py "${args[@]}"
+
+      - name: Upload only validated managed outputs
+        if: ${{ steps.prepare.outputs.has_changes == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: repo2c4-validated-docs
+          path: ${{ runner.temp }}/repo2c4-docs-artifact/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Create review PR only for a validated diff
+    needs: prepare
+    if: ${{ needs.prepare.outputs.has_changes == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout the same validated main commit without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download validated artifacts from this run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name repo2c4-validated-docs --dir "$RUNNER_TEMP/repo2c4-docs-artifact"
+
+      - name: Create or identify a dedicated, human-review PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPOSITORY: ${{ inputs.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          OUTPUT_ID: ${{ inputs.output_id }}
+        run: |
+          set -euo pipefail
+          python3 scripts/architecture-pr.py publish \
+            --repository "$TARGET_REPOSITORY" --source-sha "$SOURCE_SHA" \
+            --output-id "$OUTPUT_ID" --artifact-dir "$RUNNER_TEMP/repo2c4-docs-artifact"

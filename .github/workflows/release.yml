@@ -1,0 +1,231 @@
+name: Verify and optionally release Repo2C4 tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact version already declared in Directory.Build.props (no implicit version override)'
+        type: string
+        required: true
+        default: '1.0.0'
+      publish_github_release:
+        description: 'Explicitly publish GitHub Release assets and a tag (never pushes to NuGet)'
+        type: boolean
+        required: true
+        default: false
+      publication_confirmation:
+        description: 'Type PUBLISH only when deliberately publishing a public GitHub Release; otherwise leave NO'
+        type: string
+        required: true
+        default: 'NO'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo2c4-manual-release
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Verify packages and clean install
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publishing: ${{ steps.inputs.outputs.publishing }}
+    steps:
+      - name: Check explicit version and release mode
+        id: inputs
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH_RELEASE: ${{ inputs.publish_github_release }}
+          CONFIRMATION: ${{ inputs.publication_confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version must be a valid project SemVer identifier."
+            exit 1
+          fi
+          if [[ "$PUBLISH_RELEASE" == true && "$CONFIRMATION" != PUBLISH ]]; then
+            echo "::error::Public release requires publication_confirmation=PUBLISH."
+            exit 1
+          fi
+          if [[ "$PUBLISH_RELEASE" != true && "$CONFIRMATION" == PUBLISH ]]; then
+            echo "::error::Publication confirmation was provided without opt-in."
+            exit 1
+          fi
+          echo "publishing=$PUBLISH_RELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout selected main commit without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Confirm project version and product package identities
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          declared="$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)"
+          test "$declared" = "$VERSION"
+          test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)" = "$VERSION"
+          test "$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Cli
+          test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Mcp
+          test "$(dotnet msbuild src/Repo2C4.Core/Repo2C4.Core.csproj -nologo -getProperty:IsPackable | tr -d '\r' | tail -n 1)" = false
+
+      - name: Restore, format, build and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool restore
+          dotnet restore Repo2C4.slnx --locked-mode
+          dotnet format Repo2C4.slnx --verify-no-changes --no-restore
+          dotnet build Repo2C4.slnx --configuration Release --no-restore
+          dotnet test Repo2C4.slnx --configuration Release --no-build
+
+      - name: Set up pinned Node.js and LikeC4 CLI
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Install official LikeC4 validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global --no-audit --no-fund likec4@1.59.4
+          likec4 --version
+
+      - name: Dry-run package build and isolated consumer installation
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify-distribution.sh artifacts/distribution "$VERSION"
+          cd artifacts/distribution
+          sha256sum Repo2C4.Cli."$VERSION".nupkg Repo2C4.Mcp."$VERSION".nupkg > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          echo "Both versioned tools are installable and runnable from a clean local feed; no publication in the dry-run job."
+
+      - name: Retain validated release payload only after explicit opt-in
+        if: ${{ steps.inputs.outputs.publishing == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: repo2c4-release-payload
+          path: artifacts/distribution/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Opt-in GitHub Release only
+    needs: dry-run
+    if: ${{ needs.dry-run.outputs.publishing == 'true' && needs.dry-run.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download only this run's verified release payload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/payload"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name repo2c4-release-payload --dir "$RUNNER_TEMP/payload"
+          cd "$RUNNER_TEMP/payload"
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 3
+          test -s "Repo2C4.Cli.$VERSION.nupkg"
+          test -s "Repo2C4.Mcp.$VERSION.nupkg"
+          sha256sum --check SHA256SUMS
+
+      - name: Verify main has not moved and create release at validated SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          CONFIRMATION: ${{ inputs.publication_confirmation }}
+          PUBLISH_RELEASE: ${{ inputs.publish_github_release }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$PUBLISH_RELEASE" = true
+          test "$CONFIRMATION" = PUBLISH
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+          tag="v$VERSION"
+          expected_assets=(
+            "Repo2C4.Cli.$VERSION.nupkg"
+            "Repo2C4.Mcp.$VERSION.nupkg"
+            "SHA256SUMS"
+          )
+
+          existing_tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
+          if [ -n "$existing_tag_sha" ]; then
+            if [ "$existing_tag_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Existing tag $tag points to a different commit; refusing publication."
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null
+          fi
+
+          release_json=""
+          if release_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets 2>/dev/null)"; then
+            if [ "$(jq -r '.isDraft' <<<"$release_json")" != "true" ]; then
+              expected="$(printf '%s\n' "${expected_assets[@]}" | sort)"
+              actual="$(jq -r '.assets[].name' <<<"$release_json" | sort)"
+              if [ "$actual" != "$expected" ]; then
+                echo "::error::Published release exists but does not contain exactly the expected assets."
+                exit 1
+              fi
+              echo "Release $tag is already published with the expected assets at the validated commit."
+              exit 0
+            fi
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft \
+              --title "Repo2C4 $tag" \
+              --notes "Explicitly published, locally installable CLI and MCP tool packages. Download the attached artifacts, verify SHA256SUMS, and review docs/distribution.md. This release does not publish to NuGet.org."
+          fi
+
+          for asset in "${expected_assets[@]}"; do
+            gh release upload "$tag" "$RUNNER_TEMP/payload/$asset" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          done
+
+          release_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$release_json")" != "true" ]; then
+            echo "::error::Release changed state before the verified publication step."
+            exit 1
+          fi
+          expected="$(printf '%s\n' "${expected_assets[@]}" | sort)"
+          actual="$(jq -r '.assets[].name' <<<"$release_json" | sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Draft release does not contain exactly the expected verified assets."
+            exit 1
+          fi
+
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$final_json")" != "false" ]; then
+            echo "::error::Release was not published successfully."
+            exit 1
+          fi
+          if [ "$(jq -r '.assets[].name' <<<"$final_json" | sort)" != "$expected" ]; then
+            echo "::error::Published release assets differ from the verified payload."
+            exit 1
+          fi

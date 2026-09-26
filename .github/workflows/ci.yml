@@ -20,6 +20,8 @@ jobs:
   build-test-pack:
     name: Restore, build, test, coverage e smoke
     runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
 
     steps:
       - name: Checkout
@@ -168,6 +170,22 @@ jobs:
             exit 1
           fi
 
+      - name: Validar sintaxe dos workflows com actionlint pinado
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=1.7.12
+          digest=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --output "$workdir/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
+          echo "$digest  $workdir/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$workdir/actionlint.tar.gz" -C "$workdir" actionlint
+          "$workdir/actionlint" -shellcheck= -pyflakes= .github/workflows/*.yml
+
       - name: Verificar Central Package Management
         shell: bash
         run: |
@@ -233,6 +251,29 @@ jobs:
           REPO2C4_LIKEC4_INTEGRATION: '1'
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
+      - name: Validar automação de PR com fixtures e HTTP/gh simulados
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/automation -p 'test_*.py' -v
+
+      - name: Smoke test da automação de documentação com LikeC4 real
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="$RUNNER_TEMP/repo2c4-workflow-fixture"
+          trap 'rm -rf "$smoke_dir" docs/generated/ci-fixture' EXIT
+          env -u GITHUB_ACTIONS -u GITHUB_REF GITHUB_OUTPUT=/dev/null \
+            python3 scripts/architecture-pr.py prepare \
+              --repository "$GITHUB_REPOSITORY" --source-sha "$GITHUB_SHA" \
+              --repository-root examples/fixtures/library-only \
+              --mode reviewed --model-path examples/end-to-end/architecture.c1.v1.json \
+              --output-id ci-fixture --artifact-dir "$smoke_dir"
+          test -s "$smoke_dir/metadata.json"
+          test -s "$smoke_dir/managed/evidence-report.md"
+          test -s "$smoke_dir/managed/.repo2c4-manifest.json"
+          grep -Fq 'Hypotheses requiring review' "$smoke_dir/managed/evidence-report.md"
+
       - name: Smoke test end-to-end da CLI offline
         shell: bash
         run: |
@@ -293,6 +334,12 @@ jobs:
           set -e
           test "$conflict_exit" -eq 5
           grep -Fq "// human edit" "$workdir/c2/model.c4"
+
+      - name: Empacotar e instalar ferramentas CLI e MCP em ambiente isolado
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
 
       - name: Smoke test da CLI
         shell: bash
@@ -382,4 +429,4 @@ jobs:
             exit 1
           fi
 
-          echo "Alias de compatibilidade aprovado. O pack permanece desabilitado até a Fase 5."
+          echo "Alias de compatibilidade aprovado. A instalação/execução dos dois pacotes foi validada no CI."

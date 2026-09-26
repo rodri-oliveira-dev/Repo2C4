@@ -2,10 +2,23 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>repo2c4-mcp</ToolCommandName>
+    <PackageId>Repo2C4.Mcp</PackageId>
+    <Authors>Rodrigo de Oliveira</Authors>
+    <Description>Repo2C4 local stdio Model Context Protocol server for evidence-based LikeC4 workflows.</Description>
+    <PackageTags>likec4;c4;architecture;documentation;dotnet-tool</PackageTags>
+    <RepositoryUrl>https://github.com/rodri-oliveira-dev/Repo2C4</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ModelContextProtocol.Core" PrivateAssets="all" />
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Repo2C4.Core/Repo2C4.Core.csproj" />

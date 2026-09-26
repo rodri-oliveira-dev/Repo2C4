@@ -1,17 +1,33 @@
 # Repo2C4
 
-Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evidence from local .NET repositories and, in later phases, generating reviewable LikeC4 documentation. Inference must not convert unsupported hypotheses into confirmed facts.
+[Português (Brasil)](README.pt-BR.md)
+
+Repo2C4 is a .NET 10 tool for collecting verifiable architectural evidence from authorized local .NET repositories and generating reviewable LikeC4 documentation. Inference must not convert unsupported hypotheses into confirmed facts.
+
+## Install and try the distributed CLI/MCP
+
+**No public NuGet publication is assumed.** From a trusted checkout, install the .NET 10 SDK and the official LikeC4 CLI, then build, pack and smoke-test both tools from an isolated local feed:
+
+```bash
+dotnet tool restore
+dotnet restore Repo2C4.slnx --locked-mode
+dotnet build Repo2C4.slnx --configuration Release --no-restore
+npm install --global likec4@1.59.4
+bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
+```
+
+To inspect a local repository, use `repo2c4 inspect --repository /absolute/local/repository --output snapshot.json`. A reviewed or optional AI-generated candidate can then be previewed, applied and validated using `generate` and `validate`. The installed `repo2c4-mcp` is a stdio server requiring `--repository-root /absolute/authorized/root`. See [full installation and walkthrough](docs/distribution.md), [step-by-step fixture C1/C2/C3](examples/end-to-end/README.md) and [MCP client configuration](docs/mcp-client.md).
 
 ## Architecture and current scope
 
 | Project | Responsibility |
 | --- | --- |
 | `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
-| `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate` commands; no AI calls or automatic architecture inference. |
+| `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate`; optional `infer` with local Ollama or consent-gated OpenAI cloud. All proposed assertions require human review. |
 | `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; exposes `inspect_repository`, `get_evidence`, `get_snapshot`, `get_evidence_report`, `generate_likec4` and `validate_likec4`. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. AI providers and rendering are not implemented. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection and interpretation remain client responsibilities.
+CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. The CLI alone implements optional inference adapters; Core and MCP have no provider SDK, hosted API key or direct inference call. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection remains the MCP client's responsibility; direct CLI inference requires an explicit provider and model.
 
 ## Prerequisites and verification
 
@@ -36,7 +52,7 @@ Default exclusions include `.git`, `bin`, `obj`, `node_modules`, `artifacts` and
 
 Default budgets are **1,000 accepted files**, **1 MiB per file**, **16 MiB total accepted file sizes** and **20,000 visited filesystem entries**. Adjust `MaxFiles`, `MaxBytesPerFile`, `MaxTotalBytes` and `MaxVisitedEntries` explicitly to fit the authorized checkout. The returned `RepositorySnapshot` includes only file-relative paths, sizes and bounded diagnostics, never source bodies or raw secrets. `sha256` is null because whole-file hashes are not computed. `scan.*` diagnostics give observed omission counts for excluded, inaccessible, binary and oversized files or limit exhaustion. When the entry budget stops enumeration, `scan.entryLimit` warns that unvisited entries were not counted and omission totals are **lower bounds**. Cancellation throws `OperationCanceledException`, never returning a partial result as a successful snapshot. Two scans of an unchanged repository yield the same `ContractJson.SerializeSnapshot` output.
 
-**Security boundary:** the caller must authorize the root and run against a trusted, stable, preferably read-only checkout with least-privilege permissions. Managed pre/post-open link checks cannot guarantee atomic no-follow semantics during concurrent, malicious filesystem changes. Future readers of snapshot paths must revalidate containment, permissions, links and byte limits at the actual point of use. A nominally safe text file can still contain secrets. Before any future provider sends content or metadata off-machine, obtain explicit user consent and apply appropriate secret redaction. This phase sends nothing to an AI provider.
+**Security boundary:** the caller must authorize the root and run against a trusted, stable, preferably read-only checkout with least-privilege permissions. Managed pre/post-open link checks cannot guarantee atomic no-follow semantics during concurrent, malicious filesystem changes. Future readers of snapshot paths must revalidate containment, permissions, links and byte limits at the actual point of use. A nominally safe text file can still contain secrets. The optional OpenAI CLI provider requires explicit `--allow-external-ai` consent and sends only a bounded sanitized metadata projection. Offline inspection and MCP never contact an AI provider.
 
 ## Evidence-backed .NET facts (issue #8)
 
@@ -81,6 +97,16 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
 
 `inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Generation is preview-only by default. `--apply` writes only Repo2C4-managed files whose current SHA-256 still matches `.repo2c4-manifest.json`; manual edits and unmanaged collisions become conflicts and remain untouched.
 
+Optional direct CLI inference proposes a review-required model. Choose local Ollama with `infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json`, or choose OpenAI using `--provider openai --allow-external-ai` with `OPENAI_API_KEY` in the host environment. The offline CLI and MCP do not depend on either provider.
+
+| Inference mode | Provider/selection | Network, cost and confidentiality |
+| --- | --- | --- |
+| MCP client | The external client selects its own model; the Repo2C4 MCP host has no provider connection. | Evidence is exposed to the authorized client; the client's configuration determines any further external sharing or charges. |
+| Ollama local CLI | Explicit `--provider ollama` and installed local model ID. | Uses loopback HTTP without a cloud API key; local compute cost, no direct cloud request by Repo2C4. |
+| OpenAI cloud CLI | Explicit `--provider openai --allow-external-ai`, model ID and host-provided `OPENAI_API_KEY`. | Sends only a bounded sanitized evidence projection to the fixed cloud API, which can incur token-based charges. Sanitized architectural metadata still leaves the machine. |
+
+See the [local inference guide (EN)](docs/inference.md), [local guide (PT-BR)](docs/inference.pt-BR.md), [cloud consent and privacy guide (EN)](docs/inference-openai.md) and [cloud guide (PT-BR)](docs/inference-openai.pt-BR.md).
+
 Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
 ## MCP stdio foundation (issue #13)
@@ -115,7 +141,7 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 `.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
-**Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
+**Phase 5 distribution:** two versioned installable .NET tools, `Repo2C4.Cli` (`repo2c4`) and `Repo2C4.Mcp` (`repo2c4-mcp`), are packed and clean-install tested in CI without an external publication. The Core is internal. The manual release workflow defaults to a non-publishing dry run; public GitHub Release assets require dual opt-in, and NuGet.org publication is not implemented. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
 
 See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 4 issues #17–#19 share `phase/04-review-and-c3`; the single phase pull request is opened only after the last issue is implemented.
 
@@ -128,3 +154,8 @@ C1/C2 generation remains the default. To derive a reviewable C3 proposal for exa
 ## Managed regeneration
 
 Phase 4 issue #19 adds review-first regeneration. CLI `generate` previews file-level changes by default and `--apply` is required to persist them. MCP `generate_likec4` returns the same structured change summary when a destination is supplied. Repo2C4 records only its generated outputs in `.repo2c4-manifest.json`, never deletes unknown files, and blocks apply when a managed file was edited or removed outside Repo2C4.
+
+
+## Manually triggered review-only LikeC4 PR (issue #22)
+
+The [Reviewable LikeC4 documentation PR](.github/workflows/architecture-pr.yml) workflow is manually dispatched **only on the trusted default `main`**. It accepts this repository's authorized inspection root and either an existing, human-reviewed v1 model matching a fresh snapshot or explicitly consented, sanitized OpenAI cloud inference. It performs locked restore, format/build/test, guarded managed generation, official LikeC4 validation and a bounded diff. A dedicated short-lived write-permission job proposes a PR **only if validated managed files changed**; it never pushes to `main`, approves or merges a PR, or turns AI hypotheses into confirmed architecture. For input examples, security/permission configuration, confidentiality, caveats and fixture tests, see [workflow guide](docs/architecture-pr.md). Publication of this workflow through Actions requires the Phase 5 branch to be merged to default `main`; its script and test fixtures run in the branch CI before then.
