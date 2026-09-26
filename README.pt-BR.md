@@ -22,7 +22,7 @@ dotnet tool install --global Repo2C4.Mcp --version 1.0.0
 npm install --global likec4@1.59.4
 ```
 
-Na CLI, inspecione uma raiz local autorizada, revise evidências/modelo, faça preview com `generate`, valide e só então use `--apply`. No MCP, conecte `repo2c4-mcp` com a menor raiz absoluta possível, inspecione evidências primeiro, faça preview, valide e autorize escrita explicitamente por último. Configurações copiáveis para VS Code, Claude Desktop e stdio portátil estão no [quickstart MCP](docs/mcp-quickstart.pt-BR.md). Consulte também [distribuição](docs/distribution.pt-BR.md) e a [fixture end-to-end](examples/end-to-end/README.md).
+Na CLI, execute primeiro `repo2c4 init --repository /caminho/absoluto/do/repositorio` e `repo2c4 doctor --repository /caminho/absoluto/do/repositorio`. O `init` apenas cria configuração local segura e o `doctor` apenas diagnostica pré-requisitos; nenhum deles analisa, compila, infere ou escreve C4. Depois inspecione a raiz autorizada, revise evidências/modelo, faça preview com `generate`, valide e só então use `--apply`. No MCP, conecte `repo2c4-mcp` com a menor raiz absoluta possível, inspecione evidências primeiro, faça preview, valide e autorize escrita explicitamente por último. Configurações copiáveis para VS Code, Claude Desktop e stdio portátil estão no [quickstart MCP](docs/mcp-quickstart.pt-BR.md). Consulte também [distribuição](docs/distribution.pt-BR.md) e a [fixture end-to-end](examples/end-to-end/README.md).
 
 ## Exemplo: repositório até LikeC4
 
