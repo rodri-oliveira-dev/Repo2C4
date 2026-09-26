@@ -152,6 +152,7 @@ public sealed class OpenAiInferenceProvider : IArchitectureInferenceProvider
 
                 if (type.GetString() != "message"
                     || !item.TryGetProperty("role", out JsonElement role)
+                    || role.ValueKind != JsonValueKind.String
                     || role.GetString() != "assistant"
                     || !item.TryGetProperty("content", out JsonElement contents)
                     || contents.ValueKind != JsonValueKind.Array
@@ -164,6 +165,7 @@ public sealed class OpenAiInferenceProvider : IArchitectureInferenceProvider
                 {
                     if (part.ValueKind != JsonValueKind.Object
                         || !part.TryGetProperty("type", out JsonElement contentType)
+                        || contentType.ValueKind != JsonValueKind.String
                         || contentType.GetString() != "output_text"
                         || !part.TryGetProperty("text", out JsonElement text)
                         || text.ValueKind != JsonValueKind.String
