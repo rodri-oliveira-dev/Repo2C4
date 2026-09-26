@@ -239,10 +239,13 @@ jobs:
       - name: Publish validated tools to NuGet.org
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          tag="v$VERSION"
+          expected="$(printf '%s\n' "Repo2C4.Cli.$VERSION.nupkg" "Repo2C4.Mcp.$VERSION.nupkg" "SHA256SUMS" | sort)"
           if [ -z "${NUGET_API_KEY:-}" ]; then
             echo "::error::The protected release environment must provide NUGET_API_KEY."
             exit 1
