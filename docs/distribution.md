@@ -1,10 +1,21 @@
-# Repo2C4 distribution and verified release (Phase 5)
+# Repo2C4 distribution and verified release
 
 Repo2C4 v1.0.0 ships two **separate .NET 10 tool packages**, `Repo2C4.Cli` (command `repo2c4`) and `Repo2C4.Mcp` (command `repo2c4-mcp`). The shared Core remains an internal project reference, not a separately published package. Package version comes from `Directory.Build.props`; the two products use the same version and distinct, non-placeholder package IDs. The tools target .NET 10, so a compatible .NET runtime/SDK must be installed. LikeC4 is an **independent, externally installed** validator and renderer, not bundled inside Repo2C4.
 
-## Install the two tools without publishing
+## Install the published tools
 
-From a trusted checkout of the [Repo2C4 repository](https://github.com/rodri-oliveira-dev/Repo2C4), install the .NET 10 SDK from `global.json` and the pinned official LikeC4 CLI (CI uses Node.js 22.23.3 and `likec4@1.59.4`):
+Published releases expose both product tools through NuGet.org. Install the exact release version:
+
+```bash
+dotnet tool install --global Repo2C4.Cli --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+repo2c4 --help
+repo2c4-mcp --help
+```
+
+LikeC4 is still an independent dependency for validation/rendering and must be installed separately.
+
+For maintainers or offline verification from a trusted checkout, install the .NET 10 SDK from `global.json` and the pinned official LikeC4 CLI (CI uses Node.js 22.23.3 and `likec4@1.59.4`):
 
 ```bash
 dotnet tool restore
@@ -25,7 +36,7 @@ dotnet tool install --tool-path ./local-tools/mcp Repo2C4.Mcp --version 1.0.0 --
 ./local-tools/mcp/repo2c4-mcp --help
 ```
 
-Tool command extensions differ on Windows (`.exe`). The install script is a Linux/CI smoke test; Windows users can run the shown `dotnet tool install` commands with Windows-appropriate paths. Packages downloaded from a future explicit GitHub Release have SHA-256 checksums in the attached `SHA256SUMS`. **Do not assume the packages are already available on NuGet.org**: this phase does not publish there.
+Tool command extensions differ on Windows (`.exe`). The install script is a Linux/CI smoke test; Windows users can run the shown `dotnet tool install` commands with Windows-appropriate paths. Packages attached to the matching GitHub Release are the validated payload sent to NuGet.org and include SHA-256 checksums in `SHA256SUMS`. Prefer the exact version shown by the release notes rather than an unbounded latest install.
 
 ## Local repository → evidence → reviewed architecture → LikeC4
 
@@ -66,10 +77,10 @@ MCP uses protocol messages on stdout and diagnostics on stderr; do not pipe bann
 
 ## Versioned release: verification first, publication separately authorized
 
-[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the two tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish GitHub assets deliberately, select `publish_github_release=true` **and** enter `publication_confirmation=PUBLISH`; only then does the separate write-scoped job recheck that `main` still points at the validated commit, reject an existing tag/release, verify package SHA-256 and create the version tag and GitHub Release with exactly the two product packages and `SHA256SUMS`. This option publishes GitHub Release assets, **not NuGet.org**. Do not request a public release before reviewing version, package contents and repository permissions.
+[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the two tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact three release assets, creates/publishes the versioned GitHub Release and pushes only `Repo2C4.Cli` and `Repo2C4.Mcp` to NuGet.org using the environment-provided `NUGET_API_KEY`. A final read-only job then installs that exact version from NuGet.org as an external consumer and executes both public commands. Failed publication or propagation is reported without printing the API key.
 
 The regular [CI](../.github/workflows/ci.yml) performs the same pack/clean-install smoke on push and PR without any AI key or release write permission. [CodeQL](../.github/workflows/codeql.yml), [Dependency Review](../.github/workflows/dependency-review.yml) and security/audit checks must remain green before the Phase 5 PR is merged. The dedicated [documentation PR workflow](architecture-pr.md) is a separate manual process, not release publication.
 
 ## Known limitations
 
-Repo2C4 initially inspects local .NET repositories rather than arbitrary languages or remote Git URLs. The source scanner does not execute repository code; it limits supported files, sizes, evidence counts and paths. C1/C2 and selected C3 are **reviewable proposals**; repository-static evidence does not independently prove runtime topology. Models and evidence reports may reveal repository-relative names and should be handled as potentially confidential. Cloud inference is opt-in and sends only sanitized but potentially revealing architecture metadata; local Ollama stays on loopback. The tool does not install LikeC4, render its own diagrams, auto-approve architecture, merge PRs, publish NuGet.org or provide a SaaS service. Phase 6 addresses broader public adoption and officially available installation channels.
+Repo2C4 initially inspects local .NET repositories rather than arbitrary languages or remote Git URLs. The source scanner does not execute repository code; it limits supported files, sizes, evidence counts and paths. C1/C2 and selected C3 are **reviewable proposals**; repository-static evidence does not independently prove runtime topology. Models and evidence reports may reveal repository-relative names and should be handled as potentially confidential. Cloud inference is opt-in and sends only sanitized but potentially revealing architecture metadata; local Ollama stays on loopback. The tool does not install LikeC4, render its own diagrams, auto-approve architecture, merge PRs or provide a SaaS service. Public release remains manually triggered and separately protected; ordinary pushes and pull requests never publish packages.
