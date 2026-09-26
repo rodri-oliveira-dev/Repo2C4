@@ -13,7 +13,7 @@ repo2c4-mcp --help
 likec4 --version
 ```
 
-Autorize somente uma raiz absoluta existente. Não use diretório pessoal, raiz do disco ou pasta contendo repositórios não relacionados.
+Autorize somente uma raiz absoluta existente. Não use diretório pessoal, raiz do disco ou pasta contendo repositórios não relacionados. Se a CLI também estiver instalada, `repo2c4 init --repository /caminho/absoluto` e `repo2c4 doctor --repository /caminho/absoluto` preparam/verificam a mesma raiz sem iniciar análise ou inferência.
 
 ## Conectar
 
