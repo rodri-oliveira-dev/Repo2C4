@@ -25,9 +25,15 @@ public sealed class RemoteRepositoryWorkspace : IAsyncDisposable
         Provenance = provenance;
     }
 
-    public string RootPath { get; }
+    public string RootPath
+    {
+        get;
+    }
 
-    public RemoteRepositoryProvenance Provenance { get; }
+    public RemoteRepositoryProvenance Provenance
+    {
+        get;
+    }
 
     public ValueTask DisposeAsync()
     {
@@ -68,6 +74,8 @@ public sealed class GitProcessRunner : IGitProcessRunner
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(arguments);
+
         using Process process = new()
         {
             StartInfo = new ProcessStartInfo("git")
@@ -253,12 +261,12 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
 
         if (string.IsNullOrWhiteSpace(reference)
             || reference.Length > 256
-            || reference.StartsWith('-', StringComparison.Ordinal)
+            || reference.StartsWith("-", StringComparison.Ordinal)
             || reference.Any(char.IsControl)
             || reference.Contains("..", StringComparison.Ordinal)
             || reference.Contains("@{", StringComparison.Ordinal)
-            || reference.EndsWith('.', StringComparison.Ordinal)
-            || reference.EndsWith('/', StringComparison.Ordinal)
+            || reference.EndsWith(".", StringComparison.Ordinal)
+            || reference.EndsWith("/", StringComparison.Ordinal)
             || reference.Contains(' '))
         {
             throw new RemoteRepositoryException("remote_ref_invalid", "Remote Git ref is invalid.");
