@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Repo2C4.Mcp;
 
-internal sealed record McpHostOptions(string RepositoryRoot)
+internal sealed record McpHostOptions(string RepositoryRoot, bool AllowRemoteAcquisition)
 {
     internal const string RepositoryRootEnvironmentVariable = "REPO2C4_REPOSITORY_ROOT";
 
@@ -17,6 +17,7 @@ internal sealed record McpHostOptions(string RepositoryRoot)
         options = null;
         error = null;
         string? commandLineRoot = null;
+        bool allowRemoteAcquisition = false;
 
         for (int index = 0; index < args.Length; index++)
         {
@@ -30,6 +31,18 @@ internal sealed record McpHostOptions(string RepositoryRoot)
                 }
 
                 commandLineRoot = args[++index];
+                continue;
+            }
+
+            if (string.Equals(argument, "--allow-remote-acquisition", StringComparison.Ordinal))
+            {
+                if (allowRemoteAcquisition)
+                {
+                    error = "Repo2C4 MCP configuration error: --allow-remote-acquisition may be specified only once.";
+                    return false;
+                }
+
+                allowRemoteAcquisition = true;
                 continue;
             }
 
@@ -64,7 +77,7 @@ internal sealed record McpHostOptions(string RepositoryRoot)
             return false;
         }
 
-        options = new McpHostOptions(repositoryRoot);
+        options = new McpHostOptions(repositoryRoot, allowRemoteAcquisition);
         return true;
     }
 }
