@@ -131,20 +131,23 @@ def prepare(args: argparse.Namespace, root: Path) -> bool:
         raise AutomationError("Staging directory must be outside the source repository.")
     staging.mkdir(parents=True)
     cli = (root / "src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll").as_posix()
-    if model_path is None:
-        temp = staging / "private"
-        temp.mkdir()
-        snapshot = temp / "snapshot.json"
-        candidate = temp / "candidate.json"
-        if not os.environ.get("OPENAI_API_KEY"):
-            raise AutomationError("OPENAI_API_KEY is required for explicit hosted inference.")
+    temp = staging / "private"
+    temp.mkdir()
+    snapshot = temp / "snapshot.json"
+    try:
         command("dotnet", cli, "inspect", "--repository", str(repository_root),
                 "--output", str(snapshot), cwd=root)
-        command("dotnet", cli, "infer", "--snapshot", str(snapshot),
-                "--provider", "openai", "--model-id", args.model_id,
-                "--allow-external-ai", "--output", str(candidate), cwd=root)
-        model_path = candidate
-    try:
+        if model_path is None:
+            if not os.environ.get("OPENAI_API_KEY"):
+                raise AutomationError("OPENAI_API_KEY is required for explicit hosted inference.")
+            candidate = temp / "candidate.json"
+            command("dotnet", cli, "infer", "--snapshot", str(snapshot),
+                    "--provider", "openai", "--model-id", args.model_id,
+                    "--allow-external-ai", "--output", str(candidate), cwd=root)
+            model_path = candidate
+        elif json.loads(model_path.read_text(encoding="utf-8")).get("snapshot") != json.loads(
+                snapshot.read_text(encoding="utf-8")):
+            raise AutomationError("Reviewed model snapshot differs from the freshly inspected authorized repository.")
         command("dotnet", cli, "generate", "--model", str(model_path),
                 "--output", str(output), cwd=root)
         command("dotnet", cli, "generate", "--model", str(model_path),
