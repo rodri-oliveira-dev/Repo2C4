@@ -322,9 +322,10 @@ internal static class CliApplication
             }
 
             Directory.CreateDirectory(outputDirectory);
-            if (File.Exists(fullOutput))
+            string provenancePath = fullOutput + ".acquisition.json";
+            if (File.Exists(fullOutput) || (remote && File.Exists(provenancePath)))
             {
-                standardError.WriteLine("Snapshot output already exists; choose a new path.");
+                standardError.WriteLine("Snapshot output or acquisition provenance already exists; choose a new path.");
                 return CliExitCodes.IoError;
             }
 
@@ -350,10 +351,12 @@ internal static class CliApplication
                     cancellationToken).ConfigureAwait(false);
                 await using var configuredWorkspace = workspace.ConfigureAwait(false);
 
-                RepositorySnapshot snapshot = InspectRepository(workspace.RootPath, cancellationToken);
+                RepositorySnapshot snapshot = InspectRepository(
+                    workspace.RootPath,
+                    workspace.Provenance.CreateRepositoryId(),
+                    cancellationToken);
                 await WriteSnapshotAsync(fullOutput, snapshot, cancellationToken).ConfigureAwait(false);
 
-                string provenancePath = fullOutput + ".acquisition.json";
                 string provenance = JsonSerializer.Serialize(
                     workspace.Provenance,
                     IndentedJsonOptions) + "\n";
@@ -396,9 +399,15 @@ internal static class CliApplication
 
     private static RepositorySnapshot InspectRepository(
         string repositoryRoot,
+        CancellationToken cancellationToken) =>
+        InspectRepository(repositoryRoot, CreateRepositoryId(repositoryRoot), cancellationToken);
+
+    private static RepositorySnapshot InspectRepository(
+        string repositoryRoot,
+        string repositoryId,
         CancellationToken cancellationToken)
     {
-        RepositoryScanOptions options = new(repositoryRoot, CreateRepositoryId(repositoryRoot));
+        RepositoryScanOptions options = new(repositoryRoot, repositoryId);
         return RepositoryFactExtractor.Extract(options, cancellationToken);
     }
 
