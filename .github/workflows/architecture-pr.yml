@@ -110,7 +110,7 @@ jobs:
 
       - name: Install official LikeC4 CLI
         run: |
-          npm install --global --no-audit --no-fund likec4@1.59.4
+          npm install --global --no-audit --no-fund --ignore-scripts likec4@1.59.4
           likec4 --version
 
       - name: Prepare validated managed outputs
