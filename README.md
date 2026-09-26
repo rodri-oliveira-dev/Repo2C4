@@ -130,3 +130,8 @@ C1/C2 generation remains the default. To derive a reviewable C3 proposal for exa
 ## Managed regeneration
 
 Phase 4 issue #19 adds review-first regeneration. CLI `generate` previews file-level changes by default and `--apply` is required to persist them. MCP `generate_likec4` returns the same structured change summary when a destination is supplied. Repo2C4 records only its generated outputs in `.repo2c4-manifest.json`, never deletes unknown files, and blocks apply when a managed file was edited or removed outside Repo2C4.
+
+
+## Manually triggered review-only LikeC4 PR (issue #22)
+
+The [Reviewable LikeC4 documentation PR](.github/workflows/architecture-pr.yml) workflow is manually dispatched **only on the trusted default `main`**. It accepts this repository's authorized inspection root and either an existing, human-reviewed v1 model matching a fresh snapshot or explicitly consented, sanitized OpenAI cloud inference. It performs locked restore, format/build/test, guarded managed generation, official LikeC4 validation and a bounded diff. A dedicated short-lived write-permission job proposes a PR **only if validated managed files changed**; it never pushes to `main`, approves or merges a PR, or turns AI hypotheses into confirmed architecture. For input examples, security/permission configuration, confidentiality, caveats and fixture tests, see [workflow guide](docs/architecture-pr.md). Publication of this workflow through Actions requires the Phase 5 branch to be merged to default `main`; its script and test fixtures run in the branch CI before then.
