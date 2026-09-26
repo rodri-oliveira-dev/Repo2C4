@@ -119,11 +119,18 @@ def checked_managed_files(root: Path, output: Path) -> tuple[list[str], list[str
     return sorted(set(changed)), sorted(set(removed))
 
 
+def safe_output_root(root: Path, output_id: str) -> Path:
+    output = root / "docs" / "generated" / output_id
+    if any(part.is_symlink() for part in (root / "docs", root / "docs" / "generated", output)):
+        raise AutomationError("Generated output path must not contain linked directories.")
+    if not output.resolve().is_relative_to(root.resolve()):
+        raise AutomationError("Generated output path leaves the authorized repository.")
+    return output
+
+
 def prepare(args: argparse.Namespace, root: Path) -> bool:
     repository_root, model_path = validate_options(args, root)
-    output = root / "docs" / "generated" / args.output_id
-    if output.is_symlink() or output.parent.is_symlink():
-        raise AutomationError("Generated output path must not contain links.")
+    output = safe_output_root(root, args.output_id)
     staging = Path(args.artifact_dir).resolve()
     if staging.exists():
         raise AutomationError("Artifact staging directory must be empty and newly created.")
@@ -204,20 +211,20 @@ def publish(args: argparse.Namespace, root: Path) -> str:
         or command("git", "rev-parse", "HEAD", cwd=root) != args.source_sha
     ):
         raise AutomationError("Artifact/source identity does not match the validated dispatch.")
-    if command("git", "ls-remote", "origin", "refs/heads/main", cwd=root).split()[0] != args.source_sha:
-        raise AutomationError("main moved after validation; restart the dispatch from current main.")
+    remote_main = command("git", "ls-remote", "origin", "refs/heads/main", cwd=root).split()
+    if not remote_main or remote_main[0] != args.source_sha:
+        raise AutomationError("main moved or could not be resolved; restart the dispatch from current main.")
     hashes = info["sha256"]
     changed, removed = info["changed"], info["removed"]
     if (not isinstance(hashes, dict) or not isinstance(changed, list)
             or not isinstance(removed, list)
             or not changed and not removed
             or any(name not in FILES for name in (*hashes, *changed, *removed))
+            or not set(changed).issubset(hashes)
             or set(changed) & set(removed)
             or "evidence-report.md" not in hashes):
         raise AutomationError("Artifact contains unsupported managed-file metadata.")
-    origin = root / "docs" / "generated" / args.output_id
-    if origin.is_symlink() or origin.parent.is_symlink():
-        raise AutomationError("Target directory contains linked paths.")
+    origin = safe_output_root(root, args.output_id)
     for name, digest in hashes.items():
         file = staging / "managed" / name
         if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_FILE:
@@ -265,7 +272,13 @@ def publish(args: argparse.Namespace, root: Path) -> str:
     command("git", "commit", "-m", "docs(likec4): propose reviewed documentation for " + args.output_id, cwd=root)
     # Auth is scoped to the publishing job, after all checks. Do not persist credentials in checkout.
     command("gh", "auth", "setup-git", cwd=root)
-    command("git", "push", "origin", "HEAD:refs/heads/" + branch, cwd=root)
+    try:
+        command("git", "push", "origin", "HEAD:refs/heads/" + branch, cwd=root)
+    except AutomationError as exception:
+        raise AutomationError(
+            "Could not push the dedicated documentation branch. Check the workflow token "
+            "contents:write permission, branch rulesets and repository Actions write policy."
+        ) from exception
     body = (
         "## Review-required LikeC4 documentation\n\n"
         "Source: protected main at \`" + args.source_sha + "\` (mode: \`" + info["mode"] + "\`).\n\n"
