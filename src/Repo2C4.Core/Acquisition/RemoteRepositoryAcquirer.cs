@@ -9,7 +9,15 @@ public sealed record RemoteRepositoryRequest(
     int MaxFiles = 20_000,
     long MaxBytes = 128L * 1024 * 1024);
 
-public sealed record RemoteRepositoryProvenance(string Url, string? Ref, string Commit);
+public sealed record RemoteRepositoryProvenance(string Url, string? Ref, string Commit)
+{
+    public string CreateRepositoryId()
+    {
+        string identity = Url.ToLowerInvariant() + "\n" + Commit.ToLowerInvariant();
+        byte[] digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity));
+        return "repo_" + Convert.ToHexString(digest).ToLowerInvariant()[..24];
+    }
+}
 
 public sealed class RemoteRepositoryException(string code, string message, Exception? innerException = null)
     : Exception(message, innerException)
@@ -37,20 +45,7 @@ public sealed class RemoteRepositoryWorkspace : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
-        try
-        {
-            if (Directory.Exists(RootPath))
-            {
-                Directory.Delete(RootPath, recursive: true);
-            }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-
+        RemoteRepositoryAcquirer.TryCleanupWorkspace(RootPath);
         return ValueTask.CompletedTask;
     }
 }
@@ -89,10 +84,15 @@ public sealed class GitProcessRunner : IGitProcessRunner
         };
 
         process.StartInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        process.StartInfo.Environment["GIT_ASKPASS"] = string.Empty;
         process.StartInfo.Environment["GCM_INTERACTIVE"] = "Never";
         process.StartInfo.Environment["GIT_LFS_SKIP_SMUDGE"] = "1";
         process.StartInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
         process.StartInfo.Environment["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
+        process.StartInfo.Environment.Remove("GIT_DIR");
+        process.StartInfo.Environment.Remove("GIT_WORK_TREE");
+        process.StartInfo.Environment.Remove("GIT_INDEX_FILE");
+        process.StartInfo.Environment.Remove("GIT_OBJECT_DIRECTORY");
         foreach (string argument in arguments)
         {
             process.StartInfo.ArgumentList.Add(argument);
@@ -167,12 +167,7 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         ValidateRef(request.Ref);
         ValidateLimits(request);
 
-        string workspace = Path.Combine(
-            Path.GetTempPath(),
-            "repo2c4",
-            "remote",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
+        string workspace = Directory.CreateTempSubdirectory("repo2c4-remote-").FullName;
 
         try
         {
@@ -211,6 +206,18 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
                 throw new RemoteRepositoryException("git_commit_invalid", "Git did not resolve a valid commit.");
             }
 
+            string tree = await RunRequiredAsync(
+                workspace,
+                timeout,
+                cancellationToken,
+                "ls-tree",
+                "-r",
+                "-l",
+                "-z",
+                "--full-tree",
+                commit).ConfigureAwait(false);
+            RejectUnsafeTree(tree, request.MaxFiles, request.MaxBytes);
+
             await RunRequiredAsync(
                 workspace,
                 timeout,
@@ -231,7 +238,7 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         }
         catch
         {
-            TryDelete(workspace);
+            TryCleanupWorkspace(workspace);
             throw;
         }
     }
@@ -273,7 +280,10 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
             || reference.Contains("@{", StringComparison.Ordinal)
             || reference.EndsWith('.')
             || reference.EndsWith('/')
-            || reference.Contains(' '))
+            || reference.Contains(' ')
+            || reference.IndexOfAny([':', '*', '^', '~', '?', '[', '\\']) >= 0
+            || reference.Contains("//", StringComparison.Ordinal)
+            || reference.EndsWith(".lock", StringComparison.Ordinal))
         {
             throw new RemoteRepositoryException("remote_ref_invalid", "Remote Git ref is invalid.");
         }
@@ -316,6 +326,46 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         return result.StandardOutput;
     }
 
+    private static void RejectUnsafeTree(string tree, int maxFiles, long maxBytes)
+    {
+        int files = 0;
+        long bytes = 0;
+        foreach (string entry in tree.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int tab = entry.IndexOf('\t');
+            if (tab <= 0)
+            {
+                throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
+            }
+
+            string metadata = entry[..tab];
+            string path = entry[(tab + 1)..].Replace('\\', '/');
+            string[] parts = metadata.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 4 || !long.TryParse(parts[3], out long size))
+            {
+                throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
+            }
+
+            string mode = parts[0];
+            if (mode is "120000" or "160000")
+            {
+                throw new RemoteRepositoryException("repository_link_rejected", "Remote repository contains unsupported links or gitlinks.");
+            }
+
+            if (string.Equals(path, ".gitmodules", StringComparison.Ordinal))
+            {
+                throw new RemoteRepositoryException("submodules_rejected", "Repositories declaring Git submodules are not supported.");
+            }
+
+            files++;
+            bytes += size;
+            if (files > maxFiles || bytes > maxBytes)
+            {
+                throw new RemoteRepositoryException("remote_limit_exceeded", "Remote repository exceeds acquisition file or size limits.");
+            }
+        }
+    }
+
     private static void RejectUnsafeMaterialization(string workspace, int maxFiles, long maxBytes)
     {
         string gitModules = Path.Combine(workspace, ".gitmodules");
@@ -356,14 +406,27 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         }
     }
 
-    private static void TryDelete(string path)
+    internal static void TryCleanupWorkspace(string path)
     {
         try
         {
-            if (Directory.Exists(path))
+            if (!Directory.Exists(path))
             {
-                Directory.Delete(path, recursive: true);
+                return;
             }
+
+            foreach (string file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+
+            Directory.Delete(path, recursive: true);
         }
         catch (IOException)
         {
