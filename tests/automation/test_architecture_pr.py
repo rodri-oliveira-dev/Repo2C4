@@ -167,6 +167,26 @@ class ArchitecturePrTests(unittest.TestCase):
         with self.assertRaisesRegex(automation.AutomationError, "Linked paths"):
             automation.relative_file(self.root, "linked.json")
 
+    def test_cloud_key_is_inherited_only_by_explicit_infer_child(self) -> None:
+        passed: list[tuple[tuple[str, ...], dict[str, str]]] = []
+
+        def fake_subprocess(values, *args, **kwargs):
+            passed.append((tuple(values), kwargs["env"]))
+            return subprocess.CompletedProcess(values, 0, b"", b"")
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-not-for-validation"}):
+            with patch.object(automation.subprocess, "run", side_effect=fake_subprocess):
+                automation.command("dotnet", "repo2c4.dll", "inspect", cwd=self.root)
+                automation.command("dotnet", "repo2c4.dll", "infer", cwd=self.root)
+                automation.command("dotnet", "repo2c4.dll", "validate", cwd=self.root)
+                automation.command("gh", "pr", "list", cwd=self.root)
+
+        self.assertEqual(4, len(passed))
+        self.assertNotIn("OPENAI_API_KEY", passed[0][1])
+        self.assertEqual("secret-not-for-validation", passed[1][1].get("OPENAI_API_KEY"))
+        self.assertNotIn("OPENAI_API_KEY", passed[2][1])
+        self.assertNotIn("OPENAI_API_KEY", passed[3][1])
+
     def test_write_denied_prevents_publish(self) -> None:
         with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
                                      "GITHUB_REF": "refs/heads/main", "GH_TOKEN": ""}):
@@ -225,6 +245,7 @@ class ArchitecturePrTests(unittest.TestCase):
         body = creations[0][creations[0].index("--body") + 1]
         self.assertIn("Human review is required", body)
         self.assertIn("evidence-report.md", body)
+        self.assertIn("https://github.com/" + REPOSITORY + "/blob/bot/repo2c4-fixture/docs/generated/fixture/evidence-report.md", body)
         self.assertNotIn("temporary-ci-token", body)
         self.assertFalse(any("merge" in call for call in called))
 
