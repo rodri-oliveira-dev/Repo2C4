@@ -236,17 +236,6 @@ jobs:
             exit 1
           fi
 
-          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
-          final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
-          if [ "$(jq -r '.isDraft' <<<"$final_json")" != "false" ]; then
-            echo "::error::Release was not published successfully."
-            exit 1
-          fi
-          if [ "$(jq -r '.assets[].name' <<<"$final_json" | sort)" != "$expected" ]; then
-            echo "::error::Published release assets differ from the verified payload."
-            exit 1
-          fi
-
       - name: Publish validated tools to NuGet.org
         shell: bash
         env:
@@ -258,14 +247,48 @@ jobs:
             echo "::error::The protected release environment must provide NUGET_API_KEY."
             exit 1
           fi
-          dotnet nuget push "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg" \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
-          dotnet nuget push "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg" \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          push_verified() {
+            local package_id="$1"
+            local package_file="$2"
+            local expected_hash
+            expected_hash="$(awk -v file="$(basename "$package_file")" '$2 == file { print $1 }' "$RUNNER_TEMP/payload/SHA256SUMS")"
+            if dotnet nuget push "$package_file" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json; then
+              return 0
+            fi
+
+            local work="$RUNNER_TEMP/nuget-verify-$package_id"
+            mkdir -p "$work"
+            if ! dotnet tool install --tool-path "$work" "$package_id" --version "$VERSION" \
+              --add-source https://api.nuget.org/v3/index.json \
+              --ignore-failed-sources >/dev/null 2>&1; then
+              echo "::error::$package_id $VERSION could not be verified after a duplicate/publication failure."
+              return 1
+            fi
+            local public_package
+            public_package="$(find "$HOME/.nuget/packages/$(echo "$package_id" | tr '[:upper:]' '[:lower:]')/$VERSION" -maxdepth 1 -name '*.nupkg' -print -quit)"
+            if [ -z "$public_package" ]; then
+              echo "::error::Unable to locate the public package payload for $package_id $VERSION."
+              return 1
+            fi
+            test "$(sha256sum "$public_package" | awk '{print $1}')" = "$expected_hash"
+          }
+
+          push_verified Repo2C4.Cli "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg"
+          push_verified Repo2C4.Mcp "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg"
+
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$final_json")" != "false" ]; then
+            echo "::error::Release was not published successfully."
+            exit 1
+          fi
+          if [ "$(jq -r '.assets[].name' <<<"$final_json" | sort)" != "$expected" ]; then
+            echo "::error::Published release assets differ from the verified payload."
+            exit 1
+          fi
+
 
   post-publish:
     name: Verify public consumer installation
