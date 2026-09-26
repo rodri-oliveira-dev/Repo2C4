@@ -12,7 +12,7 @@ public sealed class RemoteRepositoryAcquirerTests
     [InlineData("https://user:secret@example.com/repo.git", "remote_credentials_rejected")]
     public async Task RejectsUnsafeRemoteUrls(string url, string code)
     {
-        RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner([]));
+        RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(new RemoteRepositoryRequest(url), TestContext.Current.CancellationToken));
         Assert.Equal(code, exception.Code);
@@ -22,10 +22,11 @@ public sealed class RemoteRepositoryAcquirerTests
     public async Task ReportsNonexistentRefWithoutLeakingGitOutput()
     {
         ScriptedGitRunner runner = new(
-        [
+            new GitProcessResult[]
+            {
             new GitProcessResult(0, string.Empty, string.Empty),
-            new GitProcessResult(128, string.Empty, "fatal: https://user:secret@example.invalid/private"),
-        ]);
+                new GitProcessResult(128, string.Empty, "fatal: https://user:secret@example.invalid/private"),
+            });
         RemoteRepositoryAcquirer acquirer = new(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
@@ -148,8 +149,9 @@ public sealed class RemoteRepositoryAcquirerTests
         Assert.False(Directory.Exists(path));
     }
 
-    private sealed class ScriptedGitRunner(Queue<GitProcessResult> results) : IGitProcessRunner
+    private sealed class ScriptedGitRunner(IEnumerable<GitProcessResult> results) : IGitProcessRunner
     {
+        private readonly Queue<GitProcessResult> _results = new(results);
         public Task<GitProcessResult> RunAsync(
             string workingDirectory,
             IReadOnlyList<string> arguments,
@@ -157,7 +159,7 @@ public sealed class RemoteRepositoryAcquirerTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(results.Dequeue());
+            return Task.FromResult(_results.Dequeue());
         }
     }
 
