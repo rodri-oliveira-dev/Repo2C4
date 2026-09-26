@@ -3,7 +3,7 @@
     "repo2c4": {
       "type": "stdio",
       "command": "repo2c4-mcp",
-      "args": ["--repository-root", "${workspaceFolder}"]
+      "args": ["--repository-root", "${workspaceFolder}", "--allow-remote-acquisition"]
     }
   }
 }
