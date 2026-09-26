@@ -40,25 +40,8 @@ jobs:
       - name: Listar ferramentas locais
         run: dotnet tool list --local
 
-      - name: Diagnóstico temporário de lock gerado pelo SDK para empacotamento MCP
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet restore Repo2C4.slnx --force-evaluate
-          echo '__BEGIN_GENERATED_MCP_TEST_LOCK__'
-          cat tests/Repo2C4.Mcp.Tests/packages.lock.json
-          echo '__END_GENERATED_MCP_TEST_LOCK__'
-
       - name: Restaurar dependências em locked mode
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet restore Repo2C4.slnx --force-evaluate
-          echo 'BEGIN_SDK_GENERATED_MCP_TEST_LOCK'
-          base64 -w0 tests/Repo2C4.Mcp.Tests/packages.lock.json
-          echo
-          echo 'END_SDK_GENERATED_MCP_TEST_LOCK'
-          exit 1
+        run: dotnet restore Repo2C4.slnx --locked-mode
 
       - name: Verificar políticas compartilhadas de build
         shell: bash
