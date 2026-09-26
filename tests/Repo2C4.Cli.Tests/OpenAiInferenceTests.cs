@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Repo2C4.Cli.Inference;
@@ -130,7 +129,7 @@ public sealed class OpenAiInferenceTests
         using HttpClient client = CreateClient((_, _) => Task.FromResult(new HttpResponseMessage(status)
         {
             Content = new StringContent(TestKey + " PRIVATE_SERVER_BODY"),
-        });
+        }));
         OpenAiInferenceProvider provider = new(client, ModelId, TestKey, TimeSpan.FromSeconds(5));
 
         InferenceException exception = await Assert.ThrowsAsync<InferenceException>(
@@ -166,7 +165,7 @@ public sealed class OpenAiInferenceTests
         using HttpClient client = CreateClient((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = JsonContent(new { status, output = Array.Empty<object>() }),
-        });
+        }));
         OpenAiInferenceProvider provider = new(client, ModelId, TestKey, TimeSpan.FromSeconds(5));
 
         InferenceException exception = await Assert.ThrowsAsync<InferenceException>(
@@ -181,7 +180,7 @@ public sealed class OpenAiInferenceTests
         using HttpClient client = CreateClient((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StreamContent(new MemoryStream(new byte[(256 * 1024) + 1])),
-        });
+        }));
         OpenAiInferenceProvider provider = new(client, ModelId, TestKey, TimeSpan.FromSeconds(5));
 
         InferenceException exception = await Assert.ThrowsAsync<InferenceException>(
