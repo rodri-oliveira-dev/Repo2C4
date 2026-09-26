@@ -69,7 +69,13 @@ public sealed class OpenAiInferenceProvider : IArchitectureInferenceProvider
                 new { role = "system", content = prompt },
                 new { role = "user", content = ContractJson.SerializeSnapshot(sanitizedSnapshot) },
             },
-            text = new { format = new { type = "json_object" } },
+            text = new
+            {
+                format = new
+                {
+                    type = "json_object",
+                },
+            },
             max_output_tokens = 4096,
             store = false,
             truncation = "disabled",
