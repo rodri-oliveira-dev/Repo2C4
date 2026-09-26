@@ -186,6 +186,39 @@ jobs:
           tar -xzf "$workdir/actionlint.tar.gz" -C "$workdir" actionlint
           "$workdir/actionlint" -shellcheck= -pyflakes= .github/workflows/*.yml
 
+      - name: Validar exemplos de clientes MCP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("examples/mcp-clients")
+          files = {
+              "generic.mcp.json": "mcpServers",
+              "vscode.mcp.json": "servers",
+              "claude-desktop.json": "mcpServers",
+          }
+          forbidden = ("api_key", "apikey", "token", "secret", "/users/", "/home/", "c:\\users\\")
+          placeholder = "/ABSOLUTE/PATH/TO/AUTHORIZED/DOTNET/REPOSITORY"
+
+          for name, top_key in files.items():
+              text = (root / name).read_text(encoding="utf-8")
+              data = json.loads(text)
+              assert set(data) == {top_key}, f"{name}: unexpected top-level fields"
+              server = data[top_key]["repo2c4"]
+              assert server["command"] == "repo2c4-mcp"
+              args = server["args"]
+              assert args[0] == "--repository-root" and len(args) == 2
+              assert not any(value in text.lower() for value in forbidden), f"{name}: sensitive/personal value"
+              if name == "vscode.mcp.json":
+                  assert server["type"] == "stdio"
+                  assert args[1] == "${workspaceFolder}"
+              else:
+                  assert args[1] == placeholder
+          PY
+
       - name: Verificar Central Package Management
         shell: bash
         run: |
