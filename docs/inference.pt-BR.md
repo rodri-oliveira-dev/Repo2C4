@@ -24,7 +24,7 @@ As opções `--endpoint http://127.0.0.1:11434/` e `--timeout-seconds 90` são o
 
 O arquivo de saída não pode existir previamente. O snapshot deve obedecer ao contrato v1 e ter até 4 MiB. A projeção enviada ao modelo permite até 256 arquivos e 512 evidências; a requisição HTTP tem limite de 96 KiB e a resposta, 256 KiB. Falhas de conexão, indisponibilidade do modelo, respostas inválidas, cancelamento e timeout não geram `candidate.json`.
 
-Somente aliases de arquivos, IDs de evidências, descrições de categorias fixas e o ID lógico do repositório são transmitidos ao Ollama. **Nomes/caminhos originais, conteúdo bruto, descrições livres, diagnósticos do scan, hashes e segredos não são enviados.** A sanitização restringe deliberadamente os detalhes que podem ser inferidos. Nenhum código do repositório é executado pelo comando.
+Somente aliases de arquivos, IDs de evidências, descrições de categorias fixas e um ID opaco e hasheado do repositório são transmitidos ao Ollama. **Nomes/caminhos originais, conteúdo bruto, descrições livres, diagnósticos do scan, hashes e segredos não são enviados.** A sanitização restringe deliberadamente os detalhes que podem ser inferidos. Nenhum código do repositório é executado pelo comando.
 
 ## Revisão e geração
 
