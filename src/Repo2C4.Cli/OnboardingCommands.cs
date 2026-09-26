@@ -100,7 +100,10 @@ internal static class OnboardingCommands
             output.WriteLine("No repository analysis, inference, build, or C4 write was executed.");
             return CliExitCodes.Success;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException)
         {
             error.WriteLine("Initialization failed because the repository/configuration path could not be accessed.");
@@ -173,10 +176,17 @@ internal static class OnboardingCommands
             }
 
             bool success = checks.All(static check => check.Ok);
-            if (!success) error.WriteLine("Doctor found one or more onboarding problems.");
+            if (!success)
+            {
+                error.WriteLine("Doctor found one or more onboarding problems.");
+            }
+
             return success ? CliExitCodes.Success : CliExitCodes.ValidationFailed;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PathTooLongException)
         {
             error.WriteLine("Doctor could not access the selected repository.");
@@ -193,7 +203,8 @@ internal static class OnboardingCommands
 
     private static bool TryValidate(string root, string outputDirectory, string mode, string? provider, out string? error)
     {
-        if (Path.IsPathRooted(outputDirectory) || outputDirectory.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Contains("..", StringComparer.Ordinal))
+        if (Path.IsPathRooted(outputDirectory)
+            || outputDirectory.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Contains("..", StringComparer.Ordinal))
         {
             error = "Output directory must be a relative path inside the repository.";
             return false;
@@ -234,8 +245,10 @@ internal static class OnboardingCommands
         foreach (JsonProperty property in document.RootElement.EnumerateObject())
         {
             string name = property.Name.ToLowerInvariant();
-            if (name.Contains("token", StringComparison.Ordinal) || name.Contains("secret", StringComparison.Ordinal)
-                || name.Contains("key", StringComparison.Ordinal) || name.Contains("password", StringComparison.Ordinal)
+            if (name.Contains("token", StringComparison.Ordinal)
+                || name.Contains("secret", StringComparison.Ordinal)
+                || name.Contains("key", StringComparison.Ordinal)
+                || name.Contains("password", StringComparison.Ordinal)
                 || name.Contains("content", StringComparison.Ordinal))
             {
                 throw new InvalidDataException("Sensitive configuration fields are not allowed.");
@@ -252,9 +265,13 @@ internal static class OnboardingCommands
             {
                 stream.WriteByte(0);
             }
+
             return !File.Exists(path);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException) { return false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     private static async Task<bool> CommandSucceedsAsync(string command, string argument, CancellationToken cancellationToken)
@@ -263,30 +280,79 @@ internal static class OnboardingCommands
         {
             using Process process = new()
             {
-                StartInfo = new ProcessStartInfo(command, argument) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true },
+                StartInfo = new ProcessStartInfo(command, argument)
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                },
             };
-            if (!process.Start()) return false;
+            if (!process.Start())
+            {
+                return false;
+            }
+
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             return process.ExitCode == 0;
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException) { return false; }
-    }
-
-    private static bool TryParse(string[] args, string[] valueOptions, string[] flagOptions, out Dictionary<string,string> values, out HashSet<string> flags, out string? error)
-    {
-        values = new(StringComparer.Ordinal); flags = new(StringComparer.Ordinal);
-        HashSet<string> allowedValues = new(valueOptions, StringComparer.Ordinal); HashSet<string> allowedFlags = new(flagOptions, StringComparer.Ordinal);
-        for (int i=0;i<args.Length;i++)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
-            string token=args[i];
-            if (allowedFlags.Contains(token)) { if(!flags.Add(token)){error="Duplicate option: "+token+".";return false;} continue; }
-            if(!allowedValues.Contains(token)){error="Unknown option: "+token+".";return false;}
-            if(values.ContainsKey(token)||i+1>=args.Length||args[i+1].StartsWith("--",StringComparison.Ordinal)){error="Missing or duplicate value for option: "+token+".";return false;}
-            values[token]=args[++i];
+            return false;
         }
-        error=null; return true;
     }
 
-    private static bool IsReparsePoint(string path) => (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
-    private static StringComparison PathComparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+    private static bool TryParse(
+        string[] args,
+        string[] valueOptions,
+        string[] flagOptions,
+        out Dictionary<string, string> values,
+        out HashSet<string> flags,
+        out string? error)
+    {
+        values = new(StringComparer.Ordinal);
+        flags = new(StringComparer.Ordinal);
+        HashSet<string> allowedValues = new(valueOptions, StringComparer.Ordinal);
+        HashSet<string> allowedFlags = new(flagOptions, StringComparer.Ordinal);
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            string token = args[i];
+            if (allowedFlags.Contains(token))
+            {
+                if (!flags.Add(token))
+                {
+                    error = "Duplicate option: " + token + ".";
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!allowedValues.Contains(token))
+            {
+                error = "Unknown option: " + token + ".";
+                return false;
+            }
+
+            if (values.ContainsKey(token)
+                || i + 1 >= args.Length
+                || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                error = "Missing or duplicate value for option: " + token + ".";
+                return false;
+            }
+
+            values[token] = args[++i];
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool IsReparsePoint(string path) =>
+        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 }
