@@ -24,7 +24,7 @@ Use `--endpoint http://127.0.0.1:11434/` to select a different **local** Ollama 
 
 `candidate.json` must not exist beforehand. Input snapshots must be valid v1 JSON and no larger than 4 MiB. The sanitized projection is bounded to 256 inventoried files and 512 pieces of evidence; the HTTP request and response are limited to 96 KiB and 256 KiB respectively. Over-limit, malformed, unavailable and timed-out responses are rejected, and the candidate file is not created. No provider response bodies, original evidence descriptions or tokens are logged.
 
-The inference adapter only transmits opaque file aliases, evidence IDs, fixed-category summaries and a stable repository ID. It **does not transmit raw repository file bodies, original filenames/paths, original free-form descriptions, scan diagnostics, hashes or secrets**. This privacy boundary deliberately reduces the model's ability to infer detailed architecture. It is a conservative proposal, not a repository analysis service. No local source code is executed by this command.
+The inference adapter only transmits opaque file aliases, evidence IDs, fixed-category summaries and an opaque hashed repository ID. It **does not transmit raw repository file bodies, original filenames/paths, original free-form descriptions, scan diagnostics, hashes or secrets**. This privacy boundary deliberately reduces the model's ability to infer detailed architecture. It is a conservative proposal, not a repository analysis service. No local source code is executed by this command.
 
 ## Review before generation
 
