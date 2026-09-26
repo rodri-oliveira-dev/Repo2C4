@@ -4,19 +4,17 @@
 
 Repo2C4 is a .NET 10 tool for collecting verifiable architectural evidence from authorized local .NET repositories and generating reviewable LikeC4 documentation. Inference must not convert unsupported hypotheses into confirmed facts.
 
-## Install and try the distributed CLI/MCP
+## Install → connect → analyze → preview → validate → write
 
-**No public NuGet publication is assumed.** From a trusted checkout, install the .NET 10 SDK and the official LikeC4 CLI, then build, pack and smoke-test both tools from an isolated local feed:
+Install the exact public tools from NuGet.org and LikeC4 separately:
 
 ```bash
-dotnet tool restore
-dotnet restore Repo2C4.slnx --locked-mode
-dotnet build Repo2C4.slnx --configuration Release --no-restore
+dotnet tool install --global Repo2C4.Cli --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
 npm install --global likec4@1.59.4
-bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
 ```
 
-To inspect a local repository, use `repo2c4 inspect --repository /absolute/local/repository --output snapshot.json`. A reviewed or optional AI-generated candidate can then be previewed, applied and validated using `generate` and `validate`. The installed `repo2c4-mcp` is a stdio server requiring `--repository-root /absolute/authorized/root`. See [full installation and walkthrough](docs/distribution.md), [step-by-step fixture C1/C2/C3](examples/end-to-end/README.md) and [MCP client configuration](docs/mcp-client.md).
+For CLI, inspect an authorized local repository, review the evidence/model, preview with `generate`, validate, then use `--apply` only after review. For MCP, connect `repo2c4-mcp` with the smallest absolute `--repository-root`, inspect evidence first, preview generation, validate, and explicitly authorize writing last. Copyable configurations for VS Code, Claude Desktop and portable stdio are in the [MCP quickstart](docs/mcp-quickstart.md). See also the [distribution guide](docs/distribution.md) and [end-to-end fixture](examples/end-to-end/README.md).
 
 ## Architecture and current scope
 
@@ -141,7 +139,7 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 `.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
-**Phase 5 distribution:** two versioned installable .NET tools, `Repo2C4.Cli` (`repo2c4`) and `Repo2C4.Mcp` (`repo2c4-mcp`), are packed and clean-install tested in CI without an external publication. The Core is internal. The manual release workflow defaults to a non-publishing dry run; public GitHub Release assets require dual opt-in, and NuGet.org publication is not implemented. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
+**Distribution:** the two versioned .NET tools, `Repo2C4.Cli` and `Repo2C4.Mcp`, are clean-install tested. Public release remains manually gated; an authorized release publishes the validated packages to NuGet.org and GitHub Release, then verifies consumer installation. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
 
 See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 4 issues #17–#19 share `phase/04-review-and-c3`; the single phase pull request is opened only after the last issue is implemented.
 
