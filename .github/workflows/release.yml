@@ -65,6 +65,11 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
       - name: Confirm project version and product package identities
         shell: bash
         env:
@@ -77,11 +82,6 @@ jobs:
           test "$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Cli
           test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Mcp
           test "$(dotnet msbuild src/Repo2C4.Core/Repo2C4.Core.csproj -nologo -getProperty:IsPackable | tr -d '\r' | tail -n 1)" = false
-
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          dotnet-version: '10.0.x'
 
       - name: Restore, format, build and test
         shell: bash
