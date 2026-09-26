@@ -182,13 +182,13 @@ public sealed class RemoteRepositoryAcquirer(
         Uri uri = ValidateUrl(request.Url);
         ValidateRef(request.Ref);
         ValidateLimits(request);
-        await EnsurePublicHostAsync(uri.Host, cancellationToken).ConfigureAwait(false);
+        TimeSpan timeout = request.Timeout ?? DefaultTimeout;
+        await EnsurePublicHostAsync(uri.Host, timeout, cancellationToken).ConfigureAwait(false);
 
         string workspace = Directory.CreateTempSubdirectory("repo2c4-remote-").FullName;
 
         try
         {
-            TimeSpan timeout = request.Timeout ?? DefaultTimeout;
             await RunRequiredAsync(workspace, timeout, cancellationToken, "init", "--quiet").ConfigureAwait(false);
             await RunRequiredAsync(
                 workspace,
@@ -206,6 +206,7 @@ public sealed class RemoteRepositoryAcquirer(
                 "submodule.recurse=false",
                 "fetch",
                 "--quiet",
+                "--no-recurse-submodules",
                 "--depth=1",
                 "--no-tags",
                 uri.AbsoluteUri,
@@ -278,12 +279,23 @@ public sealed class RemoteRepositoryAcquirer(
         return uri;
     }
 
-    private async Task EnsurePublicHostAsync(string host, CancellationToken cancellationToken)
+    private async Task EnsurePublicHostAsync(
+        string host,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         IPAddress[] addresses;
+        using CancellationTokenSource timeoutSource = new(timeout);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            timeoutSource.Token);
         try
         {
-            addresses = await _hostResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+            addresses = await _hostResolver.ResolveAsync(host, linked.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new RemoteRepositoryException("remote_host_timeout", "Remote repository host resolution exceeded the configured timeout.");
         }
         catch (SocketException exception)
         {
@@ -298,6 +310,11 @@ public sealed class RemoteRepositoryAcquirer(
 
     private static bool IsPublicAddress(IPAddress address)
     {
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
         if (IPAddress.IsLoopback(address))
         {
             return false;
@@ -320,6 +337,7 @@ public sealed class RemoteRepositoryAcquirer(
             return !address.IsIPv6LinkLocal
                 && !address.IsIPv6Multicast
                 && !address.IsIPv6SiteLocal
+                && !address.IsIPv6UniqueLocal
                 && !address.Equals(IPAddress.IPv6Any)
                 && !address.Equals(IPAddress.IPv6None);
         }
