@@ -133,11 +133,16 @@ internal static class OnboardingCommands
                 {
                     string json = await File.ReadAllTextAsync(configPath, cancellationToken).ConfigureAwait(false);
                     RejectSensitiveConfiguration(json);
-                    config = JsonSerializer.Deserialize<Repo2C4LocalConfiguration>(json);
-                    bool valid = config is not null
-                        && string.Equals(config.SchemaVersion, SchemaVersion, StringComparison.Ordinal)
-                        && TryValidate(root, config.OutputDirectory, config.Mode, config.Provider, out _)
-                        && string.Equals(Path.GetFullPath(config.RepositoryRoot), root, PathComparison);
+                    Repo2C4LocalConfiguration? candidate = JsonSerializer.Deserialize<Repo2C4LocalConfiguration>(json);
+                    bool valid = candidate is not null
+                        && !string.IsNullOrWhiteSpace(candidate.SchemaVersion)
+                        && !string.IsNullOrWhiteSpace(candidate.RepositoryRoot)
+                        && !string.IsNullOrWhiteSpace(candidate.OutputDirectory)
+                        && !string.IsNullOrWhiteSpace(candidate.Mode)
+                        && string.Equals(candidate.SchemaVersion, SchemaVersion, StringComparison.Ordinal)
+                        && TryValidate(root, candidate.OutputDirectory, candidate.Mode, candidate.Provider, out _)
+                        && string.Equals(Path.GetFullPath(candidate.RepositoryRoot), root, PathComparison);
+                    config = valid ? candidate : null;
                     checks.Add(("configuration", valid, valid ? "valid " + SchemaVersion : "invalid or root mismatch"));
                 }
                 catch (Exception ex) when (ex is JsonException or InvalidDataException or ArgumentException or NotSupportedException)
@@ -242,6 +247,11 @@ internal static class OnboardingCommands
     private static void RejectSensitiveConfiguration(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException("Configuration root must be a JSON object.");
+        }
+
         foreach (JsonProperty property in document.RootElement.EnumerateObject())
         {
             string name = property.Name.ToLowerInvariant();
@@ -293,12 +303,47 @@ internal static class OnboardingCommands
                 return false;
             }
 
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return process.ExitCode == 0;
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+            using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeout.Token);
+
+            try
+            {
+                await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
+                await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
+                return process.ExitCode == 0;
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                TryKill(process);
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                TryKill(process);
+                throw;
+            }
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
             return false;
+        }
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 
