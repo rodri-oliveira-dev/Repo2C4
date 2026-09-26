@@ -166,20 +166,66 @@ jobs:
           test "$CONFIRMATION" = PUBLISH
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
           tag="v$VERSION"
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-            echo "::error::Tag already exists; publication must never replace an existing release."
+          expected_assets=(
+            "Repo2C4.Cli.$VERSION.nupkg"
+            "Repo2C4.Mcp.$VERSION.nupkg"
+            "SHA256SUMS"
+          )
+
+          existing_tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
+          if [ -n "$existing_tag_sha" ]; then
+            if [ "$existing_tag_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Existing tag $tag points to a different commit; refusing publication."
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null
+          fi
+
+          release_json=""
+          if release_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets 2>/dev/null)"; then
+            if [ "$(jq -r '.isDraft' <<<"$release_json")" != "true" ]; then
+              expected="$(printf '%s\n' "${expected_assets[@]}" | sort)"
+              actual="$(jq -r '.assets[].name' <<<"$release_json" | sort)"
+              if [ "$actual" != "$expected" ]; then
+                echo "::error::Published release exists but does not contain exactly the expected assets."
+                exit 1
+              fi
+              echo "Release $tag is already published with the expected assets at the validated commit."
+              exit 0
+            fi
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft \
+              --title "Repo2C4 $tag" \
+              --notes "Explicitly published, locally installable CLI and MCP tool packages. Download the attached artifacts, verify SHA256SUMS, and review docs/distribution.md. This release does not publish to NuGet.org."
+          fi
+
+          for asset in "${expected_assets[@]}"; do
+            gh release upload "$tag" "$RUNNER_TEMP/payload/$asset" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          done
+
+          release_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$release_json")" != "true" ]; then
+            echo "::error::Release changed state before the verified publication step."
             exit 1
           fi
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::Release already exists."
+          expected="$(printf '%s\n' "${expected_assets[@]}" | sort)"
+          actual="$(jq -r '.assets[].name' <<<"$release_json" | sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Draft release does not contain exactly the expected verified assets."
             exit 1
           fi
-          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-            -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null
-          gh release create "$tag" \
-            "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg" \
-            "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg" \
-            "$RUNNER_TEMP/payload/SHA256SUMS" \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" \
-            --title "Repo2C4 $tag" \
-            --notes "Explicitly published, locally installable CLI and MCP tool packages. Download the attached artifacts, verify SHA256SUMS, and review docs/distribution.md. This release does not publish to NuGet.org."
+
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$final_json")" != "false" ]; then
+            echo "::error::Release was not published successfully."
+            exit 1
+          fi
+          if [ "$(jq -r '.assets[].name' <<<"$final_json" | sort)" != "$expected" ]; then
+            echo "::error::Published release assets differ from the verified payload."
+            exit 1
+          fi
