@@ -21,17 +21,18 @@ public sealed class RemoteRepositoryAcquirerTests
     [Fact]
     public async Task ReportsNonexistentRefWithoutLeakingGitOutput()
     {
-        ScriptedGitRunner runner = new(
-            new GitProcessResult[]
-            {
+        GitProcessResult[] results =
+        [
             new GitProcessResult(0, string.Empty, string.Empty),
-                new GitProcessResult(128, string.Empty, "fatal: https://user:secret@example.invalid/private"),
-            });
+            new GitProcessResult(128, string.Empty, "fatal: https://user:secret@example.invalid/private"),
+        ];
+        ScriptedGitRunner runner = new(results);
         RemoteRepositoryAcquirer acquirer = new(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
-                new RemoteRepositoryRequest("https://example.invalid/repo.git", "missing"), TestContext.Current.CancellationToken));
+                new RemoteRepositoryRequest("https://example.invalid/repo.git", "missing"),
+                TestContext.Current.CancellationToken));
 
         Assert.Equal("remote_fetch_failed", exception.Code);
         Assert.DoesNotContain("secret", exception.Message, StringComparison.Ordinal);
