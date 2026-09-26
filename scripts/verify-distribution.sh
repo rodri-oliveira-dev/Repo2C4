@@ -61,7 +61,11 @@ cmp examples/end-to-end/snapshot.v1.json "$work/snapshot.json"
 test -s "$work/likec4/evidence-report.md"
 test -s "$work/likec4/model.c4"
 
-"$work/mcp/repo2c4-mcp" --help >"$work/mcp.stdout" 2>"$work/mcp.stderr"
+if ! "$work/mcp/repo2c4-mcp" --help >"$work/mcp.stdout" 2>"$work/mcp.stderr"; then
+  echo "Installed MCP executable failed during the help smoke test." >&2
+  cat "$work/mcp.stderr" >&2
+  exit 1
+fi
 test ! -s "$work/mcp.stdout"
 grep -Fq 'stdout is reserved exclusively for MCP protocol messages' "$work/mcp.stderr"
 
