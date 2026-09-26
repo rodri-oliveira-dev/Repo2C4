@@ -6,7 +6,7 @@
     <AnalysisLevel>10-recommended</AnalysisLevel>
     <AnalysisLevelSecurity>10-all</AnalysisLevelSecurity>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <!-- Publishing stays disabled until phase 5. -->
+    <!-- Core and tests stay non-packable; CLI and MCP explicitly opt into tool packaging. -->
     <IsPackable>false</IsPackable>
     <VersionPrefix>1.0.0</VersionPrefix>
     <NuGetAudit>true</NuGetAudit>
