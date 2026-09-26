@@ -34,6 +34,8 @@ for product in Repo2C4.Cli Repo2C4.Mcp; do
   nuspec="$(unzip -p "$archive" "$product.nuspec")"
   grep -Fq "<id>$product</id>" <<<"$nuspec"
   grep -Fq "<version>$version</version>" <<<"$nuspec"
+  grep -Fq "<readme>README.md</readme>" <<<"$nuspec"
+  unzip -p "$archive" README.md | grep -Fq "# Repo2C4"
   if grep -Eq '<id>(Template|DotNetLibraryTemplate)([.<]|$)' <<<"$nuspec"; then
     echo "Placeholder package identity detected." >&2
     exit 1
