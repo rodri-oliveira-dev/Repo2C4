@@ -163,7 +163,11 @@ public sealed class RemoteRepositoryAcquirerTests
 
     private sealed class CancellingGitRunner : IGitProcessRunner
     {
-        public string? WorkingDirectory { get; private set; }
+        public string? WorkingDirectory
+        {
+            get;
+            private set;
+        }
 
         public Task<GitProcessResult> RunAsync(
             string workingDirectory,
@@ -179,7 +183,11 @@ public sealed class RemoteRepositoryAcquirerTests
 
     private sealed class FailingGitRunner(Exception exception) : IGitProcessRunner
     {
-        public string WorkingDirectory { get; private set; } = string.Empty;
+        public string WorkingDirectory
+        {
+            get;
+            private set;
+        } = string.Empty;
 
         public Task<GitProcessResult> RunAsync(
             string workingDirectory,
