@@ -1,6 +1,22 @@
 # Repo2C4
 
-Repo2C4 is an evolving .NET 10 tool for collecting verifiable architectural evidence from local .NET repositories and, in later phases, generating reviewable LikeC4 documentation. Inference must not convert unsupported hypotheses into confirmed facts.
+[Português (Brasil)](README.pt-BR.md)
+
+Repo2C4 is a .NET 10 tool for collecting verifiable architectural evidence from authorized local .NET repositories and generating reviewable LikeC4 documentation. Inference must not convert unsupported hypotheses into confirmed facts.
+
+## Install and try the distributed CLI/MCP
+
+**No public NuGet publication is assumed.** From a trusted checkout, install the .NET 10 SDK and the official LikeC4 CLI, then build, pack and smoke-test both tools from an isolated local feed:
+
+```bash
+dotnet tool restore
+dotnet restore Repo2C4.slnx --locked-mode
+dotnet build Repo2C4.slnx --configuration Release --no-restore
+npm install --global likec4@1.59.4
+bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
+```
+
+To inspect a local repository, use `repo2c4 inspect --repository /absolute/local/repository --output snapshot.json`. A reviewed or optional AI-generated candidate can then be previewed, applied and validated using `generate` and `validate`. The installed `repo2c4-mcp` is a stdio server requiring `--repository-root /absolute/authorized/root`. See [full installation and walkthrough](docs/distribution.md), [step-by-step fixture C1/C2/C3](examples/end-to-end/README.md) and [MCP client configuration](docs/mcp-client.md).
 
 ## Architecture and current scope
 
@@ -81,7 +97,11 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
 
 `inspect` produces evidence only. A human-proposed/reviewed `ArchitectureModel` remains an explicit boundary before `generate`. Generation is preview-only by default. `--apply` writes only Repo2C4-managed files whose current SHA-256 still matches `.repo2c4-manifest.json`; manual edits and unmanaged collisions become conflicts and remain untouched.
 
-Optional direct CLI inference proposes a review-required model. Choose local Ollama with `infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json`, or choose OpenAI using `--provider openai --allow-external-ai` with `OPENAI_API_KEY` in the host environment. The offline CLI and MCP do not depend on either provider.\n\n| Inference mode | Provider/selection | Network, cost and confidentiality |\n| --- | --- | --- |\n| MCP client | The external client selects its own model; the Repo2C4 MCP host has no provider connection. | Evidence is exposed to the authorized client; the client's configuration determines any further external sharing or charges. |\n| Ollama local CLI | Explicit `--provider ollama` and installed local model ID. | Uses loopback HTTP without a cloud API key; local compute cost, no direct cloud request by Repo2C4. |\n| OpenAI cloud CLI | Explicit `--provider openai --allow-external-ai`, model ID and host-provided `OPENAI_API_KEY`. | Sends only a bounded sanitized evidence projection to the fixed cloud API, which can incur token-based charges. Sanitized architectural metadata still leaves the machine. |\n\nSee the [local inference guide (EN)](docs/inference.md), [local guide (PT-BR)](docs/inference.pt-BR.md), [cloud consent and privacy guide (EN)](docs/inference-openai.md) and [cloud guide (PT-BR)](docs/inference-openai.pt-BR.md).
+Optional direct CLI inference proposes a review-required model. Choose local Ollama with `infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json`, or choose OpenAI using `--provider openai --allow-external-ai` with `OPENAI_API_KEY` in the host environment. The offline CLI and MCP do not depend on either provider.
+
+| Inference mode | Provider/selection | Network, cost and confidentiality |\n| --- | --- | --- |\n| MCP client | The external client selects its own model; the Repo2C4 MCP host has no provider connection. | Evidence is exposed to the authorized client; the client's configuration determines any further external sharing or charges. |\n| Ollama local CLI | Explicit `--provider ollama` and installed local model ID. | Uses loopback HTTP without a cloud API key; local compute cost, no direct cloud request by Repo2C4. |\n| OpenAI cloud CLI | Explicit `--provider openai --allow-external-ai`, model ID and host-provided `OPENAI_API_KEY`. | Sends only a bounded sanitized evidence projection to the fixed cloud API, which can incur token-based charges. Sanitized architectural metadata still leaves the machine. |
+
+See the [local inference guide (EN)](docs/inference.md), [local guide (PT-BR)](docs/inference.pt-BR.md), [cloud consent and privacy guide (EN)](docs/inference-openai.md) and [cloud guide (PT-BR)](docs/inference-openai.pt-BR.md).
 
 Usage is documented in [English](docs/cli.md) and [Português](docs/cli.pt-BR.md). The [end-to-end example](examples/end-to-end/README.md) includes the deterministic snapshot, reviewed C1/C2 models and expected generated LikeC4 files.
 
@@ -117,7 +137,7 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 `.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
-**Publication is disabled through phase 4:** projects are non-packable, the template's release workflow is removed, and CI produces no NuGet package. Installation and release distribution are defined in phase 5.
+**Phase 5 distribution:** two versioned installable .NET tools, `Repo2C4.Cli` (`repo2c4`) and `Repo2C4.Mcp` (`repo2c4-mcp`), are packed and clean-install tested in CI without an external publication. The Core is internal. The manual release workflow defaults to a non-publishing dry run; public GitHub Release assets require dual opt-in, and NuGet.org publication is not implemented. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
 
 See [roadmap #4](https://github.com/rodri-oliveira-dev/Repo2C4/issues/4). Phase 4 issues #17–#19 share `phase/04-review-and-c3`; the single phase pull request is opened only after the last issue is implemented.
 
