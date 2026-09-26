@@ -25,6 +25,7 @@ public static class CliExitCodes
 internal static class CliApplication
 {
     private const long MaxModelBytes = 4L * 1024 * 1024;
+    private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
 
     public static async Task<int> RunAsync(
         string[] args,
@@ -355,7 +356,7 @@ internal static class CliApplication
                 string provenancePath = fullOutput + ".acquisition.json";
                 string provenance = JsonSerializer.Serialize(
                     workspace.Provenance,
-                    new JsonSerializerOptions { WriteIndented = true }) + "\n";
+                    IndentedJsonOptions) + "\n";
                 await WriteTextFileAsync(
                     provenancePath,
                     provenance,
