@@ -25,8 +25,13 @@ class AutomationError(Exception):
 
 
 def command(*args: str, cwd: Path, env: dict[str, str] | None = None) -> str:
+    child_env = dict(os.environ if env is None else env)
+    # The host secret is visible only to the explicitly consented inference invocation,
+    # never to git, gh, the build, the official validator or any other child process.
+    if not (len(args) > 2 and args[0] == "dotnet" and args[2] == "infer"):
+        child_env.pop("OPENAI_API_KEY", None)
     result = subprocess.run(
-        args, cwd=cwd, env=env, text=True, capture_output=True, check=False
+        args, cwd=cwd, env=child_env, text=True, capture_output=True, check=False
     )
     if result.returncode != 0:
         name = Path(args[0]).name
@@ -286,7 +291,7 @@ def publish(args: argparse.Namespace, root: Path) -> str:
         "Validation: locked restore, Release build and tests in the dispatch; "
         "official LikeC4 CLI validation passed before publishing.\n\n"
         "Evidence and outstanding architectural hypotheses: "
-        "[evidence-report.md](../blob/" + branch + "/" + pathspec + "/evidence-report.md).\n\n"
+        "[evidence-report.md](https://github.com/" + args.repository + "/blob/" + branch + "/" + pathspec + "/evidence-report.md).\n\n"
         "**Human review is required.** Evidence references do not independently prove runtime "
         "relationships or system boundaries. No automatic merge or architecture approval is performed.\n"
     )
