@@ -1,10 +1,21 @@
-# Distribuição e release verificável do Repo2C4 (Fase 5)
+# Distribuição e release verificável do Repo2C4
 
 O Repo2C4 versão 1.0.0 fornece duas ferramentas .NET 10 separadas: pacote `Repo2C4.Cli`, comando `repo2c4`, e pacote `Repo2C4.Mcp`, comando `repo2c4-mcp`. O Core permanece como referência interna, sem pacote próprio. A versão compartilhada vem de `Directory.Build.props`. O LikeC4 é um validador externo, não é instalado pelo Repo2C4.
 
-## Instalação local e teste sem publicação
+## Instalação pública e teste local
 
-Em um checkout confiável, instale o SDK .NET 10 indicado em `global.json`, Node.js e o LikeC4 oficial. O CI utiliza Node.js `22.23.3` e `likec4@1.59.4`:
+As releases publicadas disponibilizam as duas ferramentas pelo NuGet.org. Instale a versão exata indicada na release:
+
+```bash
+dotnet tool install --global Repo2C4.Cli --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+repo2c4 --help
+repo2c4-mcp --help
+```
+
+O LikeC4 continua sendo uma dependência independente para validação/renderização e deve ser instalado separadamente.
+
+Para manutenção ou verificação offline em um checkout confiável, instale o SDK .NET 10 indicado em `global.json`, Node.js e o LikeC4 oficial. O CI utiliza Node.js `22.23.3` e `likec4@1.59.4`:
 
 ```bash
 dotnet tool restore
@@ -16,7 +27,7 @@ bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
 
 O script cria apenas os dois pacotes de produto, confere identidade e versão, usa um feed NuGet local isolado com fontes externas desabilitadas, instala os dois comandos e testa `inspect → generate --apply → validate` e o comportamento do MCP por stdio. Não cria tag, release, publicação NuGet nem chamada de IA. Os diretórios temporários são excluídos e os pacotes permanecem em `artifacts/distribution/`, ignorado pelo Git. No Windows, instale os pacotes com `dotnet tool install --tool-path` em diretórios separados, ajuste os caminhos e invoque `repo2c4.exe` e `repo2c4-mcp.exe`.
 
-Pacotes de uma eventual GitHub Release explícita terão arquivos `SHA256SUMS` anexados. **Não presuma que o projeto está publicado no NuGet.org**: a publicação pública por esse canal não acontece nesta fase.
+Os pacotes anexados à GitHub Release correspondente são exatamente o payload validado enviado ao NuGet.org e incluem `SHA256SUMS`. Prefira instalar a versão exata documentada na release em vez de depender de uma versão mais recente implícita.
 
 ## Repositório .NET até C1/C2 e C3 seletivo
 
@@ -63,10 +74,10 @@ O servidor rejeita raízes inexistentes, links simbólicos/junções e acessos f
 
 ## Release manual e validação
 
-O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das duas ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente somente os dois pacotes em uma GitHub Release, habilite `publish_github_release=true` **e** digite `publication_confirmation=PUBLISH`. O job de publicação, com permissões de escrita separadas, confirma que a `main` não mudou, rejeita tags/releases já existentes e verifica os checksums antes de criar tag e GitHub Release. Essa opção **não publica no NuGet.org**. Revise o conteúdo dos pacotes, os checks e as permissões antes de autorizar uma release pública.
+O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das duas ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente, habilite `publish_release=true` **e** digite `publication_confirmation=PUBLISH`. O job com escrita roda no environment protegido `release`, confirma que a `main` não mudou, valida os três artefatos esperados, cria/publica a GitHub Release versionada e envia somente `Repo2C4.Cli` e `Repo2C4.Mcp` ao NuGet.org usando `NUGET_API_KEY` fornecida pelo environment. Depois, um job somente leitura instala essa mesma versão diretamente do NuGet.org e executa os dois comandos como consumidor externo. Falhas de publicação ou propagação são reportadas sem expor a credencial.
 
 O CI regular testa empacotamento e instalação sem credencial cloud nem permissão de release. CodeQL, Dependency Review e auditoria de dependências continuam obrigatórios. O workflow de [PR revisável de documentação](architecture-pr.pt-BR.md) é um fluxo manual distinto, sem merge automático.
 
 ## Limitações conhecidas
 
-A análise inicial aceita repositórios .NET locais, não todas as linguagens nem URLs Git remotas. A inspeção não executa o código do repositório; impõe limites de arquivos, tamanho, evidências e caminhos. C1/C2 e C3 seletivo são propostas revisáveis, não prova da topologia em execução. Snapshots, modelos e relatórios podem conter nomes de caminhos confidenciais; cuide de seu armazenamento e compartilhamento. A inferência OpenAI é opcional e transmite somente uma projeção sanitizada, ainda assim reveladora de características arquiteturais. O projeto não inclui editor/renderizador próprio, instalação automática do LikeC4, SaaS, aprovação ou merge automático, publicação NuGet nem instalação pública oficial. A Fase 6 cobre adoção e canais de distribuição oficiais.
+A análise inicial aceita repositórios .NET locais, não todas as linguagens nem URLs Git remotas. A inspeção não executa o código do repositório; impõe limites de arquivos, tamanho, evidências e caminhos. C1/C2 e C3 seletivo são propostas revisáveis, não prova da topologia em execução. Snapshots, modelos e relatórios podem conter nomes de caminhos confidenciais; cuide de seu armazenamento e compartilhamento. A inferência OpenAI é opcional e transmite somente uma projeção sanitizada, ainda assim reveladora de características arquiteturais. O projeto não inclui editor/renderizador próprio, instalação automática do LikeC4, SaaS, aprovação ou merge automático. A publicação pública continua manual e protegida; push comum e pull request nunca publicam pacotes.
