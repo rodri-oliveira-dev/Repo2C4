@@ -30,12 +30,9 @@ on:
         required: false
         type: string
       provider:
-        description: 'Only OpenAI is available for hosted inference (blank in reviewed mode)'
+        description: 'Set openai for hosted inference; leave blank in reviewed mode'
         required: false
-        type: choice
-        options:
-          - ''
-          - openai
+        type: string
       model_id:
         description: 'Explicit model ID supported by the OpenAI Responses API (infer mode only)'
         required: false
