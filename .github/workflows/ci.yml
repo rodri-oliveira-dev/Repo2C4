@@ -211,7 +211,7 @@ jobs:
               assert server["command"] == "repo2c4-mcp"
               args = server["args"]
               assert args[0] == "--repository-root" and len(args) == 3
-    assert args[2] == "--allow-remote-acquisition"
+              assert args[2] == "--allow-remote-acquisition"
               assert not any(value in text.lower() for value in forbidden), f"{name}: sensitive/personal value"
               if name == "vscode.mcp.json":
                   assert server["type"] == "stdio"
