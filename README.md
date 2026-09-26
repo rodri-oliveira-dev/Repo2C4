@@ -99,7 +99,11 @@ dotnet src/Repo2C4.Cli/bin/Release/net10.0/Repo2C4.Cli.dll validate \
 
 Optional direct CLI inference proposes a review-required model. Choose local Ollama with `infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json`, or choose OpenAI using `--provider openai --allow-external-ai` with `OPENAI_API_KEY` in the host environment. The offline CLI and MCP do not depend on either provider.
 
-| Inference mode | Provider/selection | Network, cost and confidentiality |\n| --- | --- | --- |\n| MCP client | The external client selects its own model; the Repo2C4 MCP host has no provider connection. | Evidence is exposed to the authorized client; the client's configuration determines any further external sharing or charges. |\n| Ollama local CLI | Explicit `--provider ollama` and installed local model ID. | Uses loopback HTTP without a cloud API key; local compute cost, no direct cloud request by Repo2C4. |\n| OpenAI cloud CLI | Explicit `--provider openai --allow-external-ai`, model ID and host-provided `OPENAI_API_KEY`. | Sends only a bounded sanitized evidence projection to the fixed cloud API, which can incur token-based charges. Sanitized architectural metadata still leaves the machine. |
+| Inference mode | Provider/selection | Network, cost and confidentiality |
+| --- | --- | --- |
+| MCP client | The external client selects its own model; the Repo2C4 MCP host has no provider connection. | Evidence is exposed to the authorized client; the client's configuration determines any further external sharing or charges. |
+| Ollama local CLI | Explicit `--provider ollama` and installed local model ID. | Uses loopback HTTP without a cloud API key; local compute cost, no direct cloud request by Repo2C4. |
+| OpenAI cloud CLI | Explicit `--provider openai --allow-external-ai`, model ID and host-provided `OPENAI_API_KEY`. | Sends only a bounded sanitized evidence projection to the fixed cloud API, which can incur token-based charges. Sanitized architectural metadata still leaves the machine. |
 
 See the [local inference guide (EN)](docs/inference.md), [local guide (PT-BR)](docs/inference.pt-BR.md), [cloud consent and privacy guide (EN)](docs/inference-openai.md) and [cloud guide (PT-BR)](docs/inference-openai.pt-BR.md).
 
