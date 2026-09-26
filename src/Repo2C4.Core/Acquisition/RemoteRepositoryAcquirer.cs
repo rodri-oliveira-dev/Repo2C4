@@ -155,10 +155,24 @@ public sealed class GitProcessRunner : IGitProcessRunner
     }
 }
 
-public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
+public interface IRemoteHostResolver
+{
+    Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken);
+}
+
+public sealed class SystemRemoteHostResolver : IRemoteHostResolver
+{
+    public Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken) =>
+        Dns.GetHostAddressesAsync(host, cancellationToken);
+}
+
+public sealed class RemoteRepositoryAcquirer(
+    IGitProcessRunner? git = null,
+    IRemoteHostResolver? hostResolver = null)
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
     private readonly IGitProcessRunner _git = git ?? new GitProcessRunner();
+    private readonly IRemoteHostResolver _hostResolver = hostResolver ?? new SystemRemoteHostResolver();
 
     public async Task<RemoteRepositoryWorkspace> AcquireAsync(
         RemoteRepositoryRequest request,
@@ -168,6 +182,7 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         Uri uri = ValidateUrl(request.Url);
         ValidateRef(request.Ref);
         ValidateLimits(request);
+        await EnsurePublicHostAsync(uri.Host, cancellationToken).ConfigureAwait(false);
 
         string workspace = Directory.CreateTempSubdirectory("repo2c4-remote-").FullName;
 
@@ -260,16 +275,15 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
             throw new RemoteRepositoryException("remote_url_invalid", "Remote repository URL must not contain a fragment.");
         }
 
-        EnsurePublicHostAsync(uri.Host, CancellationToken.None).GetAwaiter().GetResult();
         return uri;
     }
 
-    private static async Task EnsurePublicHostAsync(string host, CancellationToken cancellationToken)
+    private async Task EnsurePublicHostAsync(string host, CancellationToken cancellationToken)
     {
         IPAddress[] addresses;
         try
         {
-            addresses = await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
+            addresses = await _hostResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
         }
         catch (SocketException exception)
         {
