@@ -13,12 +13,13 @@ public static class Program
         TextWriter standardOutput,
         TextWriter standardError,
         CancellationToken cancellationToken,
-        HttpClient? inferenceClient = null)
+        HttpClient? inferenceClient = null,
+        TextReader? standardInput = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
 
-        return CliApplication.RunAsync(args, standardOutput, standardError, cancellationToken, inferenceClient);
+        return CliApplication.RunAsync(args, standardOutput, standardError, cancellationToken, inferenceClient, standardInput);
     }
 }

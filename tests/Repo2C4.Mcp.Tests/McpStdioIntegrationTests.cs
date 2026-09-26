@@ -232,6 +232,36 @@ public sealed class McpStdioIntegrationTests
     }
 
     [Fact]
+    public async Task RemoteInspectionToolRequiresExplicitHostOptIn()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        string repositoryRoot = FindFixtureRoot();
+        using Process process = StartServer(repositoryRoot, allowRemoteAcquisition: true);
+        await using StreamWriter input = process.StandardInput;
+        input.AutoFlush = true;
+        input.NewLine = "\n";
+        await InitializeAsync(process, input, cancellationToken);
+
+        await WriteRequestAsync(input, 2, "tools/list", new
+        {
+        });
+        using JsonDocument response = await ReadProtocolDocumentAsync(process, cancellationToken);
+        string[] toolNames =
+        [
+            .. response.RootElement.GetProperty("result").GetProperty("tools")
+                .EnumerateArray()
+                .Select(tool => tool.GetProperty("name").GetString()!),
+        ];
+
+        Assert.Contains("inspect_remote_repository", toolNames);
+
+        input.Close();
+        await process.WaitForExitAsync(cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Equal(0, process.ExitCode);
+    }
+
+    [Fact]
     public async Task InspectRepositoryRejectsExternalSymbolicLink()
     {
         if (OperatingSystem.IsWindows())
@@ -357,7 +387,7 @@ public sealed class McpStdioIntegrationTests
         await input.WriteLineAsync(request);
     }
 
-    private static Process StartServer(string repositoryRoot)
+    private static Process StartServer(string repositoryRoot, bool allowRemoteAcquisition = false)
     {
         ProcessStartInfo startInfo = new("dotnet")
         {
@@ -370,6 +400,10 @@ public sealed class McpStdioIntegrationTests
         startInfo.ArgumentList.Add(typeof(Program).Assembly.Location);
         startInfo.ArgumentList.Add("--repository-root");
         startInfo.ArgumentList.Add(repositoryRoot);
+        if (allowRemoteAcquisition)
+        {
+            startInfo.ArgumentList.Add("--allow-remote-acquisition");
+        }
 
         Process process = new()
         {
