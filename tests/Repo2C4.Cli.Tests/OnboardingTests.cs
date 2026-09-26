@@ -12,10 +12,18 @@ public sealed class OnboardingTests
         using StringWriter output = new();
         using StringWriter error = new();
 
-        int first = await Program.RunAsync(["init","--repository",temp.Path,"--non-interactive"], output, error, CancellationToken.None);
+        int first = await Program.RunAsync(
+            ["init", "--repository", temp.Path, "--non-interactive"],
+            output,
+            error,
+            CancellationToken.None);
         string configPath = Path.Combine(temp.Path, ".repo2c4.json");
         string before = File.ReadAllText(configPath);
-        int second = await Program.RunAsync(["init","--repository",temp.Path,"--non-interactive"], output, error, CancellationToken.None);
+        int second = await Program.RunAsync(
+            ["init", "--repository", temp.Path, "--non-interactive"],
+            output,
+            error,
+            CancellationToken.None);
 
         Assert.Equal(CliExitCodes.Success, first);
         Assert.Equal(CliExitCodes.Success, second);
@@ -37,7 +45,12 @@ public sealed class OnboardingTests
         using StringWriter output = new();
         using StringWriter error = new();
 
-        int exit = await Program.RunAsync(["init","--repository",temp.Path], output, error, CancellationToken.None, standardInput: input);
+        int exit = await Program.RunAsync(
+            ["init", "--repository", temp.Path],
+            output,
+            error,
+            CancellationToken.None,
+            standardInput: input);
 
         Assert.Equal(CliExitCodes.Success, exit);
         Assert.False(File.Exists(Path.Combine(temp.Path, ".repo2c4.json")));
@@ -51,7 +64,7 @@ public sealed class OnboardingTests
         string config = Path.Combine(temp.Path, ".repo2c4.json");
         File.WriteAllText(config, "{\"legacy\":true}\n");
 
-        int exit = await Run(["init","--repository",temp.Path,"--non-interactive","--force"]);
+        int exit = await Run(["init", "--repository", temp.Path, "--non-interactive", "--force"]);
 
         Assert.Equal(CliExitCodes.Success, exit);
         Assert.Equal("{\"legacy\":true}\n", File.ReadAllText(config + ".bak"));
@@ -64,7 +77,8 @@ public sealed class OnboardingTests
     public async Task InitRejectsUnsafeOutputPaths(string outputDirectory)
     {
         using TempDirectory temp = new();
-        int exit = await Run(["init","--repository",temp.Path,"--output-directory",outputDirectory,"--non-interactive"]);
+        int exit = await Run(
+            ["init", "--repository", temp.Path, "--output-directory", outputDirectory, "--non-interactive"]);
         Assert.Equal(CliExitCodes.UsageError, exit);
         Assert.False(File.Exists(Path.Combine(temp.Path, ".repo2c4.json")));
     }
@@ -73,11 +87,17 @@ public sealed class OnboardingTests
     public async Task DoctorRejectsConfigurationContainingSecretField()
     {
         using TempDirectory temp = new();
-        File.WriteAllText(Path.Combine(temp.Path, ".repo2c4.json"), "{\"schemaVersion\":\"repo2c4.config/v1\",\"repositoryRoot\":\"x\",\"outputDirectory\":\"docs\",\"mode\":\"offline\",\"provider\":null,\"apiKey\":\"do-not-store\"}");
+        File.WriteAllText(
+            Path.Combine(temp.Path, ".repo2c4.json"),
+            "{\"schemaVersion\":\"repo2c4.config/v1\",\"repositoryRoot\":\"x\",\"outputDirectory\":\"docs\",\"mode\":\"offline\",\"provider\":null,\"apiKey\":\"do-not-store\"}");
 
         using StringWriter output = new();
         using StringWriter error = new();
-        int exit = await Program.RunAsync(["doctor","--repository",temp.Path], output, error, CancellationToken.None);
+        int exit = await Program.RunAsync(
+            ["doctor", "--repository", temp.Path],
+            output,
+            error,
+            CancellationToken.None);
 
         Assert.Equal(CliExitCodes.ValidationFailed, exit);
         Assert.Contains("FAIL configuration", output.ToString(), StringComparison.Ordinal);
@@ -88,7 +108,7 @@ public sealed class OnboardingTests
     public async Task DoctorMissingConfigurationHasCoherentValidationExit()
     {
         using TempDirectory temp = new();
-        int exit = await Run(["doctor","--repository",temp.Path]);
+        int exit = await Run(["doctor", "--repository", temp.Path]);
         Assert.Equal(CliExitCodes.ValidationFailed, exit);
     }
 
@@ -101,13 +121,23 @@ public sealed class OnboardingTests
 
     private sealed class TempDirectory : IDisposable
     {
-        public TempDirectory() => Path = Directory.CreateTempSubdirectory("repo2c4-onboarding-").FullName;
+        public TempDirectory() =>
+            Path = Directory.CreateTempSubdirectory("repo2c4-onboarding-").FullName;
+
         public string Path { get; }
+
         public void Dispose()
         {
-            try { Directory.Delete(Path, true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            try
+            {
+                Directory.Delete(Path, true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
         }
     }
 }
