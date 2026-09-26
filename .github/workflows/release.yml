@@ -197,21 +197,26 @@ jobs:
               exit 0
             fi
           else
+            notes_file="$RUNNER_TEMP/release-notes.md"
+            printf '%s\n' \
+              "Repo2C4 $tag" \
+              "" \
+              "Install the published .NET tools from NuGet.org:" \
+              "" \
+              '~~~bash' \
+              "dotnet tool install --global Repo2C4.Cli --version $VERSION" \
+              "dotnet tool install --global Repo2C4.Mcp --version $VERSION" \
+              "repo2c4 --help" \
+              "repo2c4-mcp --help" \
+              '~~~' \
+              "" \
+              "The attached .nupkg files are the exact validated payload published to NuGet.org." \
+              "Verify downloads with SHA256SUMS. See docs/distribution.md for runtime requirements, MCP configuration and security guidance." \
+              > "$notes_file"
             gh release create "$tag" \
               --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft \
               --title "Repo2C4 $tag" \
-              --notes "Repo2C4 $tag
-
-Install the published .NET tools from NuGet.org:
-
-```bash
-dotnet tool install --global Repo2C4.Cli --version $VERSION
-dotnet tool install --global Repo2C4.Mcp --version $VERSION
-repo2c4 --help
-repo2c4-mcp --help
-```
-
-The attached .nupkg files are the exact validated payload published to NuGet.org. Verify downloads with SHA256SUMS. See docs/distribution.md for runtime requirements, MCP configuration and security guidance."
+              --notes-file "$notes_file"
           fi
 
           for asset in "${expected_assets[@]}"; do
