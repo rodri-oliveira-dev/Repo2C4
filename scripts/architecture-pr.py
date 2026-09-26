@@ -281,8 +281,8 @@ def publish(args: argparse.Namespace, root: Path) -> str:
         ) from exception
     body = (
         "## Review-required LikeC4 documentation\n\n"
-        "Source: protected main at \`" + args.source_sha + "\` (mode: \`" + info["mode"] + "\`).\n\n"
-        "Generated files: " + ", ".join(" \`" + p + "\`" for p in staged) + ".\n\n"
+        "Source: protected main at `" + args.source_sha + "` (mode: `" + info["mode"] + "`).\n\n"
+        "Generated files: " + ", ".join(" `" + p + "`" for p in staged) + ".\n\n"
         "Validation: locked restore, Release build and tests in the dispatch; "
         "official LikeC4 CLI validation passed before publishing.\n\n"
         "Evidence and outstanding architectural hypotheses: "
