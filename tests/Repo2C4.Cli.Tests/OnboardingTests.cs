@@ -124,7 +124,10 @@ public sealed class OnboardingTests
         public TempDirectory() =>
             Path = Directory.CreateTempSubdirectory("repo2c4-onboarding-").FullName;
 
-        public string Path\n        {\n            get;\n        }
+        public string Path
+        {
+            get;
+        }
 
         public void Dispose()
         {
