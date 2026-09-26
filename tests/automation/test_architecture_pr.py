@@ -281,10 +281,12 @@ class ArchitecturePrTests(unittest.TestCase):
         called: list[tuple[str, ...]] = []
         fake_command = self._publish_command(called, contents)
 
+        real_run = subprocess.run
+
         def fake_run(values, *args, **kwargs):
             if values[:3] == ["git", "ls-remote", "--exit-code"]:
                 return subprocess.CompletedProcess(values, 0, b"existing", b"")
-            return subprocess.run(values, *args, **kwargs)
+            return real_run(values, *args, **kwargs)
 
         with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
                                      "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
@@ -300,10 +302,12 @@ class ArchitecturePrTests(unittest.TestCase):
         called: list[tuple[str, ...]] = []
         fake_command = self._publish_command(called, contents, fail_push=True)
 
+        real_run = subprocess.run
+
         def fake_run(values, *args, **kwargs):
             if values[:3] == ["git", "ls-remote", "--exit-code"]:
                 return subprocess.CompletedProcess(values, 2, b"", b"")
-            return subprocess.run(values, *args, **kwargs)
+            return real_run(values, *args, **kwargs)
 
         with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
                                      "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
