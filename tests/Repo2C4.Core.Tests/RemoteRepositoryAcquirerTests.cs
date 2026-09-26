@@ -1,3 +1,4 @@
+using System.Net;
 using Repo2C4.Core.Acquisition;
 using Xunit;
 
@@ -5,6 +6,8 @@ namespace Repo2C4.Core.Tests;
 
 public sealed class RemoteRepositoryAcquirerTests
 {
+    private static RemoteRepositoryAcquirer CreateAcquirer(IGitProcessRunner runner) =>
+        new(runner, new PublicHostResolver());
     [Theory]
     [InlineData("http://example.com/repo.git", "remote_url_invalid")]
     [InlineData("ssh://example.com/repo.git", "remote_url_invalid")]
@@ -171,6 +174,18 @@ public sealed class RemoteRepositoryAcquirerTests
         string path = workspace.RootPath;
         await workspace.DisposeAsync();
         Assert.False(Directory.Exists(path));
+    }
+
+    private sealed class PublicHostResolver : IRemoteHostResolver
+    {
+        public Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IPAddress address = host == "127.0.0.1"
+                ? IPAddress.Loopback
+                : IPAddress.Parse("203.0.113.10");
+            return Task.FromResult(new[] { address });
+        }
     }
 
     private sealed class ScriptedGitRunner(IEnumerable<GitProcessResult> results) : IGitProcessRunner
