@@ -174,6 +174,26 @@ public sealed class OpenAiInferenceTests
         Assert.Equal(InferenceFailure.InvalidResponse, exception.Failure);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task NonStringResponseDiscriminatorsAreRejectedAsInvalidResponse(bool invalidRole)
+    {
+        string response = invalidRole
+            ? """{"status":"completed","output":[{"type":"message","role":42,"content":[]}]}"""
+            : """{"status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":42,"text":"ignored"}]}]}""";
+        using HttpClient client = CreateClient((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(response, Encoding.UTF8, "application/json"),
+        }));
+        OpenAiInferenceProvider provider = new(client, ModelId, TestKey, TimeSpan.FromSeconds(5));
+
+        InferenceException exception = await Assert.ThrowsAsync<InferenceException>(
+            () => provider.InferAsync(SanitizedFixture(), CancellationToken.None));
+
+        Assert.Equal(InferenceFailure.InvalidResponse, exception.Failure);
+    }
+
     [Fact]
     public async Task OversizedResponseIsRejectedEvenWithoutContentLength()
     {
