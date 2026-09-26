@@ -13,7 +13,7 @@ repo2c4-mcp --help
 likec4 --version
 ```
 
-Authorize only one existing absolute repository root. Do not use a home directory, drive root, or a directory containing unrelated repositories.
+Authorize only one existing absolute repository root. Do not use a home directory, drive root, or a directory containing unrelated repositories. If the CLI is installed too, `repo2c4 init --repository /absolute/path` and `repo2c4 doctor --repository /absolute/path` can prepare/check the same root without starting analysis or inference.
 
 ## Connect
 
