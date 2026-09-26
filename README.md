@@ -21,8 +21,8 @@ For CLI, run `repo2c4 init --repository /absolute/repository/path` and `repo2c4 
 | Project | Responsibility |
 | --- | --- |
 | `src/Repo2C4.Core` | Versioned evidence contracts, safe local inventory, evidence-backed .NET declaration extraction and deterministic in-memory LikeC4 emission. |
-| `src/Repo2C4.Cli` | Offline `inspect`, `generate` and `validate`; optional `infer` with local Ollama or consent-gated OpenAI cloud. All proposed assertions require human review. |
-| `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; exposes `inspect_repository`, `get_evidence`, `get_snapshot`, `get_evidence_report`, `generate_likec4` and `validate_likec4`. |
+| `src/Repo2C4.Cli` | `inspect` supports authorized local paths and opt-in public HTTPS acquisition with `--remote-url`; `generate`/`validate` remain local, and optional `infer` supports local Ollama or consent-gated OpenAI cloud. All proposed assertions require human review. |
+| `src/Repo2C4.Mcp` | Local MCP server over stdio with an explicit repository-root boundary; exposes local inspection/evidence/generation tools by default and adds `inspect_remote_repository` only when the host starts with `--allow-remote-acquisition`. |
 | `tests/Repo2C4.*.Tests` | Separate boundary and startup tests for each product project. |
 
 CLI and MCP reference Core, never each other. Core does not reference the hosts. Core contains local inventory and evidence extraction of static .NET declarations, without deriving proven runtime architecture. The CLI alone implements optional inference adapters; Core and MCP have no provider SDK, hosted API key or direct inference call. MCP transport is local stdio only. Phase 3 now covers bounded evidence inspection, protected deterministic LikeC4 generation/validation, generic MCP-client configuration and a vendor-neutral C1/C2 protocol-client test. AI selection remains the MCP client's responsibility; direct CLI inference requires an explicit provider and model.
@@ -158,7 +158,7 @@ Phase 4 issue #19 adds review-first regeneration. CLI `generate` previews file-l
 
 The [Reviewable LikeC4 documentation PR](.github/workflows/architecture-pr.yml) workflow is manually dispatched **only on the trusted default `main`**. It accepts this repository's authorized inspection root and either an existing, human-reviewed v1 model matching a fresh snapshot or explicitly consented, sanitized OpenAI cloud inference. It performs locked restore, format/build/test, guarded managed generation, official LikeC4 validation and a bounded diff. A dedicated short-lived write-permission job proposes a PR **only if validated managed files changed**; it never pushes to `main`, approves or merges a PR, or turns AI hypotheses into confirmed architecture. For input examples, security/permission configuration, confidentiality, caveats and fixture tests, see [workflow guide](docs/architecture-pr.md). Publication of this workflow through Actions requires the Phase 5 branch to be merged to default `main`; its script and test fixtures run in the branch CI before then.
 
-### Optional remote Git inspection
+## Optional remote Git inspection
 
 Local paths remain the primary and most private source. For a public HTTPS Git repository, Repo2C4 can acquire a selected ref in an isolated temporary workspace and feed that workspace into the same bounded evidence scanner:
 
