@@ -54,7 +54,7 @@ class ArchitecturePrTests(unittest.TestCase):
             ("git", "commit", "-q", "-m", "fixture"),
         ):
             subprocess.run(argv, cwd=self.root, check=True, capture_output=True)
-        self.environment = patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY}, clear=False)
+        self.environment = patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_ACTIONS": "false"}, clear=False)
         self.environment.start()
         self.addCleanup(self.environment.stop)
         self.original_command = automation.command
