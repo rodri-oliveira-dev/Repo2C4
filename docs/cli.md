@@ -22,7 +22,9 @@ The snapshot output file must not already exist. Choose another path if it does.
 repo2c4 infer --snapshot snapshot.json --provider ollama --model-id IDENTIFIER --output candidate.json
 ```
 
-For OpenAI cloud inference, add `--provider openai --allow-external-ai` and provide `OPENAI_API_KEY` through the host environment. It reports the number of anonymized files and sanitized evidence records before sending them to the fixed HTTPS Responses API. Without explicit consent or a key no cloud request is made. The selected model and current token-based API pricing determine cost; sanitized metadata still leaves your machine. See [cloud consent, pricing and confidentiality](inference-openai.md).\n\nThe Ollama command accepts `--endpoint http://127.0.0.1:11434/` and `--timeout-seconds 90`. Only loopback HTTP endpoints are supported. It transmits a bounded and sanitized snapshot projection, never raw repository content, secrets, original file paths or free-form descriptions. The provider returns a versioned model proposal; the CLI attaches the original local snapshot, validates the v1 contract and marks **every AI-generated assertion as requiring human review**. It refuses invalid JSON, malformed models, timeouts, unavailable local models and existing output files. See [local Ollama inference and the reviewed example](inference.md).
+For OpenAI cloud inference, add `--provider openai --allow-external-ai` and provide `OPENAI_API_KEY` through the host environment. It reports the number of anonymized files and sanitized evidence records before sending them to the fixed HTTPS Responses API. Without explicit consent or a key no cloud request is made. The selected model and current token-based API pricing determine cost; sanitized metadata still leaves your machine. See [cloud consent, pricing and confidentiality](inference-openai.md).
+
+The Ollama command accepts `--endpoint http://127.0.0.1:11434/` and `--timeout-seconds 90`. Only loopback HTTP endpoints are supported. It transmits a bounded and sanitized snapshot projection, never raw repository content, secrets, original file paths or free-form descriptions. The provider returns a versioned model proposal; the CLI attaches the original local snapshot, validates the v1 contract and marks **every AI-generated assertion as requiring human review**. It refuses invalid JSON, malformed models, timeouts, unavailable local models and existing output files. See [local Ollama inference and the reviewed example](inference.md).
 
 ### Generate
 
@@ -78,7 +80,7 @@ repo2c4 validate --output DIR
 | `3` | Invalid v1 snapshot/model data. |
 | `4` | LikeC4 validation failed or the configured LikeC4 CLI could not validate. |
 | `5` | Local filesystem/path operation failed or overwrite policy blocked the operation. |
-| `6` | Explicit local inference provider unavailable or timed out. |
+| `6` | Inference provider unavailable, rejected the request, or timed out. |
 
 The underlying LikeC4 exit code is reported as diagnostic context but is mapped to Repo2C4 exit code `4`.
 
