@@ -20,6 +20,8 @@ jobs:
   build-test-pack:
     name: Restore, build, test, coverage e smoke
     runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
 
     steps:
       - name: Checkout
