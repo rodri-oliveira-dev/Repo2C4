@@ -69,6 +69,7 @@ internal sealed class McpRemoteRepositoryTools(McpSnapshotStore snapshotStore)
                     gitRef,
                     McpLimits.ToolExecutionTimeout),
                 linked.Token).ConfigureAwait(false);
+            await using var configuredWorkspace = workspace.ConfigureAwait(false);
 
             RepositoryScanOptions options = new(
                 workspace.RootPath,
