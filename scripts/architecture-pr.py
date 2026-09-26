@@ -97,9 +97,11 @@ def checked_managed_files(root: Path, output: Path) -> tuple[list[str], list[str
     prefix = output.relative_to(root).as_posix() + "/"
     changed: list[str] = []
     removed: list[str] = []
+    child_env = dict(os.environ)
+    child_env.pop("OPENAI_API_KEY", None)
     status = subprocess.run(
         ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", prefix],
-        cwd=root, capture_output=True, check=False,
+        cwd=root, env=child_env, capture_output=True, check=False,
     )
     if status.returncode != 0:
         raise AutomationError("Could not inspect generated-file diff.")
@@ -216,6 +218,9 @@ def publish(args: argparse.Namespace, root: Path) -> str:
         or command("git", "rev-parse", "HEAD", cwd=root) != args.source_sha
     ):
         raise AutomationError("Artifact/source identity does not match the validated dispatch.")
+    # Configure the workflow-scoped credential before either remote lookup. The checkout
+    # intentionally does not persist credentials.
+    command("gh", "auth", "setup-git", cwd=root)
     remote_main = command("git", "ls-remote", "origin", "refs/heads/main", cwd=root).split()
     if not remote_main or remote_main[0] != args.source_sha:
         raise AutomationError("main moved or could not be resolved; restart the dispatch from current main.")
@@ -242,9 +247,11 @@ def publish(args: argparse.Namespace, root: Path) -> str:
                        "--json", "url", "--jq", ".[0].url // empty", cwd=root)
     if existing:
         return "Existing review PR: " + existing
+    child_env = dict(os.environ)
+    child_env.pop("OPENAI_API_KEY", None)
     branch_check = subprocess.run(
         ["git", "ls-remote", "--exit-code", "origin", "refs/heads/" + branch],
-        cwd=root, capture_output=True, check=False
+        cwd=root, env=child_env, capture_output=True, check=False
     )
     if branch_check.returncode == 0:
         raise AutomationError("A documentation branch already exists without an open PR; review it manually.")
@@ -275,8 +282,6 @@ def publish(args: argparse.Namespace, root: Path) -> str:
     command("git", "config", "user.name", "github-actions[bot]", cwd=root)
     command("git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com", cwd=root)
     command("git", "commit", "-m", "docs(likec4): propose reviewed documentation for " + args.output_id, cwd=root)
-    # Auth is scoped to the publishing job, after all checks. Do not persist credentials in checkout.
-    command("gh", "auth", "setup-git", cwd=root)
     try:
         command("git", "push", "origin", "HEAD:refs/heads/" + branch, cwd=root)
     except AutomationError as exception:
