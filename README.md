@@ -14,7 +14,7 @@ dotnet tool install --global Repo2C4.Mcp --version 1.0.0
 npm install --global likec4@1.59.4
 ```
 
-For CLI, inspect an authorized local repository, review the evidence/model, preview with `generate`, validate, then use `--apply` only after review. For MCP, connect `repo2c4-mcp` with the smallest absolute `--repository-root`, inspect evidence first, preview generation, validate, and explicitly authorize writing last. Copyable configurations for VS Code, Claude Desktop and portable stdio are in the [MCP quickstart](docs/mcp-quickstart.md). See also the [distribution guide](docs/distribution.md) and [end-to-end fixture](examples/end-to-end/README.md).
+For CLI, run `repo2c4 init --repository /absolute/repository/path` and `repo2c4 doctor --repository /absolute/repository/path` first. `init` only creates safe local onboarding configuration and `doctor` only diagnoses prerequisites; neither analyzes, builds, infers, or writes C4. Then inspect the authorized repository, review the evidence/model, preview with `generate`, validate, and use `--apply` only after review. For MCP, connect `repo2c4-mcp` with the smallest absolute `--repository-root`, inspect evidence first, preview generation, validate, and explicitly authorize writing last. Copyable configurations for VS Code, Claude Desktop and portable stdio are in the [MCP quickstart](docs/mcp-quickstart.md). See also the [distribution guide](docs/distribution.md) and [end-to-end fixture](examples/end-to-end/README.md).
 
 ## Architecture and current scope
 
