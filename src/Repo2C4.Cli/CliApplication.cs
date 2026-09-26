@@ -29,7 +29,8 @@ internal static class CliApplication
         TextWriter standardOutput,
         TextWriter standardError,
         CancellationToken cancellationToken,
-        HttpClient? inferenceClient = null)
+        HttpClient? inferenceClient = null,
+        TextReader? standardInput = null)
     {
         if (args.Length == 1 && args[0] is "--help" or "-h" or "help")
         {
@@ -53,6 +54,8 @@ internal static class CliApplication
 
         return command switch
         {
+            "init" => await OnboardingCommands.InitAsync(commandArguments, standardInput ?? Console.In, standardOutput, standardError, cancellationToken).ConfigureAwait(false),
+            "doctor" => await OnboardingCommands.DoctorAsync(commandArguments, standardOutput, standardError, cancellationToken).ConfigureAwait(false),
             "infer" => await RunInferAsync(commandArguments, standardOutput, standardError, inferenceClient, cancellationToken)
                 .ConfigureAwait(false),
             "inspect" => await RunInspectAsync(commandArguments, standardOutput, standardError, cancellationToken)
@@ -610,6 +613,14 @@ internal static class CliApplication
     {
         switch (command)
         {
+            case "init":
+                output.WriteLine("Usage: repo2c4 init [--repository PATH] [--output-directory RELATIVE] [--mode offline|mcp|inference] [--provider ollama|openai] [--non-interactive] [--force]");
+                output.WriteLine("Creates only .repo2c4.json. Existing configuration is preserved unless --force is explicit; forced replacement creates a backup.");
+                return CliExitCodes.Success;
+            case "doctor":
+                output.WriteLine("Usage: repo2c4 doctor [--repository PATH]");
+                output.WriteLine("Diagnoses local prerequisites and selected-mode configuration without running repository analysis, builds, or inference.");
+                return CliExitCodes.Success;
             case "infer":
                 output.WriteLine("Usage: repo2c4 infer --snapshot FILE --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai] [--endpoint http://127.0.0.1:11434/] [--timeout-seconds 90]");
                 output.WriteLine("OpenAI additionally requires --allow-external-ai and OPENAI_API_KEY; --endpoint is local Ollama only.");
@@ -638,11 +649,14 @@ internal static class CliApplication
         output.WriteLine("Repo2C4 CLI");
         output.WriteLine();
         output.WriteLine("Commands:");
+        output.WriteLine("  init     [--repository PATH] [--non-interactive] [--force]");
+        output.WriteLine("  doctor   [--repository PATH]");
         output.WriteLine("  inspect  --repository PATH --output snapshot.json");
         output.WriteLine("  infer    --snapshot snapshot.json --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai]");
         output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");
         output.WriteLine();
+        output.WriteLine("init writes configuration only; doctor performs diagnostics only.");
         output.WriteLine("inspect records evidence only; generate requires a user-proposed/reviewed ArchitectureModel.");
         output.WriteLine("Only infer calls AI. Cloud inference requires explicit consent and OPENAI_API_KEY; all proposals require human review.");
     }
