@@ -104,6 +104,26 @@ public sealed class OnboardingTests
         Assert.DoesNotContain("do-not-store", output.ToString() + error.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("{\"schemaVersion\":\"repo2c4.config/v1\",\"repositoryRoot\":\"x\",\"mode\":\"offline\",\"provider\":null}")]
+    [InlineData("[]")]
+    public async Task DoctorRejectsMalformedConfiguration(string json)
+    {
+        using TempDirectory temp = new();
+        File.WriteAllText(Path.Combine(temp.Path, ".repo2c4.json"), json);
+
+        using StringWriter output = new();
+        using StringWriter error = new();
+        int exit = await Program.RunAsync(
+            ["doctor", "--repository", temp.Path],
+            output,
+            error,
+            CancellationToken.None);
+
+        Assert.Equal(CliExitCodes.ValidationFailed, exit);
+        Assert.Contains("FAIL configuration", output.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task DoctorMissingConfigurationHasCoherentValidationExit()
     {
