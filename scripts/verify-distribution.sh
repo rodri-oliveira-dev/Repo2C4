@@ -73,4 +73,59 @@ test "$bad_exit" -eq 2
 test ! -s "$work/mcp-bad.stdout"
 grep -Fq 'invalid or unavailable' "$work/mcp-bad.stderr"
 
+# Exercise the installed MCP executable through real JSON-RPC stdio, not just --help.
+python3 - "$work/mcp/repo2c4-mcp" "$(pwd)/examples/fixtures/library-only" <<'PY'
+import json
+import select
+import subprocess
+import sys
+
+process = subprocess.Popen(
+    [sys.argv[1], "--repository-root", sys.argv[2]],
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    text=True, bufsize=1,
+)
+
+def request(payload):
+    process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    process.stdin.flush()
+
+def response(expected_id):
+    readable, _, _ = select.select([process.stdout], [], [], 20)
+    if not readable:
+        process.kill()
+        raise AssertionError("Installed MCP server did not respond within 20 seconds.")
+    line = process.stdout.readline()
+    if not line:
+        raise AssertionError("Installed MCP server exited without a protocol response.")
+    payload = json.loads(line)
+    assert payload.get("id") == expected_id, payload
+    assert "error" not in payload, payload
+    return payload["result"]
+
+try:
+    request({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+        "protocolVersion":"2025-11-25","capabilities":{},
+        "clientInfo":{"name":"repo2c4-distribution-smoke","version":"1.0.0"}
+    }})
+    init = response(1)
+    assert init["serverInfo"]["name"] == "repo2c4", init
+    request({"jsonrpc":"2.0","method":"notifications/initialized","params":{}})
+    request({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}})
+    tools = response(2)["tools"]
+    names = {tool["name"] for tool in tools}
+    assert {"inspect_repository", "get_evidence", "get_snapshot",
+            "generate_likec4", "validate_likec4"}.issubset(names), names
+    request({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+        "name":"inspect_repository","arguments":{"repositoryPath":".","maxFiles":50}
+    }})
+    inspected = response(3)
+    assert inspected.get("isError") is not True, inspected
+    assert "snapshotId" in json.dumps(inspected), inspected
+finally:
+    process.stdin.close()
+    process.wait(timeout=10)
+    assert process.returncode == 0, process.returncode
+PY
+
 printf 'Versioned .NET tools installed and exercised from a clean local feed: CLI and MCP %s.\n' "$version"
