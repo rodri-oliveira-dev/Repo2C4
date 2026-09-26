@@ -103,13 +103,15 @@ public sealed class RemoteRepositoryAcquirerTests
     [Fact]
     public async Task RejectsSymbolicLinksWhenSupported()
     {
-        MaterializingGitRunner runner = new(static root =>
+        bool linkCreated = false;
+        MaterializingGitRunner runner = new(root =>
         {
             string target = Path.Combine(root, "target.txt");
             File.WriteAllText(target, "safe");
             try
             {
                 File.CreateSymbolicLink(Path.Combine(root, "link.txt"), target);
+                linkCreated = true;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -123,11 +125,30 @@ public sealed class RemoteRepositoryAcquirerTests
             RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
                 new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken);
             await workspace.DisposeAsync();
+            Assert.False(linkCreated, "Symbolic link was materialized but not rejected.");
         }
         catch (RemoteRepositoryException exception)
         {
             Assert.Equal("repository_link_rejected", exception.Code);
+            Assert.False(Directory.Exists(runner.WorkingDirectory));
         }
+    }
+
+    [Theory]
+    [InlineData("+refs/*:refs/remotes/x/*")]
+    [InlineData("^refs/heads/main")]
+    [InlineData("refs//heads/main")]
+    [InlineData("refs/heads/main.lock")]
+    public async Task RejectsRefspecSyntax(string reference)
+    {
+        RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
+
+        RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
+            () => acquirer.AcquireAsync(
+                new RemoteRepositoryRequest("https://example.invalid/repo.git", reference),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("remote_ref_invalid", exception.Code);
     }
 
     [Fact]
