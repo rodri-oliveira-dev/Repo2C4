@@ -63,7 +63,7 @@ internal sealed class McpRemoteRepositoryTools(McpSnapshotStore snapshotStore)
         try
         {
             RemoteRepositoryAcquirer acquirer = new();
-            await using RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
+            RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
                 new RemoteRepositoryRequest(
                     repositoryUrl,
                     gitRef,
