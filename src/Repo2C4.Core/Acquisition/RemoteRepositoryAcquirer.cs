@@ -211,10 +211,10 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
             await ValidateTreeAsync(
                 workspace,
                 timeout,
-                cancellationToken,
                 request.MaxFiles,
                 request.MaxBytes,
-                commit).ConfigureAwait(false);
+                commit,
+                cancellationToken).ConfigureAwait(false);
 
             await RunRequiredAsync(
                 workspace,
@@ -377,10 +377,10 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
     private async Task ValidateTreeAsync(
         string workspace,
         TimeSpan timeout,
-        CancellationToken cancellationToken,
         int maxFiles,
         long maxBytes,
-        string commit)
+        string commit,
+        CancellationToken cancellationToken)
     {
         GitProcessResult result = await _git.RunAsync(
             workspace,
