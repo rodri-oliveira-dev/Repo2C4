@@ -1,7 +1,5 @@
 using System.ComponentModel;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Repo2C4.Core.Acquisition;
@@ -109,10 +107,6 @@ internal sealed class McpRemoteRepositoryTools(McpSnapshotStore snapshotStore)
         }
     }
 
-    private static string CreateRepositoryId(RemoteRepositoryProvenance provenance)
-    {
-        string identity = provenance.Url.ToLowerInvariant() + "\n" + provenance.Commit;
-        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
-        return "repo_" + Convert.ToHexString(digest).ToLowerInvariant()[..24];
-    }
+    private static string CreateRepositoryId(RemoteRepositoryProvenance provenance) =>
+        provenance.CreateRepositoryId();
 }
