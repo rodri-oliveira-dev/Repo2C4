@@ -8,6 +8,7 @@ public sealed class RemoteRepositoryAcquirerTests
 {
     private static RemoteRepositoryAcquirer CreateAcquirer(IGitProcessRunner runner) =>
         new(runner, new PublicHostResolver());
+
     [Theory]
     [InlineData("http://example.com/repo.git", "remote_url_invalid")]
     [InlineData("ssh://example.com/repo.git", "remote_url_invalid")]
@@ -17,7 +18,7 @@ public sealed class RemoteRepositoryAcquirerTests
     [InlineData("https://127.0.0.1/repo.git", "remote_host_not_public")]
     public async Task RejectsUnsafeRemoteUrls(string url, string code)
     {
-        RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(new RemoteRepositoryRequest(url), TestContext.Current.CancellationToken));
         Assert.Equal(code, exception.Code);
@@ -32,7 +33,7 @@ public sealed class RemoteRepositoryAcquirerTests
             new GitProcessResult(128, string.Empty, "fatal: https://user:secret@example.invalid/private"),
         ];
         ScriptedGitRunner runner = new(results);
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
@@ -47,10 +48,8 @@ public sealed class RemoteRepositoryAcquirerTests
     public async Task PropagatesCancellationAndCleansWorkspace()
     {
         CancellingGitRunner runner = new();
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
         using CancellationTokenSource cancellation = new();
-        cancellation.Cancel();
-
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => acquirer.AcquireAsync(
                 new RemoteRepositoryRequest("https://example.invalid/repo.git"),
@@ -64,7 +63,7 @@ public sealed class RemoteRepositoryAcquirerTests
     public async Task PropagatesTimeoutFailureAndCleansWorkspace()
     {
         FailingGitRunner runner = new(new RemoteRepositoryException("git_timeout", "timed out"));
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken));
@@ -78,7 +77,7 @@ public sealed class RemoteRepositoryAcquirerTests
     {
         MaterializingGitRunner runner = new(static root =>
             File.WriteAllText(Path.Combine(root, ".gitmodules"), "[submodule \"x\"]"));
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken));
@@ -95,7 +94,7 @@ public sealed class RemoteRepositoryAcquirerTests
             File.WriteAllText(Path.Combine(root, "a.cs"), "a");
             File.WriteAllText(Path.Combine(root, "b.cs"), "b");
         });
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
@@ -123,7 +122,7 @@ public sealed class RemoteRepositoryAcquirerTests
                 return;
             }
         });
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         try
         {
@@ -146,7 +145,7 @@ public sealed class RemoteRepositoryAcquirerTests
     [InlineData("refs/heads/main.lock")]
     public async Task RejectsRefspecSyntax(string reference)
     {
-        RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(new ScriptedGitRunner(Array.Empty<GitProcessResult>()));
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
@@ -161,7 +160,7 @@ public sealed class RemoteRepositoryAcquirerTests
     {
         MaterializingGitRunner runner = new(static root =>
             File.WriteAllText(Path.Combine(root, "App.csproj"), "<Project />"));
-        RemoteRepositoryAcquirer acquirer = new(runner);
+        RemoteRepositoryAcquirer acquirer = CreateAcquirer(runner);
 
         RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
             new RemoteRepositoryRequest("https://example.invalid/repo.git", "refs/heads/main"), TestContext.Current.CancellationToken);
@@ -245,7 +244,11 @@ public sealed class RemoteRepositoryAcquirerTests
     {
         private int _call;
 
-        public string WorkingDirectory { get; private set; } = string.Empty;
+        public string WorkingDirectory
+        {
+            get;
+            private set;
+        } = string.Empty;
 
         public Task<GitProcessResult> RunAsync(
             string workingDirectory,
