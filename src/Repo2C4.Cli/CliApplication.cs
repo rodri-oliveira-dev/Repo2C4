@@ -342,11 +342,12 @@ internal static class CliApplication
             else
             {
                 RemoteRepositoryAcquirer acquirer = new();
-                await using RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
+                RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
                     new RemoteRepositoryRequest(
                         remoteUrl,
                         values.GetValueOrDefault("--remote-ref")),
                     cancellationToken).ConfigureAwait(false);
+                await using var configuredWorkspace = workspace.ConfigureAwait(false);
 
                 RepositorySnapshot snapshot = InspectRepository(workspace.RootPath, cancellationToken);
                 await WriteSnapshotAsync(fullOutput, snapshot, cancellationToken).ConfigureAwait(false);
