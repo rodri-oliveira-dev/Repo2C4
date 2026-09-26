@@ -335,6 +335,12 @@ jobs:
           test "$conflict_exit" -eq 5
           grep -Fq "// human edit" "$workdir/c2/model.c4"
 
+      - name: Empacotar e instalar ferramentas CLI e MCP em ambiente isolado
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
+
       - name: Smoke test da CLI
         shell: bash
         run: |
@@ -423,4 +429,4 @@ jobs:
             exit 1
           fi
 
-          echo "Alias de compatibilidade aprovado. O pack permanece desabilitado até a Fase 5."
+          echo "Alias de compatibilidade aprovado. A instalação/execução dos dois pacotes foi validada no CI."
