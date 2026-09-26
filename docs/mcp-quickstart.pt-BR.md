@@ -56,3 +56,7 @@ Clientes proprietários não são iniciados pelo CI. O CI valida JSON e invarian
 | Conflito de escrita | Faça preview primeiro. O Repo2C4 bloqueia colisões e arquivos gerenciados alterados. |
 
 Nunca coloque API key, token, conteúdo de repositório privado ou caminho pessoal nesses arquivos.
+
+## Repositório remoto público opcional
+
+O servidor MCP também expõe `inspect_remote_repository` para uma URL Git HTTPS pública e ref opcional. Ele adquire o repositório em workspace temporário isolado, rejeita credenciais/submódulos/links, executa o mesmo scanner de evidências, mantém apenas o snapshot limitado na sessão MCP e remove o workspace. A ferramenta retorna a proveniência sanitizada da aquisição (URL, ref solicitado e commit resolvido) separadamente das evidências arquiteturais. O `inspect_repository` local continua sendo o padrão e não exige acesso à rede.
