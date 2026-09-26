@@ -45,3 +45,13 @@ O servidor `repo2c4-mcp` usa exclusivamente stdio e exige `--repository-root /ra
 O [CI](.github/workflows/ci.yml) verifica restore locked, formatação, compilação, testes/cobertura, validação LikeC4, testes de CLI/MCP, empacotamento e instalação limpa dos dois produtos. As verificações de CodeQL, Dependency Review, auditoria e os controles de PR permanecem aplicáveis. O [workflow de release](.github/workflows/release.yml) é exclusivamente manual na `main` e executa somente dry-run por padrão. Uma release pública requer habilitação e confirmação explícitas; o job protegido publica os dois pacotes validados no NuGet.org e na GitHub Release, seguido de smoke de instalação pública. O [workflow de documentação](docs/architecture-pr.pt-BR.md) cria somente PR revisável, sem merge automático.
 
 Limitações: inicialmente repositórios .NET locais, C1/C2 e C3 para um container selecionado, sem aquisição de URL Git remota, sem editor/renderizador próprio, sem execução de código de terceiros e sem aprovação arquitetural automática. Snapshots, relatórios e modelos revisados podem conter caminhos e nomes confidenciais. A Fase 6 amplia o onboarding e os canais públicos de instalação.
+
+### Inspeção Git remota opcional
+
+Paths locais continuam sendo a fonte principal e mais privada. Para um repositório Git HTTPS público, o Repo2C4 pode adquirir um ref selecionado em workspace temporário isolado e encaminhá-lo ao mesmo scanner limitado de evidências:
+
+```bash
+repo2c4 inspect --remote-url https://github.com/OWNER/REPOSITORY.git --remote-ref refs/heads/main --output snapshot.json
+```
+
+URL resolvida, ref solicitado e commit concreto são gravados separadamente em `snapshot.json.acquisition.json`; são proveniência da aquisição, não evidência arquitetural. A aquisição remota exige rede e Git, rejeita credenciais embutidas, URLs SSH/file, submódulos e links simbólicos, aplica limites de arquivos/tamanho/tempo, nunca executa builds, hooks ou scripts do repositório e remove o workspace temporário após a inspeção. Repositórios privados/autenticados e análise dependente de Git LFS ficam deliberadamente fora do escopo. Considere as implicações de confiança e confidencialidade antes de adquirir código de terceiros.
