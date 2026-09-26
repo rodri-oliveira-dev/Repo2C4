@@ -8,8 +8,8 @@ on:
         type: string
         required: true
         default: '1.0.0'
-      publish_github_release:
-        description: 'Explicitly publish GitHub Release assets and a tag (never pushes to NuGet)'
+      publish_release:
+        description: 'Explicitly publish the GitHub Release and both .NET tools to NuGet.org'
         type: boolean
         required: true
         default: false
@@ -41,7 +41,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
-          PUBLISH_RELEASE: ${{ inputs.publish_github_release }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
           CONFIRMATION: ${{ inputs.publication_confirmation }}
         run: |
           set -euo pipefail
@@ -128,13 +128,14 @@ jobs:
           retention-days: 1
 
   publish:
-    name: Opt-in GitHub Release only
+    name: Opt-in GitHub Release and NuGet.org
     needs: dry-run
     if: ${{ needs.dry-run.outputs.publishing == 'true' && needs.dry-run.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: write
+    environment: release
     steps:
       - name: Download only this run's verified release payload
         shell: bash
@@ -158,7 +159,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
           CONFIRMATION: ${{ inputs.publication_confirmation }}
-          PUBLISH_RELEASE: ${{ inputs.publish_github_release }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/main
@@ -199,7 +200,18 @@ jobs:
             gh release create "$tag" \
               --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft \
               --title "Repo2C4 $tag" \
-              --notes "Explicitly published, locally installable CLI and MCP tool packages. Download the attached artifacts, verify SHA256SUMS, and review docs/distribution.md. This release does not publish to NuGet.org."
+              --notes "Repo2C4 $tag
+
+Install the published .NET tools from NuGet.org:
+
+```bash
+dotnet tool install --global Repo2C4.Cli --version $VERSION
+dotnet tool install --global Repo2C4.Mcp --version $VERSION
+repo2c4 --help
+repo2c4-mcp --help
+```
+
+The attached .nupkg files are the exact validated payload published to NuGet.org. Verify downloads with SHA256SUMS. See docs/distribution.md for runtime requirements, MCP configuration and security guidance."
           fi
 
           for asset in "${expected_assets[@]}"; do
@@ -229,3 +241,76 @@ jobs:
             echo "::error::Published release assets differ from the verified payload."
             exit 1
           fi
+
+      - name: Publish validated tools to NuGet.org
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "::error::The protected release environment must provide NUGET_API_KEY."
+            exit 1
+          fi
+          dotnet nuget push "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+          dotnet nuget push "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+  post-publish:
+    name: Verify public consumer installation
+    needs: publish
+    if: ${{ needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install and exercise the published NuGet tools
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          install_with_retry() {
+            local package="$1"
+            local path="$2"
+            local attempt
+            for attempt in {1..12}; do
+              if dotnet tool install --tool-path "$path" "$package" --version "$VERSION" \
+                --add-source https://api.nuget.org/v3/index.json \
+                --ignore-failed-sources; then
+                return 0
+              fi
+              if [ "$attempt" -eq 12 ]; then
+                echo "::error::$package $VERSION was not consumable from NuGet.org after publication."
+                return 1
+              fi
+              sleep 10
+            done
+          }
+
+          install_with_retry Repo2C4.Cli "$work/cli"
+          install_with_retry Repo2C4.Mcp "$work/mcp"
+
+          "$work/cli/repo2c4" --help | grep -Fq 'Repo2C4 CLI'
+          if ! "$work/mcp/repo2c4-mcp" --help >"$work/mcp.stdout" 2>"$work/mcp.stderr"; then
+            cat "$work/mcp.stderr" >&2
+            exit 1
+          fi
+          test ! -s "$work/mcp.stdout"
+          grep -Fq 'stdout is reserved exclusively for MCP protocol messages' "$work/mcp.stderr"
+
+          echo "Published Repo2C4 CLI and MCP $VERSION installed and executed successfully from NuGet.org."
