@@ -14,7 +14,7 @@ public sealed class RemoteRepositoryAcquirerTests
     {
         RemoteRepositoryAcquirer acquirer = new(new ScriptedGitRunner([]));
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
-            () => acquirer.AcquireAsync(new RemoteRepositoryRequest(url)));
+            () => acquirer.AcquireAsync(new RemoteRepositoryRequest(url), TestContext.Current.CancellationToken));
         Assert.Equal(code, exception.Code);
     }
 
@@ -30,7 +30,7 @@ public sealed class RemoteRepositoryAcquirerTests
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
-                new RemoteRepositoryRequest("https://example.invalid/repo.git", "missing")));
+                new RemoteRepositoryRequest("https://example.invalid/repo.git", "missing"), TestContext.Current.CancellationToken));
 
         Assert.Equal("remote_fetch_failed", exception.Code);
         Assert.DoesNotContain("secret", exception.Message, StringComparison.Ordinal);
@@ -60,7 +60,7 @@ public sealed class RemoteRepositoryAcquirerTests
         RemoteRepositoryAcquirer acquirer = new(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
-            () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git")));
+            () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken));
 
         Assert.Equal("git_timeout", exception.Code);
         Assert.False(Directory.Exists(runner.WorkingDirectory));
@@ -74,7 +74,7 @@ public sealed class RemoteRepositoryAcquirerTests
         RemoteRepositoryAcquirer acquirer = new(runner);
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
-            () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git")));
+            () => acquirer.AcquireAsync(new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken));
 
         Assert.Equal("submodules_rejected", exception.Code);
         Assert.False(Directory.Exists(runner.WorkingDirectory));
@@ -92,7 +92,7 @@ public sealed class RemoteRepositoryAcquirerTests
 
         RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
             () => acquirer.AcquireAsync(
-                new RemoteRepositoryRequest("https://example.invalid/repo.git", MaxFiles: 1)));
+                new RemoteRepositoryRequest("https://example.invalid/repo.git", MaxFiles: 1), TestContext.Current.CancellationToken));
 
         Assert.Equal("remote_limit_exceeded", exception.Code);
         Assert.False(Directory.Exists(runner.WorkingDirectory));
@@ -119,7 +119,7 @@ public sealed class RemoteRepositoryAcquirerTests
         try
         {
             RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
-                new RemoteRepositoryRequest("https://example.invalid/repo.git"));
+                new RemoteRepositoryRequest("https://example.invalid/repo.git"), TestContext.Current.CancellationToken);
             await workspace.DisposeAsync();
         }
         catch (RemoteRepositoryException exception)
@@ -136,7 +136,7 @@ public sealed class RemoteRepositoryAcquirerTests
         RemoteRepositoryAcquirer acquirer = new(runner);
 
         RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
-            new RemoteRepositoryRequest("https://example.invalid/repo.git", "refs/heads/main"));
+            new RemoteRepositoryRequest("https://example.invalid/repo.git", "refs/heads/main"), TestContext.Current.CancellationToken);
 
         Assert.Equal("https://example.invalid/repo.git", workspace.Provenance.Url);
         Assert.Equal("refs/heads/main", workspace.Provenance.Ref);
