@@ -56,3 +56,7 @@ Proprietary client applications are not launched by CI. CI validates the example
 | Write conflict | Keep preview first. Repo2C4 blocks unmanaged collisions and changed managed files. |
 
 Never put API keys, tokens, private repository contents, or personal paths in these configuration files.
+
+## Optional public remote repository
+
+The MCP server also exposes `inspect_remote_repository` for a public HTTPS Git URL and optional ref. It acquires the repository into an isolated temporary workspace, rejects credentials/submodules/links, runs the same evidence scanner, stores only the bounded snapshot in the MCP session and deletes the workspace. The tool returns sanitized acquisition provenance (URL, requested ref and resolved commit) separately from architectural evidence. Local `inspect_repository` remains the default and does not require network access.
