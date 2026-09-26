@@ -155,6 +155,23 @@ public sealed class RemoteRepositoryAcquirerTests
         Assert.Equal("remote_ref_invalid", exception.Code);
     }
 
+    [Theory]
+    [InlineData("::ffff:127.0.0.1")]
+    [InlineData("fd00::1")]
+    public async Task RejectsNonPublicIpv6Forms(string address)
+    {
+        RemoteRepositoryAcquirer acquirer = new(
+            new ScriptedGitRunner(Array.Empty<GitProcessResult>()),
+            new FixedHostResolver(IPAddress.Parse(address)));
+
+        RemoteRepositoryException exception = await Assert.ThrowsAsync<RemoteRepositoryException>(
+            () => acquirer.AcquireAsync(
+                new RemoteRepositoryRequest("https://example.invalid/repo.git"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("remote_host_not_public", exception.Code);
+    }
+
     [Fact]
     public async Task SuccessfulAcquisitionRecordsSanitizedProvenanceAndCleansOnDispose()
     {
@@ -173,6 +190,15 @@ public sealed class RemoteRepositoryAcquirerTests
         string path = workspace.RootPath;
         await workspace.DisposeAsync();
         Assert.False(Directory.Exists(path));
+    }
+
+    private sealed class FixedHostResolver(IPAddress address) : IRemoteHostResolver
+    {
+        public Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new[] { address });
+        }
     }
 
     private sealed class PublicHostResolver : IRemoteHostResolver
