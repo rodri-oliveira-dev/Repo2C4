@@ -96,7 +96,7 @@ Quando a mudança afetar cobertura ou testes de forma relevante:
 dotnet test --configuration Release --no-build --coverlet --coverlet-output-format cobertura
 ```
 
-Até a Fase 5, todos os projetos são não empacotáveis e o release herdado do template permanece desativado. Não executar `dotnet pack` nem publicar pacotes/tags/releases nesta fase.
+Na Fase 5, somente a CLI e o MCP são empacotáveis como ferramentas .NET; o Core continua interno. Executar o script `scripts/verify-distribution.sh` para pack e instalação local isolada nos testes, sem publicar nada externamente. O workflow `release.yml` é exclusivamente manual, com dry-run por padrão, e publicação de GitHub Release somente com opt-in duplo. Não criar tags, GitHub Releases, publicação NuGet ou executar o workflow publicador sem solicitação explícita.
 
 Ao alterar `.github/workflows/`, execute também `actionlint` conforme `authoring-github-workflows` e confirme o gate `Agent governance validation`.
 
