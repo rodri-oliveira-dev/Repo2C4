@@ -187,13 +187,23 @@ class ArchitecturePrTests(unittest.TestCase):
         self.assertNotIn("OPENAI_API_KEY", passed[2][1])
         self.assertNotIn("OPENAI_API_KEY", passed[3][1])
 
-    def test_write_denied_prevents_publish(self) -> None:
-        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
-                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": ""}):
-            with self.assertRaisesRegex(automation.AutomationError, "write permissions"):
-                automation.publish(args_for(self.root), self.root)
+    def test_checked_managed_files_removes_cloud_key_from_git_status(self) -> None:
+        captured_env: dict[str, str] = {}
 
-    def test_validated_diff_creates_exactly_one_review_pr_with_safe_description(self) -> None:
+        def fake_run(values, *args, **kwargs):
+            captured_env.update(kwargs["env"])
+            return subprocess.CompletedProcess(values, 0, b"", b"")
+
+        output = self.root / "docs" / "generated" / "fixture"
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-not-for-git-status"}):
+            with patch.object(automation.subprocess, "run", side_effect=fake_run):
+                changed, removed = automation.checked_managed_files(self.root, output)
+
+        self.assertEqual([], changed)
+        self.assertEqual([], removed)
+        self.assertNotIn("OPENAI_API_KEY", captured_env)
+
+    def _publish_fixture(self) -> tuple[argparse.Namespace, dict[str, bytes]]:
         info = args_for(self.root)
         stage = Path(info.artifact_dir)
         managed = stage / "managed"
@@ -211,21 +221,103 @@ class ArchitecturePrTests(unittest.TestCase):
             "sha256": {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()},
             "validated": True,
         }), encoding="utf-8")
-        called: list[tuple[str, ...]] = []
+        return info, contents
 
+    @staticmethod
+    def _publish_command(called: list[tuple[str, ...]], contents: dict[str, bytes],
+                         *, remote_sha: str = SOURCE_SHA, fail_push: bool = False):
         def fake_command(*values: str, cwd: Path, env=None) -> str:
             called.append(values)
             if values[:3] == ("git", "rev-parse", "HEAD"):
                 return SOURCE_SHA
             if values[:3] == ("git", "ls-remote", "origin"):
-                return SOURCE_SHA + "\trefs/heads/main"
+                return remote_sha + "\trefs/heads/main"
             if values[:3] == ("gh", "pr", "list"):
                 return ""
             if values[:4] == ("git", "diff", "--cached", "--name-only"):
                 return "\n".join("docs/generated/fixture/" + name for name in sorted(contents))
+            if values[:2] == ("git", "push") and fail_push:
+                raise automation.AutomationError("git failed (exit 1).")
             if values[:3] == ("gh", "pr", "create"):
                 return "https://github.com/rodri-oliveira-dev/Repo2C4/pull/123"
             return ""
+        return fake_command
+
+    def test_write_denied_prevents_publish(self) -> None:
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
+                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": ""}):
+            with self.assertRaisesRegex(automation.AutomationError, "write permissions"):
+                automation.publish(args_for(self.root), self.root)
+
+    def test_publish_rejects_artifact_checksum_mismatch_without_creating_pr(self) -> None:
+        info, contents = self._publish_fixture()
+        (Path(info.artifact_dir) / "managed" / "model.c4").write_bytes(b"tampered\n")
+        called: list[tuple[str, ...]] = []
+        fake_command = self._publish_command(called, contents)
+
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
+                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
+            with patch.object(automation, "command", fake_command):
+                with self.assertRaisesRegex(automation.AutomationError, "checksum"):
+                    automation.publish(info, self.root)
+
+        self.assertFalse(any(call[:3] == ("gh", "pr", "create") for call in called))
+
+    def test_publish_rejects_unexpected_remote_main_sha_without_creating_pr(self) -> None:
+        info, contents = self._publish_fixture()
+        called: list[tuple[str, ...]] = []
+        fake_command = self._publish_command(called, contents, remote_sha="b" * 40)
+
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
+                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
+            with patch.object(automation, "command", fake_command):
+                with self.assertRaisesRegex(automation.AutomationError, "main moved"):
+                    automation.publish(info, self.root)
+
+        self.assertFalse(any(call[:3] == ("gh", "pr", "create") for call in called))
+
+    def test_publish_rejects_existing_dedicated_branch_without_open_pr(self) -> None:
+        info, contents = self._publish_fixture()
+        called: list[tuple[str, ...]] = []
+        fake_command = self._publish_command(called, contents)
+
+        def fake_run(values, *args, **kwargs):
+            if values[:3] == ["git", "ls-remote", "--exit-code"]:
+                return subprocess.CompletedProcess(values, 0, b"existing", b"")
+            return subprocess.run(values, *args, **kwargs)
+
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
+                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
+            with patch.object(automation, "command", fake_command), patch.object(
+                    automation.subprocess, "run", side_effect=fake_run):
+                with self.assertRaisesRegex(automation.AutomationError, "already exists"):
+                    automation.publish(info, self.root)
+
+        self.assertFalse(any(call[:3] == ("gh", "pr", "create") for call in called))
+
+    def test_publish_reports_push_failure_without_creating_pr(self) -> None:
+        info, contents = self._publish_fixture()
+        called: list[tuple[str, ...]] = []
+        fake_command = self._publish_command(called, contents, fail_push=True)
+
+        def fake_run(values, *args, **kwargs):
+            if values[:3] == ["git", "ls-remote", "--exit-code"]:
+                return subprocess.CompletedProcess(values, 2, b"", b"")
+            return subprocess.run(values, *args, **kwargs)
+
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": REPOSITORY,
+                                     "GITHUB_REF": "refs/heads/main", "GH_TOKEN": "temporary-ci-token"}):
+            with patch.object(automation, "command", fake_command), patch.object(
+                    automation.subprocess, "run", side_effect=fake_run):
+                with self.assertRaisesRegex(automation.AutomationError, "Could not push"):
+                    automation.publish(info, self.root)
+
+        self.assertFalse(any(call[:3] == ("gh", "pr", "create") for call in called))
+
+    def test_validated_diff_creates_exactly_one_review_pr_with_safe_description(self) -> None:
+        info, contents = self._publish_fixture()
+        called: list[tuple[str, ...]] = []
+        fake_command = self._publish_command(called, contents)
 
         real_run = subprocess.run
 
@@ -248,6 +340,9 @@ class ArchitecturePrTests(unittest.TestCase):
         self.assertIn("https://github.com/" + REPOSITORY + "/blob/bot/repo2c4-fixture/docs/generated/fixture/evidence-report.md", body)
         self.assertNotIn("temporary-ci-token", body)
         self.assertFalse(any("merge" in call for call in called))
+        auth_index = called.index(("gh", "auth", "setup-git"))
+        remote_index = next(i for i, call in enumerate(called) if call[:3] == ("git", "ls-remote", "origin"))
+        self.assertLess(auth_index, remote_index)
 
 
 if __name__ == "__main__":
