@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 
 namespace Repo2C4.Core.Acquisition;
 
@@ -206,17 +208,13 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
                 throw new RemoteRepositoryException("git_commit_invalid", "Git did not resolve a valid commit.");
             }
 
-            string tree = await RunRequiredAsync(
+            await ValidateTreeAsync(
                 workspace,
                 timeout,
                 cancellationToken,
-                "ls-tree",
-                "-r",
-                "-l",
-                "-z",
-                "--full-tree",
+                request.MaxFiles,
+                request.MaxBytes,
                 commit).ConfigureAwait(false);
-            RejectUnsafeTree(tree, request.MaxFiles, request.MaxBytes);
 
             await RunRequiredAsync(
                 workspace,
@@ -252,9 +250,9 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
             throw new RemoteRepositoryException("remote_url_invalid", "Remote repository URL must be an absolute public HTTPS URL.");
         }
 
-        if (!string.IsNullOrEmpty(uri.UserInfo))
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query))
         {
-            throw new RemoteRepositoryException("remote_credentials_rejected", "Embedded credentials and authenticated repositories are not supported.");
+            throw new RemoteRepositoryException("remote_credentials_rejected", "Embedded credentials, query parameters, and authenticated repositories are not supported.");
         }
 
         if (!string.IsNullOrEmpty(uri.Fragment))
@@ -262,7 +260,57 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
             throw new RemoteRepositoryException("remote_url_invalid", "Remote repository URL must not contain a fragment.");
         }
 
+        EnsurePublicHostAsync(uri.Host, CancellationToken.None).GetAwaiter().GetResult();
         return uri;
+    }
+
+    private static async Task EnsurePublicHostAsync(string host, CancellationToken cancellationToken)
+    {
+        IPAddress[] addresses;
+        try
+        {
+            addresses = await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SocketException exception)
+        {
+            throw new RemoteRepositoryException("remote_host_unresolved", "Remote repository host could not be resolved.", exception);
+        }
+
+        if (addresses.Length == 0 || addresses.Any(static address => !IsPublicAddress(address)))
+        {
+            throw new RemoteRepositoryException("remote_host_not_public", "Remote repository host must resolve only to public network addresses.");
+        }
+    }
+
+    private static bool IsPublicAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+        {
+            return false;
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            byte[] bytes = address.GetAddressBytes();
+            return bytes[0] != 10
+                && bytes[0] != 127
+                && !(bytes[0] == 169 && bytes[1] == 254)
+                && !(bytes[0] == 172 && bytes[1] is >= 16 and <= 31)
+                && !(bytes[0] == 192 && bytes[1] == 168)
+                && !(bytes[0] == 0)
+                && !(bytes[0] >= 224);
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return !address.IsIPv6LinkLocal
+                && !address.IsIPv6Multicast
+                && !address.IsIPv6SiteLocal
+                && !address.Equals(IPAddress.IPv6Any)
+                && !address.Equals(IPAddress.IPv6None);
+        }
+
+        return false;
     }
 
     private static void ValidateRef(string? reference)
@@ -326,43 +374,78 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
         return result.StandardOutput;
     }
 
-    private static void RejectUnsafeTree(string tree, int maxFiles, long maxBytes)
+    private async Task ValidateTreeAsync(
+        string workspace,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        int maxFiles,
+        long maxBytes,
+        string commit)
     {
+        GitProcessResult result = await _git.RunAsync(
+            workspace,
+            ["ls-tree", "-r", "-l", "-z", "--full-tree", commit],
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+        if (result.ExitCode != 0)
+        {
+            throw new RemoteRepositoryException("git_process_failed", "Git process failed while validating the repository tree.");
+        }
+
         int files = 0;
         long bytes = 0;
-        foreach (string entry in tree.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        int start = 0;
+        ReadOnlySpan<char> output = result.StandardOutput.AsSpan();
+        while (start < output.Length)
         {
-            int tab = entry.IndexOf('\t');
-            if (tab <= 0)
+            int relativeEnd = output[start..].IndexOf('\0');
+            int end = relativeEnd < 0 ? output.Length : start + relativeEnd;
+            if (end > start)
             {
-                throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
+                ValidateTreeEntry(output[start..end], ref files, ref bytes, maxFiles, maxBytes);
             }
 
-            string metadata = entry[..tab];
-            string path = entry[(tab + 1)..].Replace('\\', '/');
-            string[] parts = metadata.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 4 || !long.TryParse(parts[3], out long size))
-            {
-                throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
-            }
+            start = end + 1;
+        }
+    }
 
-            string mode = parts[0];
-            if (mode is "120000" or "160000")
-            {
-                throw new RemoteRepositoryException("repository_link_rejected", "Remote repository contains unsupported links or gitlinks.");
-            }
+    private static void ValidateTreeEntry(
+        ReadOnlySpan<char> entry,
+        ref int files,
+        ref long bytes,
+        int maxFiles,
+        long maxBytes)
+    {
+        int tab = entry.IndexOf('\t');
+        if (tab <= 0)
+        {
+            throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
+        }
 
-            if (string.Equals(path, ".gitmodules", StringComparison.Ordinal))
-            {
-                throw new RemoteRepositoryException("submodules_rejected", "Repositories declaring Git submodules are not supported.");
-            }
+        string metadata = entry[..tab].ToString();
+        string path = entry[(tab + 1)..].ToString().Replace('\\', '/');
+        string[] parts = metadata.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 4 || !long.TryParse(parts[3], out long size))
+        {
+            throw new RemoteRepositoryException("git_tree_invalid", "Git tree metadata is invalid.");
+        }
 
-            files++;
-            bytes += size;
-            if (files > maxFiles || bytes > maxBytes)
-            {
-                throw new RemoteRepositoryException("remote_limit_exceeded", "Remote repository exceeds acquisition file or size limits.");
-            }
+        string mode = parts[0];
+        if (mode is "120000" or "160000")
+        {
+            throw new RemoteRepositoryException("repository_link_rejected", "Remote repository contains unsupported links or gitlinks.");
+        }
+
+        if (string.Equals(path, ".gitmodules", StringComparison.Ordinal))
+        {
+            throw new RemoteRepositoryException("submodules_rejected", "Repositories declaring Git submodules are not supported.");
+        }
+
+        files++;
+        bytes += size;
+        if (files > maxFiles || bytes > maxBytes)
+        {
+            throw new RemoteRepositoryException("remote_limit_exceeded", "Remote repository exceeds acquisition file or size limits.");
         }
     }
 
