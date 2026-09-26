@@ -2,7 +2,7 @@
   "mcpServers": {
     "repo2c4": {
       "command": "repo2c4-mcp",
-      "args": ["--repository-root", "/ABSOLUTE/PATH/TO/AUTHORIZED/DOTNET/REPOSITORY"]
+      "args": ["--repository-root", "/ABSOLUTE/PATH/TO/AUTHORIZED/DOTNET/REPOSITORY", "--allow-remote-acquisition"]
     }
   }
 }
