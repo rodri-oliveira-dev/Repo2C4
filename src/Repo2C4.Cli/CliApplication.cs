@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Repo2C4.Cli.Inference;
+using Repo2C4.Core.Acquisition;
 using Repo2C4.Core.C3;
 using Repo2C4.Core.Contracts;
 using Repo2C4.Core.Generation;
@@ -283,7 +285,7 @@ internal static class CliApplication
     {
         if (!TryParseOptions(
             args,
-            ["--repository", "--output"],
+            ["--repository", "--remote-url", "--remote-ref", "--output"],
             [],
             out Dictionary<string, string> values,
             out _,
@@ -293,22 +295,23 @@ internal static class CliApplication
             return CliExitCodes.UsageError;
         }
 
-        if (!TryGetRequired(values, "--repository", out string repository)
-            || !TryGetRequired(values, "--output", out string output))
+        bool local = TryGetRequired(values, "--repository", out string repository);
+        bool remote = TryGetRequired(values, "--remote-url", out string remoteUrl);
+        if (local == remote || !TryGetRequired(values, "--output", out string output))
         {
-            standardError.WriteLine("inspect requires --repository PATH and --output FILE.");
+            standardError.WriteLine(
+                "inspect requires exactly one source: --repository PATH or --remote-url HTTPS_URL, plus --output FILE.");
+            return CliExitCodes.UsageError;
+        }
+
+        if (!remote && values.ContainsKey("--remote-ref"))
+        {
+            standardError.WriteLine("--remote-ref requires --remote-url.");
             return CliExitCodes.UsageError;
         }
 
         try
         {
-            string fullRepository = Path.GetFullPath(repository);
-            if (!Directory.Exists(fullRepository))
-            {
-                standardError.WriteLine("Repository directory does not exist.");
-                return CliExitCodes.IoError;
-            }
-
             string fullOutput = Path.GetFullPath(output);
             string? outputDirectory = Path.GetDirectoryName(fullOutput);
             if (outputDirectory is null)
@@ -324,13 +327,49 @@ internal static class CliApplication
                 return CliExitCodes.IoError;
             }
 
-            RepositoryScanOptions options = new(fullRepository, CreateRepositoryId(fullRepository));
-            RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(options, cancellationToken);
-            string json = NormalizeText(ContractJson.SerializeSnapshot(snapshot));
+            if (local)
+            {
+                string fullRepository = Path.GetFullPath(repository);
+                if (!Directory.Exists(fullRepository))
+                {
+                    standardError.WriteLine("Repository directory does not exist.");
+                    return CliExitCodes.IoError;
+                }
 
-            await WriteTextFileAsync(fullOutput, json, overwrite: false, cancellationToken).ConfigureAwait(false);
+                RepositorySnapshot snapshot = InspectRepository(fullRepository, cancellationToken);
+                await WriteSnapshotAsync(fullOutput, snapshot, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                RemoteRepositoryAcquirer acquirer = new();
+                await using RemoteRepositoryWorkspace workspace = await acquirer.AcquireAsync(
+                    new RemoteRepositoryRequest(
+                        remoteUrl,
+                        values.GetValueOrDefault("--remote-ref")),
+                    cancellationToken).ConfigureAwait(false);
+
+                RepositorySnapshot snapshot = InspectRepository(workspace.RootPath, cancellationToken);
+                await WriteSnapshotAsync(fullOutput, snapshot, cancellationToken).ConfigureAwait(false);
+
+                string provenancePath = fullOutput + ".acquisition.json";
+                string provenance = JsonSerializer.Serialize(
+                    workspace.Provenance,
+                    new JsonSerializerOptions { WriteIndented = true }) + "\n";
+                await WriteTextFileAsync(
+                    provenancePath,
+                    provenance,
+                    overwrite: false,
+                    cancellationToken).ConfigureAwait(false);
+                standardError.WriteLine("Remote acquisition provenance: " + provenancePath);
+            }
+
             standardOutput.WriteLine(fullOutput);
             return CliExitCodes.Success;
+        }
+        catch (RemoteRepositoryException exception)
+        {
+            standardError.WriteLine(exception.Code + ": " + exception.Message);
+            return CliExitCodes.IoError;
         }
         catch (ContractValidationException exception)
         {
@@ -351,6 +390,23 @@ internal static class CliApplication
             standardError.WriteLine("Inspection failed because a local path could not be read or written.");
             return CliExitCodes.IoError;
         }
+    }
+
+    private static RepositorySnapshot InspectRepository(
+        string repositoryRoot,
+        CancellationToken cancellationToken)
+    {
+        RepositoryScanOptions options = new(repositoryRoot, CreateRepositoryId(repositoryRoot));
+        return RepositoryFactExtractor.Extract(options, cancellationToken);
+    }
+
+    private static async Task WriteSnapshotAsync(
+        string output,
+        RepositorySnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        string json = NormalizeText(ContractJson.SerializeSnapshot(snapshot));
+        await WriteTextFileAsync(output, json, overwrite: false, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> RunGenerateAsync(
@@ -627,8 +683,8 @@ internal static class CliApplication
                 output.WriteLine("Proposes a review-required model from sanitized metadata; never generates C4 files.");
                 return CliExitCodes.Success;
             case "inspect":
-                output.WriteLine("Usage: repo2c4 inspect --repository PATH --output snapshot.json");
-                output.WriteLine("Collects bounded local evidence only. It does not infer a C4 model.");
+                output.WriteLine("Usage: repo2c4 inspect (--repository PATH | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
+                output.WriteLine("Collects bounded evidence only. Remote HTTPS acquisition uses an isolated temporary workspace and writes separate acquisition provenance.");
                 return CliExitCodes.Success;
             case "generate":
                 output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
@@ -651,7 +707,7 @@ internal static class CliApplication
         output.WriteLine("Commands:");
         output.WriteLine("  init     [--repository PATH] [--non-interactive] [--force]");
         output.WriteLine("  doctor   [--repository PATH]");
-        output.WriteLine("  inspect  --repository PATH --output snapshot.json");
+        output.WriteLine("  inspect  (--repository PATH | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
         output.WriteLine("  infer    --snapshot snapshot.json --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai]");
         output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");
