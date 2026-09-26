@@ -2,7 +2,16 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>repo2c4</ToolCommandName>
+    <PackageId>Repo2C4.Cli</PackageId>
+    <Authors>Rodrigo de Oliveira</Authors>
+    <Description>Repo2C4 command-line architecture evidence and reviewable LikeC4 documentation tool.</Description>
+    <PackageTags>likec4;c4;architecture;documentation;dotnet-tool</PackageTags>
+    <RepositoryUrl>https://github.com/rodri-oliveira-dev/Repo2C4</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Repo2C4.Core/Repo2C4.Core.csproj" />
