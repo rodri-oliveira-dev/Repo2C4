@@ -91,6 +91,8 @@ public sealed class GitProcessRunner : IGitProcessRunner
         process.StartInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
         process.StartInfo.Environment["GCM_INTERACTIVE"] = "Never";
         process.StartInfo.Environment["GIT_LFS_SKIP_SMUDGE"] = "1";
+        process.StartInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
+        process.StartInfo.Environment["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
         foreach (string argument in arguments)
         {
             process.StartInfo.ArgumentList.Add(argument);
@@ -182,6 +184,10 @@ public sealed class RemoteRepositoryAcquirer(IGitProcessRunner? git = null)
                 cancellationToken,
                 "-c",
                 "credential.helper=",
+                "-c",
+                "protocol.allow=never",
+                "-c",
+                "protocol.https.allow=always",
                 "-c",
                 "protocol.file.allow=never",
                 "-c",
