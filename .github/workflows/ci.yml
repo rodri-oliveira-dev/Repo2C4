@@ -279,6 +279,49 @@ jobs:
           likec4_version="$(likec4 --version)"
           echo "LikeC4 CLI: $likec4_version"
           [[ "$likec4_version" == *"1.59.4"* ]]
+          likec4 start --help >/dev/null
+
+      - name: Validar contrato de onboarding dos READMEs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          checks = {
+              "README.md": [
+                  "## What is Repo2C4?",
+                  "## Current capabilities and limitations",
+                  "## Quick Start",
+                  "## Example output: evidence → review → LikeC4",
+                  "## Architecture and development",
+                  "repo2c4 inspect",
+                  "repo2c4 generate",
+                  "repo2c4 validate",
+                  "repo2c4-mcp --repository-root",
+                  "likec4 start",
+                  "requiresReview",
+              ],
+              "README.pt-BR.md": [
+                  "## O que é o Repo2C4?",
+                  "## Capacidades e limitações atuais",
+                  "## Quick Start",
+                  "## Exemplo de saída: evidência → revisão → LikeC4",
+                  "## Arquitetura e desenvolvimento",
+                  "repo2c4 inspect",
+                  "repo2c4 generate",
+                  "repo2c4 validate",
+                  "repo2c4-mcp --repository-root",
+                  "likec4 start",
+                  "requiresReview",
+              ],
+          }
+
+          for path, required in checks.items():
+              content = Path(path).read_text(encoding="utf-8")
+              missing = [value for value in required if value not in content]
+              assert not missing, f"{path}: missing onboarding contract entries: {missing}"
+          PY
 
       - name: Validar integração real com LikeC4
         env:
