@@ -529,7 +529,13 @@ public sealed class ArchitectureAnalysisWorkflow
                 status,
                 message.Attempt,
                 message.AnalysisSummary,
-                message.ValidationDiagnostics);
+                message.ValidationDiagnostics)
+            {
+                TerminalReason =
+                    message.TerminalStatus == ArchitectureWorkflowStatus.InsufficientEvidence
+                        ? "insufficient_evidence"
+                        : string.Empty,
+            };
 
             return ValueTask.FromResult(result);
         }
