@@ -208,14 +208,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             fixtureName);
         TempRepositoryFixture fixture = TempRepositoryFixture.Create(source);
 
-        string mcpServerPath = System.IO.Path.Combine(
-            repositoryRoot,
-            "src",
-            "Repo2C4.Mcp",
-            "bin",
-            "Release",
-            "net10.0",
-            "Repo2C4.Mcp.dll");
+        string mcpServerPath = TestPaths.McpServer(repositoryRoot);
 
         if (!File.Exists(mcpServerPath))
         {
@@ -515,22 +508,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         }
     }
 
-    private static string FindRepositoryRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(System.IO.Path.Combine(directory.FullName, "Repo2C4.slnx")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException(
-            "Could not locate the Repo2C4 repository root.");
-    }
+    private static string FindRepositoryRoot() => TestPaths.RepositoryRoot();
 
     private sealed class ValidationOverrideMcpSession(
         IAgentMcpSession inner,
