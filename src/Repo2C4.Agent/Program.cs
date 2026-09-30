@@ -55,11 +55,12 @@ public static class Program
             return UsageExitCode;
         }
 
+        AgentHostOptions configuredOptions = options!;
         cancellationToken.ThrowIfCancellationRequested();
 
         // Phase 7 starts with a provider/model-aware host. Concrete provider adapters are issue #35.
         // A configuration-only startup is therefore valid without contacting a provider.
-        if (options.Prompt is null)
+        if (configuredOptions.Prompt is null)
         {
             return SuccessExitCode;
         }
@@ -71,7 +72,7 @@ public static class Program
         try
         {
             AgentChatClientCreation creation = await chatClientFactory
-                .CreateAsync(options, cancellationToken)
+                .CreateAsync(configuredOptions, cancellationToken)
                 .ConfigureAwait(false);
 
             if (creation.ChatClient is null)
@@ -83,9 +84,9 @@ public static class Program
             }
 
             using IChatClient chatClient = creation.ChatClient;
-            AIAgent agent = agentFactory.Create(chatClient, options);
+            AIAgent agent = agentFactory.Create(chatClient, configuredOptions);
             string response = await sessionRunner
-                .RunAsync(agent, options.Prompt, cancellationToken)
+                .RunAsync(agent, configuredOptions.Prompt, cancellationToken)
                 .ConfigureAwait(false);
 
             standardOutput.WriteLine(response);
