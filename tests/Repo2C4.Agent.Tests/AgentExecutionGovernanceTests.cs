@@ -1,3 +1,4 @@
+using Microsoft.Extensions.AI;
 using Xunit;
 
 namespace Repo2C4.Agent.Tests;
@@ -131,6 +132,42 @@ public sealed class AgentExecutionGovernanceTests
         Assert.Equal("context_size_exceeded", contextException.Code);
         Assert.Equal(9, responseExecution.SnapshotCounters().ResponseCharacters);
         Assert.Equal(9, contextExecution.SnapshotCounters().ContextCharacters);
+    }
+
+    [Fact]
+    public async Task ProviderRequestCountsInstructionsToolsAndFunctionResults()
+    {
+        AgentExecutionContext execution = CreateExecution(maxContextCharacters: 40);
+        using TestChatClient inner = new("unused");
+        using BoundedProviderChatClient client = new(
+            inner,
+            "test",
+            TimeSpan.FromSeconds(5),
+            execution);
+        AIFunction tool = AIFunctionFactory.Create(
+            (string value) => value,
+            "echo_tool",
+            "A tool description that consumes context.");
+
+        ChatMessage message = new(
+            ChatRole.Tool,
+            [
+                new FunctionResultContent(
+                    "call-1",
+                    "A sufficiently large structured tool result."),
+            ]);
+        ChatOptions options = new()
+        {
+            Instructions = "System instructions also count.",
+            Tools = [tool],
+        };
+
+        AgentBudgetExceededException exception =
+            await Assert.ThrowsAsync<AgentBudgetExceededException>(
+                () => client.GetResponseAsync([message], options));
+
+        Assert.Equal("context_size_exceeded", exception.Code);
+        Assert.True(execution.SnapshotCounters().ContextCharacters > 40);
     }
 
     [Fact]
