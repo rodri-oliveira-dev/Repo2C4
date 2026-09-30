@@ -225,7 +225,7 @@ Defaults seguros são configuráveis somente dentro de faixas limitadas:
 | Timeout por request do provider | `--timeout-seconds` | 90 s | 1–300 |
 | Tool calls | `--max-tool-calls` | 40 | 1–100 |
 | Iterações do workflow | `--max-workflow-iterations` | 3 | 1–3 |
-| Tentativas de validação | `--max-validation-attempts` | 3 | 1–3 |
+| Tentativas de validação | `--max-validation-attempts` | 2 | 1–3 |
 | Páginas de evidência | `--max-evidence-pages` | 20 | 1–50 |
 | Resposta acumulada | `--max-response-chars` | 32000 | 1024–100000 |
 | Contexto acumulado | `--max-context-chars` | 64000 | 4096–200000 |
