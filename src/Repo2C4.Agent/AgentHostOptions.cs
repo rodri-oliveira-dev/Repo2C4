@@ -21,6 +21,12 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     } = TimeSpan.FromSeconds(90);
 
+    public TimeSpan MaxRunDuration
+    {
+        get;
+        init;
+    } = TimeSpan.FromSeconds(300);
+
     public bool AllowExternalAi
     {
         get;
@@ -112,6 +118,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? c3ContainerId = null;
         string? writeDestination = null;
         int timeoutSeconds = 90;
+        int maxDurationSeconds = 300;
         int maxValidationAttempts = 2;
         int maxToolCalls = 40;
         int maxWorkflowIterations = 3;
@@ -119,6 +126,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         int maxResponseCharacters = 32_000;
         int maxContextCharacters = 64_000;
         bool timeoutSpecified = false;
+        bool maxDurationSpecified = false;
         bool maxValidationAttemptsSpecified = false;
         bool maxToolCallsSpecified = false;
         bool maxWorkflowIterationsSpecified = false;
@@ -270,6 +278,23 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     maxValidationAttemptsSpecified = true;
+                    break;
+
+                case "--max-duration-seconds":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-duration-seconds",
+                            ref maxDurationSpecified,
+                            1,
+                            1_800,
+                            out maxDurationSeconds,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
                     break;
 
                 case "--max-tool-calls":
@@ -491,6 +516,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         {
             Endpoint = configuredEndpoint,
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+            MaxRunDuration = TimeSpan.FromSeconds(maxDurationSeconds),
             AllowExternalAi = allowExternalAi,
             RepositoryRoot = repositoryRoot?.Trim(),
             McpServerPath = mcpServerPath?.Trim(),
