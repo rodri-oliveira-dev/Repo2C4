@@ -290,7 +290,10 @@ public sealed class ArchitectureAnalysisWorkflowTests
 
             return ValueTask.FromResult(
                 state.TerminalStatus is null
-                    ? state with { EvidenceReports = ["C2 evidence report completed."] }
+                    ? state with
+                    {
+                        EvidenceReports = ["C2 evidence report completed."],
+                    }
                     : state);
         }
 
@@ -303,7 +306,10 @@ public sealed class ArchitectureAnalysisWorkflowTests
 
             return ValueTask.FromResult(
                 state.TerminalStatus is null
-                    ? state with { PreviewSummaries = ["C2 LikeC4 preview completed."] }
+                    ? state with
+                    {
+                        PreviewSummaries = ["C2 LikeC4 preview completed."],
+                    }
                     : state);
         }
 
