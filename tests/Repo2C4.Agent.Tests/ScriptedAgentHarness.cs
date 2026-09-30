@@ -64,7 +64,7 @@ internal sealed class ScriptedChatClient(
 
     public IReadOnlyList<ScriptedChatInvocation> Invocations => invocations;
 
-    public int RemainingTurns => turns.Count - Volatile.Read(ref calls);
+    public int RemainingTurns => turns.Length - Volatile.Read(ref calls);
 
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> chatMessages,
@@ -74,7 +74,7 @@ internal sealed class ScriptedChatClient(
         cancellationToken.ThrowIfCancellationRequested();
 
         int callIndex = Interlocked.Increment(ref calls) - 1;
-        if (callIndex >= turns.Count)
+        if (callIndex >= turns.Length)
         {
             throw new InvalidOperationException(
                 "The deterministic chat script has no response for call "
