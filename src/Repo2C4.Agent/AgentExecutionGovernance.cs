@@ -166,10 +166,13 @@ public sealed class AgentExecutionContext
         }
     }
 
-    public void ObserveResponse(string? response)
+    public void ObserveResponse(string? response) =>
+        ObserveResponseCharacters(response?.Length ?? 0);
+
+    public void ObserveResponseCharacters(long characters)
     {
-        int length = response?.Length ?? 0;
-        long total = Interlocked.Add(ref responseCharacters, length);
+        ArgumentOutOfRangeException.ThrowIfNegative(characters);
+        long total = Interlocked.Add(ref responseCharacters, characters);
 
         if (total > budgets.MaxResponseCharacters)
         {
