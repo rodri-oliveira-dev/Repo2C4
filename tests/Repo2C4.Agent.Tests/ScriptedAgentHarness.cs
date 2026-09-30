@@ -558,7 +558,8 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             IReadOnlyList<AITool> tools,
             IReadOnlyList<bool> validationResults)
         {
-            Queue<bool> outcomes = new(validationResults);
+            Queue<bool> outcomes = new(
+                validationResults.SelectMany(outcome => new[] { outcome, outcome }));
             AIFunction validate = AIFunctionFactory.Create(
                 (string snapshotId, JsonElement model, string? destinationPath, string? c3ContainerId) =>
                 {
