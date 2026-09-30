@@ -17,6 +17,49 @@ repo2c4-agent --help
 
 O LikeC4 continua sendo uma dependência independente para validação/renderização e deve ser instalado separadamente.
 
+## Canais públicos de distribuição
+
+A release usa canais diferentes para hospedagem dos artefatos e descoberta dos produtos:
+
+| Produto | Distribuição do artefato | Descoberta |
+| --- | --- | --- |
+| `Repo2C4.Cli` | NuGet.org + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Mcp` | NuGet.org + GitHub Release | metadata no Official MCP Registry via `server.json` |
+| `Repo2C4.Agent` | NuGet.org + GitHub Release | GitHub/NuGet |
+
+O Agent não é publicado artificialmente como servidor MCP nem como pacote de um marketplace específico. Ele permanece uma .NET Tool local e um cliente MCP independente.
+
+### Official MCP Registry
+
+O repositório contém `server.json` versionado na raiz para o nome:
+
+```text
+io.github.rodri-oliveira-dev/repo2c4-mcp
+```
+
+Ele aponta para o pacote público `Repo2C4.Mcp` no NuGet, usa `dnx` como runtime hint do .NET 10, transporte stdio e declara `--repository-root` como argumento local obrigatório do tipo `filepath`. A aquisição remota não faz parte da execução padrão publicada no Registry.
+
+A validação de ownership do pacote NuGet depende deste marcador exato no README empacotado:
+
+```html
+<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->
+```
+
+O marcador vem de `src/Repo2C4.Mcp/README.md`. O smoke de distribuição valida nome do Registry, vínculo package/version, argumento obrigatório da raiz e marcador de ownership antes da release.
+
+O Official MCP Registry armazena metadata, não o pacote NuGet. Portanto, publique **primeiro** a versão exata em NuGet.org. Depois que ela estiver publicamente disponível, instale o `mcp-publisher` oficial e execute a partir da raiz do repositório:
+
+```bash
+mcp-publisher validate
+mcp-publisher login github
+mcp-publisher publish
+```
+
+A autenticação GitHub concede o namespace pessoal `io.github.rodri-oliveira-dev/*`. Enquanto o Official MCP Registry estiver em preview, sua publicação permanece uma ação separada do mantenedor; o workflow normal do Repo2C4 não introduz uma nova credencial persistente apenas para o Registry.
+
+Ao preparar uma release futura, atualize `Directory.Build.props` e os dois campos de versão de `server.json` para o mesmo SemVer exato antes de executar a verificação de distribuição/release.
+
+
 Para manutenção ou verificação offline em um checkout confiável, instale o SDK .NET 10 indicado em `global.json`, Node.js e o LikeC4 oficial. O CI utiliza Node.js `22.23.3` e `likec4@1.59.4`:
 
 ```bash
