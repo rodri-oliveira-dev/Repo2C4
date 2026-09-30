@@ -167,17 +167,25 @@ public static class Program
         }
         catch (OperationCanceledException) when (executionToken.IsCancellationRequested)
         {
-            string terminalReason = cancellationToken.IsCancellationRequested
-                ? "cancelled"
-                : "total_duration_exceeded";
+            bool deadlineExceeded =
+                execution?.IsDeadlineExceeded is true
+                && !cancellationToken.IsCancellationRequested;
+            ArchitectureWorkflowStatus status = deadlineExceeded
+                ? ArchitectureWorkflowStatus.Failed
+                : ArchitectureWorkflowStatus.Cancelled;
+            string terminalReason = deadlineExceeded
+                ? "total_duration_exceeded"
+                : "cancelled";
 
             if (execution is not null)
             {
                 ArchitectureWorkflowResult cancelled = new(
-                    ArchitectureWorkflowStatus.Cancelled,
+                    status,
                     0,
                     string.Empty,
-                    ["Agent execution was cancelled or exceeded its total-duration budget."])
+                    deadlineExceeded
+                        ? ["Total execution-duration budget exceeded."]
+                        : ["Agent execution was cancelled."])
                 {
                     RunId = execution.RunId,
                     Counters = execution.SnapshotCounters(),
@@ -185,10 +193,12 @@ public static class Program
                 };
 
                 standardOutput.WriteLine(cancelled.ToDisplayText());
-                execution.Complete("cancelled", terminalReason);
+                execution.Complete(
+                    deadlineExceeded ? "failed" : "cancelled",
+                    terminalReason);
             }
 
-            return SuccessExitCode;
+            return deadlineExceeded ? FailureExitCode : SuccessExitCode;
         }
         catch (AgentProviderException exception)
         {
