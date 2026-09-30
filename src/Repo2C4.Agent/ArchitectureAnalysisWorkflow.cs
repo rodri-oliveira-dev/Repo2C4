@@ -215,11 +215,13 @@ public sealed class ArchitectureAnalysisWorkflow
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new ArchitectureWorkflowResult(
-                ArchitectureWorkflowStatus.Cancelled,
-                0,
-                string.Empty,
-                ["Workflow execution was cancelled."]);
+            return CancelledResult();
+        }
+#pragma warning disable CA1031 // Workflow runtime may wrap cancellation; token state is authoritative at this boundary.
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
+        {
+            return CancelledResult();
         }
 #pragma warning disable CA1031 // Workflow boundary converts unexpected framework failures to a controlled result.
         catch (Exception)
@@ -232,6 +234,13 @@ public sealed class ArchitectureAnalysisWorkflow
                 ["Workflow execution failed unexpectedly."]);
         }
     }
+
+    private static ArchitectureWorkflowResult CancelledResult() =>
+        new(
+            ArchitectureWorkflowStatus.Cancelled,
+            0,
+            string.Empty,
+            ["Workflow execution was cancelled."]);
 
     public static Workflow Build(
         IArchitectureWorkflowOperations operations,
