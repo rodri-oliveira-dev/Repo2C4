@@ -12,7 +12,8 @@ public sealed class AgentExecutionGovernanceTests
                 "--provider", "ollama",
                 "--model", "model",
                 "--goal", "Document architecture",
-                "--timeout-seconds", "120",
+                "--timeout-seconds", "60",
+                "--max-duration-seconds", "120",
                 "--max-tool-calls", "12",
                 "--max-workflow-iterations", "3",
                 "--max-evidence-pages", "8",
@@ -24,7 +25,8 @@ public sealed class AgentExecutionGovernanceTests
 
         Assert.True(parsed, error);
         Assert.NotNull(options);
-        Assert.Equal(TimeSpan.FromSeconds(120), options.Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(60), options.Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(120), options.MaxRunDuration);
         Assert.Equal(12, options.MaxToolCalls);
         Assert.Equal(3, options.MaxWorkflowIterations);
         Assert.Equal(8, options.MaxEvidencePages);
@@ -33,6 +35,7 @@ public sealed class AgentExecutionGovernanceTests
     }
 
     [Theory]
+    [InlineData("--max-duration-seconds", "0")]
     [InlineData("--max-tool-calls", "0")]
     [InlineData("--max-workflow-iterations", "4")]
     [InlineData("--max-evidence-pages", "51")]
