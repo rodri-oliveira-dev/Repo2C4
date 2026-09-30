@@ -52,14 +52,7 @@ public sealed class AgentMcpTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         string repositoryRoot = FindRepositoryRoot();
-        string mcpServer = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Repo2C4.Mcp",
-            "bin",
-            "Release",
-            "net10.0",
-            "Repo2C4.Mcp.dll");
+        string mcpServer = TestPaths.McpServer(repositoryRoot);
         Assert.True(File.Exists(mcpServer), "Build the solution before running Agent MCP integration tests.");
 
         using TempFixture fixture = TempFixture.Create(
@@ -167,14 +160,7 @@ public sealed class AgentMcpTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         string repositoryRoot = FindRepositoryRoot();
-        string mcpServer = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Repo2C4.Mcp",
-            "bin",
-            "Release",
-            "net10.0",
-            "Repo2C4.Mcp.dll");
+        string mcpServer = TestPaths.McpServer(repositoryRoot);
         Assert.True(File.Exists(mcpServer));
 
         using TempFixture fixture = TempFixture.Create(
@@ -282,21 +268,7 @@ public sealed class AgentMcpTests
             : envelope;
     }
 
-    private static string FindRepositoryRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Repo2C4.slnx")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the Repo2C4 repository root.");
-    }
+    private static string FindRepositoryRoot() => TestPaths.RepositoryRoot();
 
     private sealed class FunctionCallingTestChatClient(
         string snapshotId,
