@@ -63,6 +63,23 @@ public sealed record AgentArchitectureProposal(
 public sealed class AgentMcpInvocationState
 {
     private readonly object gate = new();
+
+    public AgentMcpInvocationState(AgentExecutionBudgets? budgets = null)
+    {
+        Execution = new AgentExecutionContext(
+            budgets ?? new AgentExecutionBudgets(
+                TimeSpan.FromSeconds(90),
+                40,
+                3,
+                20,
+                32_000,
+                64_000));
+    }
+
+    public AgentExecutionContext Execution
+    {
+        get;
+    }
     private readonly Dictionary<string, AgentArchitectureProposal> proposals =
         new(StringComparer.Ordinal);
 
@@ -262,7 +279,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 return AgentMcpSessionCreation.Failure(capabilityError!);
             }
 
-            AgentMcpInvocationState invocationState = new();
+            AgentMcpInvocationState invocationState = new(
+                AgentExecutionBudgets.FromOptions(options));
             IReadOnlyList<AITool> safeTools = AgentMcpToolPolicy.CreateSafeTools(
                 discovered,
                 options.C3ContainerId,
@@ -273,7 +291,7 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                     "generate_likec4",
                     StringComparison.Ordinal));
             IAgentMcpWriteGateway writeGateway =
-                new Repo2C4McpWriteGateway(generateLikeC4);
+                new Repo2C4McpWriteGateway(generateLikeC4, invocationState.Execution);
 #pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
             IAgentMcpSession session = new Repo2C4McpSession(
                 client,
@@ -432,7 +450,7 @@ public static class AgentMcpToolPolicy
                 continue;
             }
 
-            tools.Add(
+            AIFunction safeFunction =
                 tool.Name switch
                 {
                     "generate_likec4" => new PreviewOnlyMcpFunction(
@@ -442,8 +460,15 @@ public static class AgentMcpToolPolicy
                     "validate_likec4" => new ProposalOnlyValidationMcpFunction(
                         function,
                         authorizedC3ContainerId),
-                    _ => tool,
-                });
+                    _ => function,
+                };
+
+            tools.Add(
+                invocationState is null
+                    ? safeFunction
+                    : new GovernedMcpFunction(
+                        safeFunction,
+                        invocationState.Execution));
         }
 
         return tools;
