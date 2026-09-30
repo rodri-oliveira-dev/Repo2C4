@@ -143,8 +143,8 @@ public sealed class AgentHostTests
             error,
             cancellation.Token,
             new RecordingChatClientFactory(chatClient),
-            sessionRunner: new CancelingSessionRunner(cancellation),
-            mcpSessionFactory: mcpFactory);
+            mcpSessionFactory: mcpFactory,
+            workflowRunner: new CancelingWorkflowRunner(cancellation));
 
         Assert.Equal(0, exitCode);
         Assert.True(mcpFactory.Session.IsDisposed);
@@ -224,18 +224,21 @@ public sealed class AgentHostTests
         }
     }
 
-    private sealed class CancelingSessionRunner(CancellationTokenSource cancellation)
-        : IAgentSessionRunner
+    private sealed class CancelingWorkflowRunner(CancellationTokenSource cancellation)
+        : IArchitectureAnalysisWorkflowRunner
     {
-        public Task<string> RunAsync(
+        public Task<ArchitectureWorkflowResult> RunAsync(
             AIAgent agent,
-            string prompt,
+            AgentHostOptions options,
+            IAgentMcpSession mcpSession,
             CancellationToken cancellationToken)
         {
             _ = agent;
-            _ = prompt;
+            _ = options;
+            _ = mcpSession;
             cancellation.Cancel();
-            return Task.FromCanceled<string>(cancellationToken);
+            return Task.FromCanceled<ArchitectureWorkflowResult>(cancellationToken);
         }
     }
+
 }
