@@ -165,6 +165,113 @@ public sealed class AgentMcpTests
         await session.Completion.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
     }
 
+    [Fact]
+    public async Task RealWriteGatewayRejectsReusedStalePreviewAndManagedConflict()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        string repositoryRoot = FindRepositoryRoot();
+        string mcpServer = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Repo2C4.Mcp",
+            "bin",
+            "Release",
+            "net10.0",
+            "Repo2C4.Mcp.dll");
+        Assert.True(File.Exists(mcpServer));
+
+        using TempFixture fixture = TempFixture.Create(
+            Path.Combine(repositoryRoot, "examples", "fixtures", "library-only"));
+
+        AgentHostOptions options = new("ollama", "fake-model", "Prepare a safe write.")
+        {
+            RepositoryRoot = fixture.Path,
+            McpServerPath = mcpServer,
+        };
+
+        AgentMcpSessionCreation creation = await new Repo2C4McpSessionFactory().CreateAsync(
+            options,
+            cancellationToken);
+        Assert.NotNull(creation.Session);
+
+        IAgentMcpSession session = creation.Session;
+        try
+        {
+            McpClientTool inspect = Assert.IsType<McpClientTool>(
+                session.Tools.Single(tool => tool.Name == "inspect_repository"));
+            CallToolResult inspectResult = await inspect.CallAsync(
+                new Dictionary<string, object?> { ["repositoryPath"] = "." },
+                cancellationToken: cancellationToken);
+            string snapshotId = inspectResult.StructuredContent!.Value
+                .GetProperty("snapshotId")
+                .GetString()!;
+
+            using JsonDocument modelDocument = JsonDocument.Parse(
+                await File.ReadAllTextAsync(
+                    Path.Combine(
+                        repositoryRoot,
+                        "examples",
+                        "end-to-end",
+                        "architecture.c1.v1.json"),
+                    cancellationToken));
+            AgentArchitectureProposal proposal = new(
+                "C1",
+                snapshotId,
+                modelDocument.RootElement.Clone(),
+                null);
+
+            AgentWriteApprovalPlan approvedPlan = await session.WriteGateway.PrepareAsync(
+                [proposal],
+                "approved",
+                cancellationToken);
+            Assert.False(approvedPlan.HasConflicts);
+            Assert.Equal("approved/c1", Assert.Single(approvedPlan.Items).DestinationPath);
+
+            AgentWriteApplyResult firstApply = await session.WriteGateway.ApplyAsync(
+                approvedPlan,
+                cancellationToken);
+            Assert.Equal(AgentWriteApplyStatus.Applied, firstApply.Status);
+
+            AgentWriteApplyResult reusedApproval = await session.WriteGateway.ApplyAsync(
+                approvedPlan,
+                cancellationToken);
+            Assert.Equal(AgentWriteApplyStatus.StalePreview, reusedApproval.Status);
+
+            AgentWriteApprovalPlan freshPlan = await session.WriteGateway.PrepareAsync(
+                [proposal],
+                "approved",
+                cancellationToken);
+            Assert.False(freshPlan.HasConflicts);
+
+            string managedFile = Path.Combine(
+                fixture.Path,
+                "approved",
+                "c1",
+                "model.c4");
+            const string humanEdit = "// human edit must survive";
+            await File.AppendAllTextAsync(
+                managedFile,
+                Environment.NewLine + humanEdit,
+                cancellationToken);
+
+            AgentWriteApplyResult conflict = await session.WriteGateway.ApplyAsync(
+                freshPlan,
+                cancellationToken);
+
+            Assert.Equal(AgentWriteApplyStatus.Conflict, conflict.Status);
+            Assert.Contains(
+                humanEdit,
+                await File.ReadAllTextAsync(managedFile, cancellationToken),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            await session.DisposeAsync();
+        }
+
+        await session.Completion.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
