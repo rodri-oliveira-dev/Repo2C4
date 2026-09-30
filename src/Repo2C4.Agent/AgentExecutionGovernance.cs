@@ -18,7 +18,7 @@ public sealed record AgentExecutionBudgets(
         ArgumentNullException.ThrowIfNull(options);
 
         return new AgentExecutionBudgets(
-            options.Timeout,
+            options.MaxRunDuration,
             options.MaxToolCalls,
             options.MaxWorkflowIterations,
             options.MaxEvidencePages,
