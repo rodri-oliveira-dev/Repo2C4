@@ -126,12 +126,12 @@ public sealed class ArchitectureAnalysisWorkflowTests
     [Fact]
     public async Task CancellationReturnsControlledResultAndStopsWorkflow()
     {
+        using CancellationTokenSource cancellation = new();
         FakeOperations operations = new(true)
         {
-            BlockAnalysisUntilCancelled = true,
+            CancellationSource = cancellation,
         };
         ArchitectureAnalysisWorkflow subject = new(operations, maxValidationAttempts: 3);
-        using CancellationTokenSource cancellation = new(TimeSpan.FromMilliseconds(100));
 
         ArchitectureWorkflowResult result = await subject.RunAsync(
             ArchitectureWorkflowState.Initial(),
@@ -244,7 +244,7 @@ public sealed class ArchitectureAnalysisWorkflowTests
             init;
         }
 
-        public bool BlockAnalysisUntilCancelled
+        public CancellationTokenSource? CancellationSource
         {
             get;
             init;
@@ -256,8 +256,9 @@ public sealed class ArchitectureAnalysisWorkflowTests
         {
             Calls.Add("analysis");
 
-            if (BlockAnalysisUntilCancelled)
+            if (CancellationSource is not null)
             {
+                CancellationSource.Cancel();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             }
 
