@@ -1,6 +1,6 @@
 # Repo2C4 distribution and verified release
 
-Repo2C4 v1.0.0 ships two **separate .NET 10 tool packages**, `Repo2C4.Cli` (command `repo2c4`) and `Repo2C4.Mcp` (command `repo2c4-mcp`). The shared Core remains an internal project reference, not a separately published package. Package version comes from `Directory.Build.props`; the two products use the same version and distinct, non-placeholder package IDs. The tools target .NET 10, so a compatible .NET runtime/SDK must be installed. LikeC4 is an **independent, externally installed** validator and renderer, not bundled inside Repo2C4.
+Repo2C4 v1.0.0 ships three **separate .NET 10 tool packages**: `Repo2C4.Cli` (command `repo2c4`), `Repo2C4.Mcp` (command `repo2c4-mcp`) and `Repo2C4.Agent` (command `repo2c4-agent`). The shared Core remains an internal project reference, not a separately published package. The Agent is a client of the MCP executable over stdio and does not take a project/domain dependency on Core or MCP. Package version comes from `Directory.Build.props`; the two products use the same version and distinct, non-placeholder package IDs. The tools target .NET 10, so a compatible .NET runtime/SDK must be installed. LikeC4 is an **independent, externally installed** validator and renderer, not bundled inside Repo2C4.
 
 ## Install the published tools
 
@@ -9,8 +9,10 @@ Published releases expose both product tools through NuGet.org. Install the exac
 ```bash
 dotnet tool install --global Repo2C4.Cli --version 1.0.0
 dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Agent --version 1.0.0
 repo2c4 --help
 repo2c4-mcp --help
+repo2c4-agent --help
 ```
 
 LikeC4 is still an independent dependency for validation/rendering and must be installed separately.
@@ -25,15 +27,17 @@ npm install --global likec4@1.59.4
 bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
 ```
 
-The script packs **only CLI and MCP**, verifies version and package identity, builds an isolated local NuGet feed and installs both commands into separate temporary tool paths using a NuGet configuration with `<clear/>` package sources. It exercises a real `inspect → generate --apply → validate` workflow and checks that MCP help writes **only to stderr** and an unauthorized/missing root is rejected. It never pushes a package, creates a tag or invokes a cloud API. Its temporary tool directories are deleted on completion. The two packages remain in ignored `artifacts/distribution/` for optional local use.
+The script packs **CLI, MCP and Agent**, verifies version/package identity, builds an isolated local NuGet feed and installs all three commands into separate temporary tool paths using a NuGet configuration with `<clear/>` package sources. It exercises a real `inspect → generate --apply → validate` workflow, checks the MCP stdio protocol, and runs the packaged Agent against the checked-in `library-only` fixture using a controlled loopback Ollama-compatible fake plus the installed real MCP. The fake deliberately emits no proposal, so the expected Agent outcome is the controlled `insufficient_evidence` terminal reason with no write. It never pushes a package, creates a tag or invokes a cloud API. Its temporary tool directories are deleted on completion. The two packages remain in ignored `artifacts/distribution/` for optional local use.
 
 To install from previously verified package files (without using external feeds), create a NuGet.Config containing only the directory of the two local `.nupkg` files, then run:
 
 ```bash
 dotnet tool install --tool-path ./local-tools/cli Repo2C4.Cli --version 1.0.0 --configfile ./NuGet.Config
 dotnet tool install --tool-path ./local-tools/mcp Repo2C4.Mcp --version 1.0.0 --configfile ./NuGet.Config
+dotnet tool install --tool-path ./local-tools/agent Repo2C4.Agent --version 1.0.0 --configfile ./NuGet.Config
 ./local-tools/cli/repo2c4 --help
 ./local-tools/mcp/repo2c4-mcp --help
+./local-tools/agent/repo2c4-agent --help
 ```
 
 Tool command extensions differ on Windows (`.exe`). The install script is a Linux/CI smoke test; Windows users can run the shown `dotnet tool install` commands with Windows-appropriate paths. Packages attached to the matching GitHub Release are the validated payload sent to NuGet.org and include SHA-256 checksums in `SHA256SUMS`. Prefer the exact version shown by the release notes rather than an unbounded latest install.
@@ -73,11 +77,11 @@ The MCP server is a separate stdio tool. The host must provide exactly one autho
 }
 ```
 
-MCP uses protocol messages on stdout and diagnostics on stderr; do not pipe banners or logs to its stdout. The client obtains bounded evidence through `inspect_repository`, `get_evidence` and `get_snapshot`, proposes its own reviewed C1/C2 model, and uses `generate_likec4`/ `validate_likec4` with explicit write authorization. See [MCP client guide](mcp-client.md) and [MCP access policy](mcp.md) for the evidence-first prompt, request limits, paginated evidence, review/write semantics and local root constraints. Never point an MCP server at an untrusted writable checkout while another process can swap symlinks.
+MCP uses protocol messages on stdout and diagnostics on stderr; do not pipe banners or logs to its stdout. The client obtains bounded evidence through `inspect_repository`, `get_evidence` and `get_snapshot`, proposes its own reviewed C1/C2 model, and uses `generate_likec4`/ `validate_likec4` with explicit write authorization. `repo2c4-agent` is one such MCP client, with Microsoft Agent Framework workflow/HITL policy; MCP remains independently usable by other hosts. See the [Agent guide](agent.md). See [MCP client guide](mcp-client.md) and [MCP access policy](mcp.md) for the evidence-first prompt, request limits, paginated evidence, review/write semantics and local root constraints. Never point an MCP server at an untrusted writable checkout while another process can swap symlinks.
 
 ## Versioned release: verification first, publication separately authorized
 
-[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the two tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact three release assets, creates/publishes the versioned GitHub Release and pushes only `Repo2C4.Cli` and `Repo2C4.Mcp` to NuGet.org using the environment-provided `NUGET_API_KEY`. A final read-only job then installs that exact version from NuGet.org as an external consumer and executes both public commands. Failed publication or propagation is reported without printing the API key.
+[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the three tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact four release assets, creates/publishes the versioned GitHub Release and pushes only `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent` to NuGet.org using the environment-provided `NUGET_API_KEY`. A final read-only job then installs that exact version from NuGet.org as an external consumer and executes all three public commands. Failed publication or propagation is reported without printing the API key.
 
 The regular [CI](../.github/workflows/ci.yml) performs the same pack/clean-install smoke on push and PR without any AI key or release write permission. [CodeQL](../.github/workflows/codeql.yml), [Dependency Review](../.github/workflows/dependency-review.yml) and security/audit checks must remain green before the Phase 5 PR is merged. The dedicated [documentation PR workflow](architecture-pr.md) is a separate manual process, not release publication.
 
