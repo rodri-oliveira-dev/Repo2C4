@@ -89,6 +89,12 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     }
 
+    internal AgentExecutionContext? ExecutionContext
+    {
+        get;
+        init;
+    }
+
     public static bool TryParse(
         string[] args,
         out AgentHostOptions? options,
