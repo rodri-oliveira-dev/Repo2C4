@@ -36,9 +36,82 @@ public interface IAgentMcpSession : IAsyncDisposable
         get;
     }
 
+    AgentMcpInvocationState InvocationState
+    {
+        get;
+    }
+
     Task Completion
     {
         get;
+    }
+}
+
+/// <summary>One MCP-accepted architecture proposal captured without referencing Repo2C4.Core.</summary>
+public sealed record AgentArchitectureProposal(
+    string Level,
+    string SnapshotId,
+    JsonElement Model,
+    string? C3ContainerId);
+
+/// <summary>Run-local capture of successful preview calls made through the safe MCP boundary.</summary>
+public sealed class AgentMcpInvocationState
+{
+    private readonly object gate = new();
+    private readonly Dictionary<string, AgentArchitectureProposal> proposals =
+        new(StringComparer.Ordinal);
+
+    public void BeginAttempt()
+    {
+        lock (gate)
+        {
+            proposals.Clear();
+        }
+    }
+
+    public void RecordPreview(
+        string snapshotId,
+        JsonElement model,
+        string? c3ContainerId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+
+        string level =
+            model.ValueKind == JsonValueKind.Object
+            && model.TryGetProperty("level", out JsonElement levelElement)
+            && levelElement.ValueKind == JsonValueKind.String
+                ? levelElement.GetString() ?? "unknown"
+                : "unknown";
+
+        AgentArchitectureProposal proposal = new(
+            level,
+            snapshotId,
+            model.Clone(),
+            c3ContainerId);
+
+        lock (gate)
+        {
+            proposals[level] = proposal;
+        }
+    }
+
+    public IReadOnlyList<AgentArchitectureProposal> SnapshotProposals()
+    {
+        lock (gate)
+        {
+            return
+            [
+                .. proposals.Values
+                    .OrderBy(
+                        proposal => proposal.Level switch
+                        {
+                            "C1" => 0,
+                            "C2" => 1,
+                            _ => 2,
+                        })
+                    .ThenBy(proposal => proposal.Level, StringComparer.Ordinal),
+            ];
+        }
     }
 }
 
@@ -184,11 +257,16 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 return AgentMcpSessionCreation.Failure(capabilityError!);
             }
 
+            AgentMcpInvocationState invocationState = new();
             IReadOnlyList<AITool> safeTools = AgentMcpToolPolicy.CreateSafeTools(
                 discovered,
-                options.C3ContainerId);
+                options.C3ContainerId,
+                invocationState);
 #pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
-            IAgentMcpSession session = new Repo2C4McpSession(client, safeTools);
+            IAgentMcpSession session = new Repo2C4McpSession(
+                client,
+                safeTools,
+                invocationState);
 #pragma warning restore CA2000
             return AgentMcpSessionCreation.Success(session);
         }
@@ -282,7 +360,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
 
     private sealed class Repo2C4McpSession(
         McpClient client,
-        IReadOnlyList<AITool> tools) : IAgentMcpSession
+        IReadOnlyList<AITool> tools,
+        AgentMcpInvocationState invocationState) : IAgentMcpSession
     {
         private readonly McpClient client =
             client ?? throw new ArgumentNullException(nameof(client));
@@ -291,6 +370,11 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
         {
             get;
         } = tools ?? throw new ArgumentNullException(nameof(tools));
+
+        public AgentMcpInvocationState InvocationState
+        {
+            get;
+        } = invocationState ?? throw new ArgumentNullException(nameof(invocationState));
 
         public Task Completion
         {
@@ -304,8 +388,6 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             _ = await client.Completion.ConfigureAwait(false);
         }
     }
-
-
 }
 
 /// <summary>Applies host-enforced safety policy to MCP tools before exposing them to the model.</summary>
@@ -313,7 +395,8 @@ public static class AgentMcpToolPolicy
 {
     public static IReadOnlyList<AITool> CreateSafeTools(
         IEnumerable<AITool> discovered,
-        string? authorizedC3ContainerId)
+        string? authorizedC3ContainerId,
+        AgentMcpInvocationState? invocationState = null)
     {
         ArgumentNullException.ThrowIfNull(discovered);
 
@@ -325,18 +408,23 @@ public static class AgentMcpToolPolicy
                 continue;
             }
 
-            if (string.Equals(tool.Name, "generate_likec4", StringComparison.Ordinal))
+            if (tool is not AIFunction function)
             {
-                if (tool is not AIFunction function)
-                {
-                    continue;
-                }
-
-                tools.Add(new PreviewOnlyMcpFunction(function, authorizedC3ContainerId));
                 continue;
             }
 
-            tools.Add(tool);
+            tools.Add(
+                tool.Name switch
+                {
+                    "generate_likec4" => new PreviewOnlyMcpFunction(
+                        function,
+                        authorizedC3ContainerId,
+                        invocationState),
+                    "validate_likec4" => new ProposalOnlyValidationMcpFunction(
+                        function,
+                        authorizedC3ContainerId),
+                    _ => tool,
+                });
         }
 
         return tools;
@@ -344,7 +432,8 @@ public static class AgentMcpToolPolicy
 
     private sealed class PreviewOnlyMcpFunction(
         AIFunction inner,
-        string? authorizedC3ContainerId)
+        string? authorizedC3ContainerId,
+        AgentMcpInvocationState? invocationState)
         : DelegatingAIFunction(inner)
     {
         public override string Description =>
@@ -352,7 +441,7 @@ public static class AgentMcpToolPolicy
                 ? "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and disables C3."
                 : "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and permits C3 only for the user-selected container.";
 
-        protected override ValueTask<object?> InvokeCoreAsync(
+        protected override async ValueTask<object?> InvokeCoreAsync(
             AIFunctionArguments arguments,
             CancellationToken cancellationToken)
         {
@@ -376,8 +465,65 @@ public static class AgentMcpToolPolicy
                 safeArguments[key] = value;
             }
 
+            string? safeC3ContainerId =
+                requestedC3 && authorizedC3ContainerId is not null
+                    ? authorizedC3ContainerId
+                    : null;
+
             safeArguments["dryRun"] = true;
             safeArguments["write"] = false;
+            safeArguments["destinationPath"] = null;
+            safeArguments["c3ContainerId"] = safeC3ContainerId;
+
+            object? result = await base
+                .InvokeCoreAsync(safeArguments, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (invocationState is not null
+                && safeArguments.TryGetValue("snapshotId", out object? snapshotValue)
+                && snapshotValue is string snapshotId
+                && safeArguments.TryGetValue("model", out object? modelValue)
+                && TryGetJsonElement(modelValue, out JsonElement model))
+            {
+                invocationState.RecordPreview(snapshotId, model, safeC3ContainerId);
+            }
+
+            return result;
+        }
+    }
+
+    private sealed class ProposalOnlyValidationMcpFunction(
+        AIFunction inner,
+        string? authorizedC3ContainerId)
+        : DelegatingAIFunction(inner)
+    {
+        public override string Description =>
+            "Validate only an in-memory proposal. This Agent wrapper ignores destinationPath and permits C3 only for the user-selected container.";
+
+        protected override ValueTask<object?> InvokeCoreAsync(
+            AIFunctionArguments arguments,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            AIFunctionArguments safeArguments = [];
+            bool requestedC3 = false;
+            foreach ((string key, object? value) in arguments)
+            {
+                if (key == "destinationPath")
+                {
+                    continue;
+                }
+
+                if (key == "c3ContainerId")
+                {
+                    requestedC3 = value is not null;
+                    continue;
+                }
+
+                safeArguments[key] = value;
+            }
+
             safeArguments["destinationPath"] = null;
             safeArguments["c3ContainerId"] =
                 requestedC3 && authorizedC3ContainerId is not null
@@ -385,6 +531,24 @@ public static class AgentMcpToolPolicy
                     : null;
 
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
+        }
+    }
+
+    private static bool TryGetJsonElement(object? value, out JsonElement element)
+    {
+        switch (value)
+        {
+            case JsonElement jsonElement:
+                element = jsonElement;
+                return true;
+
+            case JsonDocument document:
+                element = document.RootElement.Clone();
+                return true;
+
+            default:
+                element = default;
+                return false;
         }
     }
 }

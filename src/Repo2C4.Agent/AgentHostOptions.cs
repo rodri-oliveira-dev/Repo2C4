@@ -47,6 +47,12 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     }
 
+    public int MaxValidationAttempts
+    {
+        get;
+        init;
+    } = 2;
+
     public static bool TryParse(
         string[] args,
         out AgentHostOptions? options,
@@ -63,7 +69,9 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? mcpServerPath = null;
         string? c3ContainerId = null;
         int timeoutSeconds = 90;
+        int maxValidationAttempts = 2;
         bool timeoutSpecified = false;
+        bool maxValidationAttemptsSpecified = false;
         bool allowExternalAi = false;
 
         for (int index = 0; index < args.Length; index++)
@@ -173,6 +181,26 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     c3ContainerId = c3ContainerValue;
+                    break;
+
+                case "--max-validation-attempts":
+                    if (maxValidationAttemptsSpecified)
+                    {
+                        return Fail("--max-validation-attempts may be specified only once.", out options, out error);
+                    }
+
+                    if (!TryReadValue(args, ref index, out string? attemptsValue)
+                        || !int.TryParse(
+                            attemptsValue,
+                            System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out maxValidationAttempts)
+                        || maxValidationAttempts is < 1 or > 3)
+                    {
+                        return Fail("--max-validation-attempts must be between 1 and 3.", out options, out error);
+                    }
+
+                    maxValidationAttemptsSpecified = true;
                     break;
 
                 case "--timeout-seconds":
@@ -285,6 +313,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             RepositoryRoot = repositoryRoot?.Trim(),
             McpServerPath = mcpServerPath?.Trim(),
             C3ContainerId = configuredC3ContainerId,
+            MaxValidationAttempts = maxValidationAttempts,
         };
         error = null;
         return true;

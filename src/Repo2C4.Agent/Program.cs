@@ -38,7 +38,8 @@ public static class Program
         IAgentChatClientFactory? chatClientFactory = null,
         IRepo2C4AgentFactory? agentFactory = null,
         IAgentSessionRunner? sessionRunner = null,
-        IAgentMcpSessionFactory? mcpSessionFactory = null)
+        IAgentMcpSessionFactory? mcpSessionFactory = null,
+        IArchitectureAnalysisWorkflowRunner? workflowRunner = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(standardOutput);
@@ -63,6 +64,7 @@ public static class Program
         agentFactory ??= new Repo2C4AgentFactory();
         sessionRunner ??= new AgentSessionRunner();
         mcpSessionFactory ??= new Repo2C4McpSessionFactory();
+        workflowRunner ??= new ArchitectureAnalysisWorkflowRunner(sessionRunner);
 
         try
         {
@@ -105,13 +107,19 @@ public static class Program
                     return SuccessExitCode;
                 }
 
-                string analysisPrompt = EvidenceFirstAnalysisPrompt.Build(configuredOptions);
-                string response = await sessionRunner
-                    .RunAsync(agent, analysisPrompt, cancellationToken)
+                ArchitectureWorkflowResult result = await workflowRunner
+                    .RunAsync(
+                        agent,
+                        configuredOptions,
+                        mcpSession,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
-                standardOutput.WriteLine(response);
-                return SuccessExitCode;
+                standardOutput.WriteLine(result.ToDisplayText());
+                return result.Status is ArchitectureWorkflowStatus.Failed
+                    or ArchitectureWorkflowStatus.ValidationFailed
+                        ? FailureExitCode
+                        : SuccessExitCode;
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -137,9 +145,9 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--c3-container <container-id>] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--c3-container <container-id>] [--max-validation-attempts 1-3] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
         standardError.WriteLine(
-            "The agent starts from inspect_repository, queries MCP evidence/snapshot pages as needed, proposes C1/C2 as dry-run previews and summarizes confirmed facts, review items and diagnostics.");
+            "Agent Framework Workflows orchestrates proposal -> evidence report -> dry-run preview -> validation with a bounded validation-attempt budget (default 2, maximum 3).");
         standardError.WriteLine(
             "C3 is disabled unless --c3-container selects one container; the host never allows the model to select a different C3 target.");
         standardError.WriteLine(

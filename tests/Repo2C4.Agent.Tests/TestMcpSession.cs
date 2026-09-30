@@ -38,6 +38,11 @@ internal sealed class TestMcpSession(IReadOnlyList<AITool> tools) : IAgentMcpSes
         get;
     } = tools;
 
+    public AgentMcpInvocationState InvocationState
+    {
+        get;
+    } = new();
+
     public Task Completion => Task.CompletedTask;
 
     public bool IsDisposed
