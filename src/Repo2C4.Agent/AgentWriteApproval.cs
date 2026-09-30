@@ -768,6 +768,12 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
                 applyResult?.Destinations ?? [],
                 applyResult?.Diagnostic ?? "The approved write was cancelled.");
         }
+#pragma warning disable CA1031 // If protected apply completed, preserve its controlled outcome instead of replacing it with a provider/framework failure.
+        catch (Exception) when (applyResult is not null)
+#pragma warning restore CA1031
+        {
+            return ToWriteApprovalResult(applyResult);
+        }
 
         if (!approved)
         {
@@ -785,7 +791,12 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
                 "Approval was granted but the protected write tool did not execute.");
         }
 
-        return applyResult.Status switch
+        return ToWriteApprovalResult(applyResult);
+    }
+
+    private static WriteApprovalResult ToWriteApprovalResult(
+        AgentWriteApplyResult applyResult) =>
+        applyResult.Status switch
         {
             AgentWriteApplyStatus.Applied => new WriteApprovalResult(
                 WriteApprovalStatus.Applied,
@@ -793,7 +804,7 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
                 null),
             AgentWriteApplyStatus.StalePreview => new WriteApprovalResult(
                 WriteApprovalStatus.StalePreview,
-                [],
+                applyResult.Destinations,
                 applyResult.Diagnostic),
             AgentWriteApplyStatus.Conflict => new WriteApprovalResult(
                 WriteApprovalStatus.Conflict,
@@ -808,5 +819,4 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
                 applyResult.Destinations,
                 applyResult.Diagnostic),
         };
-    }
 }
