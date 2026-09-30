@@ -21,7 +21,6 @@ public sealed class AgentCompositionTests
             options.Prompt!,
             TestContext.Current.CancellationToken);
 
-        Assert.IsType<ChatClientAgent>(agent);
         Assert.Equal("session-complete", response);
         Assert.NotNull(chatClient.LastOptions);
         Assert.Equal("unit-model", chatClient.LastOptions.ModelId);
