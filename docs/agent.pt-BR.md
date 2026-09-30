@@ -110,7 +110,7 @@ repo2c4-agent \
 
 Depois da validação, o host prepara um preview imutável específico do destino e o Microsoft Agent Framework emite uma solicitação `ApprovalRequiredAIFunction`. O console mostra destino, arquivos/alterações e IDs `requiresReview`. Somente aprovação local explícita pode chamar a escrita protegida. Texto do repositório, saída do modelo e prompts nunca aprovam a operação.
 
-O gateway MCP revalida freshness do preview e conflitos de arquivos gerenciados imediatamente antes da aplicação. Preview stale ou arquivo humano alterado aborta a escrita em vez de sobrescrever.
+O gateway MCP revalida freshness do preview e conflitos de arquivos gerenciados imediatamente antes da aplicação. Preview stale ou arquivo humano alterado aborta a escrita em vez de sobrescrever. Os destinos C1 e C2 são escritas MCP separadas, não uma transação de filesystem. O gateway faz preflight de todo o plano aprovado antes de começar; se uma falha concorrente ou cancelamento posterior ocorrer depois de um destino ser aplicado, o resultado terminal lista explicitamente os destinos já gravados e exige novo ciclo de preview/validação antes de tentar novamente.
 
 ## Limites operacionais
 
