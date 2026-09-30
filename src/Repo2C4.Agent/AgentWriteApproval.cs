@@ -40,6 +40,7 @@ public enum AgentWriteApplyStatus
     Applied,
     StalePreview,
     Conflict,
+    Cancelled,
     Failed,
 }
 
@@ -152,7 +153,15 @@ internal sealed class Repo2C4McpWriteGateway(
         List<string> written = [];
         foreach (AgentWritePlanItem approved in plan.Items)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return new AgentWriteApplyResult(
+                    AgentWriteApplyStatus.Cancelled,
+                    written,
+                    PartialWriteDiagnostic(
+                        written,
+                        "The approved LikeC4 write was cancelled."));
+            }
 
             try
             {
@@ -178,7 +187,9 @@ internal sealed class Repo2C4McpWriteGateway(
                         : new AgentWriteApplyResult(
                             AgentWriteApplyStatus.Failed,
                             written,
-                            "The approved LikeC4 write failed.");
+                            PartialWriteDiagnostic(
+                                written,
+                                "The approved LikeC4 write failed."));
                 }
 
                 if (result.StructuredContent is not JsonElement content
@@ -190,14 +201,21 @@ internal sealed class Repo2C4McpWriteGateway(
                     return new AgentWriteApplyResult(
                         AgentWriteApplyStatus.Failed,
                         written,
-                        "The MCP write returned an unexpected result.");
+                        PartialWriteDiagnostic(
+                            written,
+                            "The MCP write returned an unexpected result."));
                 }
 
                 written.Add(approved.DestinationPath);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
+                return new AgentWriteApplyResult(
+                    AgentWriteApplyStatus.Cancelled,
+                    written,
+                    PartialWriteDiagnostic(
+                        written,
+                        "The approved LikeC4 write was cancelled."));
             }
 #pragma warning disable CA1031 // Raw MCP errors may contain local paths; return only controlled classifications.
             catch (Exception exception)
@@ -209,11 +227,15 @@ internal sealed class Repo2C4McpWriteGateway(
                     ? new AgentWriteApplyResult(
                         AgentWriteApplyStatus.Conflict,
                         written,
-                        "Managed output conflict prevented the approved write.")
+                        PartialWriteDiagnostic(
+                            written,
+                            "Managed output conflict prevented the approved write."))
                     : new AgentWriteApplyResult(
                         AgentWriteApplyStatus.Failed,
                         written,
-                        "The approved LikeC4 write failed.");
+                        PartialWriteDiagnostic(
+                            written,
+                            "The approved LikeC4 write failed."));
             }
         }
 
@@ -222,6 +244,15 @@ internal sealed class Repo2C4McpWriteGateway(
             written,
             null);
     }
+
+    private static string PartialWriteDiagnostic(
+        IReadOnlyList<string> written,
+        string diagnostic) =>
+        written.Count == 0
+            ? diagnostic
+            : diagnostic
+                + " One or more approved destinations were already applied; "
+                + "the result lists them explicitly. Re-run preview and validation before retrying.";
 
     private async ValueTask<CallToolResult> CallGenerateLikeC4Async(
         Dictionary<string, object?> arguments,
@@ -715,16 +746,26 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
             approved,
             approved ? "Approved by the local human operator." : "Rejected by the local human operator.");
 
-        _ = await approvalAgent
-            .RunAsync(
-                [
-                    new ChatMessage(
-                        ChatRole.User,
-                        [approvalResponse]),
-                ],
-                session,
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            _ = await approvalAgent
+                .RunAsync(
+                    [
+                        new ChatMessage(
+                            ChatRole.User,
+                            [approvalResponse]),
+                    ],
+                    session,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new WriteApprovalResult(
+                WriteApprovalStatus.Cancelled,
+                applyResult?.Destinations ?? [],
+                applyResult?.Diagnostic ?? "The approved write was cancelled.");
+        }
 
         if (!approved)
         {
@@ -754,6 +795,10 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
                 applyResult.Diagnostic),
             AgentWriteApplyStatus.Conflict => new WriteApprovalResult(
                 WriteApprovalStatus.Conflict,
+                applyResult.Destinations,
+                applyResult.Diagnostic),
+            AgentWriteApplyStatus.Cancelled => new WriteApprovalResult(
+                WriteApprovalStatus.Cancelled,
                 applyResult.Destinations,
                 applyResult.Diagnostic),
             _ => new WriteApprovalResult(
