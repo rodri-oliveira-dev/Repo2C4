@@ -324,15 +324,45 @@ public sealed class ArchitectureAnalysisWorkflow
             return CancelledResult();
         }
 #pragma warning disable CA1031 // Workflow boundary converts unexpected framework failures to a controlled result.
-        catch (Exception)
+        catch (Exception exception)
 #pragma warning restore CA1031
         {
+            AgentBudgetExceededException? budgetException =
+                FindBudgetException(exception);
+            if (budgetException is not null)
+            {
+                return new ArchitectureWorkflowResult(
+                    ArchitectureWorkflowStatus.Failed,
+                    0,
+                    string.Empty,
+                    [budgetException.Message])
+                {
+                    TerminalReason = budgetException.Code,
+                };
+            }
+
             return new ArchitectureWorkflowResult(
                 ArchitectureWorkflowStatus.Failed,
                 0,
                 string.Empty,
                 ["Workflow execution failed unexpectedly."]);
         }
+    }
+
+    private static AgentBudgetExceededException? FindBudgetException(Exception exception)
+    {
+        Exception? current = exception;
+        while (current is not null)
+        {
+            if (current is AgentBudgetExceededException budgetException)
+            {
+                return budgetException;
+            }
+
+            current = current.InnerException;
+        }
+
+        return null;
     }
 
     private static ArchitectureWorkflowResult CancelledResult() =>
