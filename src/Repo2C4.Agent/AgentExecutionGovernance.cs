@@ -69,7 +69,10 @@ public sealed class AgentExecutionContext
             : runId;
     }
 
-    public string RunId { get; }
+    public string RunId
+    {
+        get;
+    }
 
     public AgentExecutionBudgets Budgets => budgets;
 
