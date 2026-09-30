@@ -47,15 +47,19 @@ A validação de ownership do pacote NuGet depende deste marcador exato no READM
 
 O marcador vem de `src/Repo2C4.Mcp/README.md`. O smoke de distribuição valida nome do Registry, vínculo package/version, argumento obrigatório da raiz e marcador de ownership antes da release.
 
-O Official MCP Registry armazena metadata, não o pacote NuGet. Portanto, publique **primeiro** a versão exata em NuGet.org. Depois que ela estiver publicamente disponível, instale o `mcp-publisher` oficial e execute a partir da raiz do repositório:
+O Official MCP Registry armazena metadata, não o pacote NuGet, então o pacote correspondente precisa estar público primeiro. O workflow protegido de release garante essa ordem: publica GitHub Release/NuGet, verifica que o `Repo2C4.Mcp` público pode ser instalado e só então executa o job de publicação no Registry.
+
+A autenticação usa o fluxo oficial GitHub Actions OIDC. O job recebe somente `contents: read` e `id-token: write`; não exige PAT nem secret persistente específico do MCP Registry. O workflow baixa uma versão fixada do `mcp-publisher`, confere seu SHA-256, valida `server.json`, verifica se aquela versão exata já existe, publica apenas quando ausente e confirma a leitura da versão pela API do Registry.
+
+Para validação local ou recuperação manual, o mantenedor ainda pode executar:
 
 ```bash
-mcp-publisher validate
+mcp-publisher validate server.json
 mcp-publisher login github
-mcp-publisher publish
+mcp-publisher publish server.json
 ```
 
-A autenticação GitHub concede o namespace pessoal `io.github.rodri-oliveira-dev/*`. Enquanto o Official MCP Registry estiver em preview, sua publicação permanece uma ação separada do mantenedor; o workflow normal do Repo2C4 não introduz uma nova credencial persistente apenas para o Registry.
+Uma versão imutável duplicada não deve ser republicada. Se o job do Registry falhar depois que NuGet/GitHub já estiverem públicos, repita somente o job que falhou a partir do mesmo commit da release; não reconstrua nem altere `server.json` para aquela versão.
 
 Ao preparar uma release futura, atualize `Directory.Build.props` e os dois campos de versão de `server.json` para o mesmo SemVer exato antes de executar a verificação de distribuição/release.
 
@@ -119,7 +123,7 @@ O servidor rejeita raízes inexistentes, links simbólicos/junções e acessos f
 
 ## Release manual e validação
 
-O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das três ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente, habilite `publish_release=true` **e** digite `publication_confirmation=PUBLISH`. O job com escrita roda no environment protegido `release`, confirma que a `main` não mudou, valida os quatro artefatos esperados, cria/publica a GitHub Release versionada e envia somente `Repo2C4.Cli`, `Repo2C4.Mcp` e `Repo2C4.Agent` ao NuGet.org usando `NUGET_API_KEY` fornecida pelo environment. Depois, um job somente leitura instala essa mesma versão diretamente do NuGet.org e executa os três comandos como consumidor externo. Falhas de publicação ou propagação são reportadas sem expor a credencial. A publicação NuGet não é transacional entre os três IDs de pacote: se um push posterior falhar depois que um pacote anterior já foi aceito, repita somente a partir do mesmo commit protegido da `main` e usando exatamente o payload validado. A verificação de hash considera satisfeito um pacote já publicado com o mesmo SHA-256 e rejeita bytes diferentes para a mesma versão; nunca reconstrua nem substitua apenas um pacote de uma versão parcialmente publicada.
+O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das três ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente, habilite `publish_release=true` **e** digite `publication_confirmation=PUBLISH`. O job com escrita roda no environment protegido `release`, confirma que a `main` não mudou, valida os quatro artefatos esperados, cria/publica a GitHub Release versionada e envia somente `Repo2C4.Cli`, `Repo2C4.Mcp` e `Repo2C4.Agent` ao NuGet.org usando `NUGET_API_KEY` fornecida pelo environment. Depois, um job somente leitura instala essa mesma versão diretamente do NuGet.org e executa os três comandos como consumidor externo. Quando esse smoke público passa, um job separado com OIDC publica a metadata correspondente do `Repo2C4.Mcp` no Official MCP Registry e confirma a versão exata pela API do Registry. Falhas de publicação ou propagação são reportadas sem expor a credencial. A publicação NuGet não é transacional entre os três IDs de pacote: se um push posterior falhar depois que um pacote anterior já foi aceito, repita somente a partir do mesmo commit protegido da `main` e usando exatamente o payload validado. A verificação de hash considera satisfeito um pacote já publicado com o mesmo SHA-256 e rejeita bytes diferentes para a mesma versão; nunca reconstrua nem substitua apenas um pacote de uma versão parcialmente publicada.
 
 O CI regular testa empacotamento e instalação sem credencial cloud nem permissão de release. CodeQL, Dependency Review e auditoria de dependências continuam obrigatórios. O workflow de [PR revisável de documentação](architecture-pr.pt-BR.md) é um fluxo manual distinto, sem merge automático.
 
