@@ -263,9 +263,10 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             ShutdownTimeout = TimeSpan.FromSeconds(5),
         });
 
+        McpClient? client = null;
         try
         {
-            McpClient client = await McpClient
+            client = await McpClient
                 .CreateAsync(transport, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -275,7 +276,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
 
             if (!Repo2C4McpCapabilities.TryValidate(discovered, out string? capabilityError))
             {
-                await client.DisposeAsync().ConfigureAwait(false);
+                await DisposeClientAsync(client).ConfigureAwait(false);
+                client = null;
                 return AgentMcpSessionCreation.Failure(capabilityError!);
             }
 
@@ -294,25 +296,46 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                     StringComparison.Ordinal));
             IAgentMcpWriteGateway writeGateway =
                 new Repo2C4McpWriteGateway(generateLikeC4, invocationState.Execution);
-#pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
+#pragma warning disable CA2000 // Ownership transfers to the returned session and is disposed by the host.
             IAgentMcpSession session = new Repo2C4McpSession(
                 client,
                 safeTools,
                 invocationState,
                 writeGateway);
 #pragma warning restore CA2000
+            client = null;
             return AgentMcpSessionCreation.Success(session);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            await DisposeClientAsync(client).ConfigureAwait(false);
             throw;
         }
 #pragma warning disable CA1031 // MCP startup is a process boundary; raw SDK/process errors may expose local paths.
         catch (Exception)
 #pragma warning restore CA1031
         {
+            await DisposeClientAsync(client).ConfigureAwait(false);
             return AgentMcpSessionCreation.Failure(
                 "Repo2C4 Agent MCP connection error: the local Repo2C4 MCP server could not be started or initialized.");
+        }
+    }
+
+    private static async ValueTask DisposeClientAsync(McpClient? client)
+    {
+        if (client is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await client.DisposeAsync().ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Startup cleanup must not replace the controlled MCP diagnostic/cancellation.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
         }
     }
 
@@ -455,6 +478,7 @@ public static class AgentMcpToolPolicy
             AIFunction safeFunction =
                 tool.Name switch
                 {
+                    "inspect_repository" => new AuthorizedRootInspectionMcpFunction(function),
                     "generate_likec4" => new PreviewOnlyMcpFunction(
                         function,
                         authorizedC3ContainerId,
@@ -474,6 +498,32 @@ public static class AgentMcpToolPolicy
         }
 
         return tools;
+    }
+
+    private sealed class AuthorizedRootInspectionMcpFunction(AIFunction inner)
+        : DelegatingAIFunction(inner)
+    {
+        public override string Description =>
+            "Inspect the complete host-authorized repository root. This Agent wrapper forces repositoryPath='.'.";
+
+        protected override ValueTask<object?> InvokeCoreAsync(
+            AIFunctionArguments arguments,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            AIFunctionArguments safeArguments = [];
+            foreach ((string key, object? value) in arguments)
+            {
+                if (key != "repositoryPath")
+                {
+                    safeArguments[key] = value;
+                }
+            }
+
+            safeArguments["repositoryPath"] = ".";
+            return base.InvokeCoreAsync(safeArguments, cancellationToken);
+        }
     }
 
     private sealed class PreviewOnlyMcpFunction(
@@ -526,10 +576,12 @@ public static class AgentMcpToolPolicy
                 .ConfigureAwait(false);
 
             if (invocationState is not null
+                && !IsMcpErrorResult(result)
                 && safeArguments.TryGetValue("snapshotId", out object? snapshotValue)
                 && snapshotValue is string snapshotId
                 && safeArguments.TryGetValue("model", out object? modelValue)
-                && TryGetJsonElement(modelValue, out JsonElement model))
+                && TryGetJsonElement(modelValue, out JsonElement model)
+                && model.ValueKind == JsonValueKind.Object)
             {
                 invocationState.RecordPreview(snapshotId, model, safeC3ContainerId);
             }
@@ -579,6 +631,12 @@ public static class AgentMcpToolPolicy
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }
     }
+
+    private static bool IsMcpErrorResult(object? result) =>
+        result is JsonElement element
+        && element.ValueKind == JsonValueKind.Object
+        && element.TryGetProperty("isError", out JsonElement isError)
+        && isError.ValueKind == JsonValueKind.True;
 
     private static bool TryGetJsonElement(object? value, out JsonElement element)
     {
