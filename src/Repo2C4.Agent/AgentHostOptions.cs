@@ -53,6 +53,36 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     } = 2;
 
+    public int MaxToolCalls
+    {
+        get;
+        init;
+    } = 40;
+
+    public int MaxWorkflowIterations
+    {
+        get;
+        init;
+    } = 3;
+
+    public int MaxEvidencePages
+    {
+        get;
+        init;
+    } = 20;
+
+    public int MaxResponseCharacters
+    {
+        get;
+        init;
+    } = 32_000;
+
+    public int MaxContextCharacters
+    {
+        get;
+        init;
+    } = 64_000;
+
     public string? WriteDestination
     {
         get;
@@ -77,8 +107,18 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? writeDestination = null;
         int timeoutSeconds = 90;
         int maxValidationAttempts = 2;
+        int maxToolCalls = 40;
+        int maxWorkflowIterations = 3;
+        int maxEvidencePages = 20;
+        int maxResponseCharacters = 32_000;
+        int maxContextCharacters = 64_000;
         bool timeoutSpecified = false;
         bool maxValidationAttemptsSpecified = false;
+        bool maxToolCallsSpecified = false;
+        bool maxWorkflowIterationsSpecified = false;
+        bool maxEvidencePagesSpecified = false;
+        bool maxResponseCharactersSpecified = false;
+        bool maxContextCharactersSpecified = false;
         bool allowExternalAi = false;
 
         for (int index = 0; index < args.Length; index++)
@@ -226,6 +266,91 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     maxValidationAttemptsSpecified = true;
                     break;
 
+                case "--max-tool-calls":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-tool-calls",
+                            ref maxToolCallsSpecified,
+                            1,
+                            100,
+                            out maxToolCalls,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    break;
+
+                case "--max-workflow-iterations":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-workflow-iterations",
+                            ref maxWorkflowIterationsSpecified,
+                            1,
+                            3,
+                            out maxWorkflowIterations,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    break;
+
+                case "--max-evidence-pages":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-evidence-pages",
+                            ref maxEvidencePagesSpecified,
+                            1,
+                            50,
+                            out maxEvidencePages,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    break;
+
+                case "--max-response-chars":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-response-chars",
+                            ref maxResponseCharactersSpecified,
+                            1_024,
+                            100_000,
+                            out maxResponseCharacters,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    break;
+
+                case "--max-context-chars":
+                    if (!TryReadBoundedInt(
+                            args,
+                            ref index,
+                            "--max-context-chars",
+                            ref maxContextCharactersSpecified,
+                            4_096,
+                            200_000,
+                            out maxContextCharacters,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    break;
+
                 case "--timeout-seconds":
                     if (timeoutSpecified)
                     {
@@ -347,6 +472,14 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                 out error);
         }
 
+        if (maxValidationAttempts > maxWorkflowIterations)
+        {
+            return Fail(
+                "--max-workflow-iterations must be greater than or equal to --max-validation-attempts.",
+                out options,
+                out error);
+        }
+
         _ = goalOption;
         options = new AgentHostOptions(provider, model, prompt?.Trim())
         {
@@ -357,6 +490,11 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             McpServerPath = mcpServerPath?.Trim(),
             C3ContainerId = configuredC3ContainerId,
             MaxValidationAttempts = maxValidationAttempts,
+            MaxToolCalls = maxToolCalls,
+            MaxWorkflowIterations = maxWorkflowIterations,
+            MaxEvidencePages = maxEvidencePages,
+            MaxResponseCharacters = maxResponseCharacters,
+            MaxContextCharacters = maxContextCharacters,
             WriteDestination = configuredWriteDestination,
         };
         error = null;
@@ -430,6 +568,48 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
 
         endpoint = null;
         return false;
+    }
+
+    private static bool TryReadBoundedInt(
+        string[] args,
+        ref int index,
+        string option,
+        ref bool specified,
+        int minimum,
+        int maximum,
+        out int value,
+        out string? error)
+    {
+        if (specified)
+        {
+            value = default;
+            error = "Repo2C4 Agent configuration error: " + option + " may be specified only once.";
+            return false;
+        }
+
+        if (!TryReadValue(args, ref index, out string? raw)
+            || !int.TryParse(
+                raw,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out value)
+            || value < minimum
+            || value > maximum)
+        {
+            error =
+                "Repo2C4 Agent configuration error: "
+                + option
+                + " must be between "
+                + minimum.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + " and "
+                + maximum.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + ".";
+            return false;
+        }
+
+        specified = true;
+        error = null;
+        return true;
     }
 
     private static bool TryReadUniqueValue(
