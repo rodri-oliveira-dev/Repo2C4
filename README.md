@@ -316,6 +316,7 @@ See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for tool
 ```bash
 dotnet run --project src/Repo2C4.Cli/Repo2C4.Cli.csproj -- --help
 dotnet run --project src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -- --help
+dotnet run --project src/Repo2C4.Agent/Repo2C4.Agent.csproj -- --help
 ```
 
 CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite starts the executable through a vendor-neutral JSON-RPC stdio client, performs real handshakes/tool calls, exercises pagination/security failures, reproduces both versioned C1 and C2 models, compares preview/written `.c4` files with goldens, and verifies that no non-protocol content is written to stdout.
@@ -324,7 +325,7 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 `.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
-**Distribution:** the two versioned .NET tools, `Repo2C4.Cli` and `Repo2C4.Mcp`, are clean-install tested. Public release remains manually gated; an authorized release publishes the validated packages to NuGet.org and GitHub Release, then verifies consumer installation. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
+**Distribution:** the three versioned .NET tools, `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent`, are clean-install tested. Public release remains manually gated; an authorized release publishes the validated packages to NuGet.org and GitHub Release, then verifies consumer installation. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
 
 
 
