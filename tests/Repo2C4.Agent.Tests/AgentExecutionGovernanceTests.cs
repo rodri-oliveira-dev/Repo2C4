@@ -108,22 +108,26 @@ public sealed class AgentExecutionGovernanceTests
     }
 
     [Fact]
-    public void ResponseAndContextBudgetsAreIndependentAndBounded()
+    public void ResponseAndContextBudgetsAreIndependentCumulativeAndBounded()
     {
         AgentExecutionContext responseExecution =
             CreateExecution(maxResponseCharacters: 8);
+        responseExecution.ObserveResponse("12345");
         AgentBudgetExceededException responseException =
             Assert.Throws<AgentBudgetExceededException>(
-                () => responseExecution.ObserveResponse("123456789"));
+                () => responseExecution.ObserveResponse("6789"));
 
         AgentExecutionContext contextExecution =
             CreateExecution(maxContextCharacters: 8);
+        contextExecution.ObserveContext("12345");
         AgentBudgetExceededException contextException =
             Assert.Throws<AgentBudgetExceededException>(
-                () => contextExecution.ObserveContext("123456789"));
+                () => contextExecution.ObserveContext("6789"));
 
         Assert.Equal("response_size_exceeded", responseException.Code);
         Assert.Equal("context_size_exceeded", contextException.Code);
+        Assert.Equal(9, responseExecution.SnapshotCounters().ResponseCharacters);
+        Assert.Equal(9, contextExecution.SnapshotCounters().ContextCharacters);
     }
 
     [Fact]
@@ -143,6 +147,21 @@ public sealed class AgentExecutionGovernanceTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => Task.Delay(TimeSpan.FromSeconds(2), deadline.Token));
+
+        Assert.True(execution.IsDeadlineExceeded);
+    }
+
+    [Fact]
+    public void ParentCancellationDoesNotMasqueradeAsDeadlineExceeded()
+    {
+        AgentExecutionContext execution = CreateExecution();
+        using CancellationTokenSource parent = new();
+        using CancellationTokenSource deadline = execution.CreateDeadlineSource(parent.Token);
+
+        parent.Cancel();
+
+        Assert.True(deadline.IsCancellationRequested);
+        Assert.False(execution.IsDeadlineExceeded);
     }
 
     [Fact]
