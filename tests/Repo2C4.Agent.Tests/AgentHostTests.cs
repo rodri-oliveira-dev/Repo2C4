@@ -202,6 +202,36 @@ public sealed class AgentHostTests
     }
 
     [Fact]
+    public async Task TotalDeadlineDuringWriteApprovalReturnsFailure()
+    {
+        using TestChatClient chatClient = new("unused");
+        TestMcpSessionFactory mcpFactory = new();
+        using StringWriter output = new();
+        using StringWriter error = new();
+
+        int exitCode = await Program.RunAsync(
+            [
+                "--provider", "ollama",
+                "--model", "model",
+                "--goal", "Document architecture",
+                "--write-destination", "architecture",
+                "--max-duration-seconds", "1",
+            ],
+            output,
+            error,
+            TestContext.Current.CancellationToken,
+            new RecordingChatClientFactory(chatClient),
+            mcpSessionFactory: mcpFactory,
+            workflowRunner: new FixedWorkflowRunner(
+                ArchitectureWorkflowStatus.RequiresReview),
+            writeApprovalRunner: new DeadlineCancellingWriteApprovalRunner());
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("Cancelled", output.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.True(mcpFactory.Session.IsDisposed);
+    }
+
+    [Fact]
     public async Task OpenAiRequiresExplicitConsentBeforeProviderCreation()
     {
         using StringWriter output = new();
@@ -292,6 +322,35 @@ public sealed class AgentHostTests
                     1,
                     "controlled result",
                     ["controlled diagnostic"]));
+        }
+    }
+
+    private sealed class DeadlineCancellingWriteApprovalRunner : IWriteApprovalRunner
+    {
+        public async Task<WriteApprovalResult> RunAsync(
+            IChatClient chatClient,
+            AgentHostOptions options,
+            IAgentMcpSession mcpSession,
+            ArchitectureWorkflowResult workflowResult,
+            CancellationToken cancellationToken)
+        {
+            _ = chatClient;
+            _ = options;
+            _ = mcpSession;
+            _ = workflowResult;
+
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The execution deadline did not cancel the write approval.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return new WriteApprovalResult(
+                    WriteApprovalStatus.Cancelled,
+                    [],
+                    "Write approval was cancelled.");
+            }
         }
     }
 
