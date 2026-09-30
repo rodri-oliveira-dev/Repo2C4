@@ -58,14 +58,7 @@ public static class Program
         AgentHostOptions configuredOptions = options!;
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 7 starts with a provider/model-aware host. Concrete provider adapters are issue #35.
-        // A configuration-only startup is therefore valid without contacting a provider.
-        if (configuredOptions.Prompt is null)
-        {
-            return SuccessExitCode;
-        }
-
-        chatClientFactory ??= new UnavailableAgentChatClientFactory();
+        chatClientFactory ??= new ProviderAgentChatClientFactory();
         agentFactory ??= new Repo2C4AgentFactory();
         sessionRunner ??= new AgentSessionRunner();
 
@@ -85,6 +78,12 @@ public static class Program
 
             using IChatClient chatClient = creation.ChatClient;
             AIAgent agent = agentFactory.Create(chatClient, configuredOptions);
+
+            if (configuredOptions.Prompt is null)
+            {
+                return SuccessExitCode;
+            }
+
             string response = await sessionRunner
                 .RunAsync(agent, configuredOptions.Prompt, cancellationToken)
                 .ConfigureAwait(false);
@@ -95,6 +94,11 @@ public static class Program
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return SuccessExitCode;
+        }
+        catch (AgentProviderException exception)
+        {
+            standardError.WriteLine(exception.Message);
+            return FailureExitCode;
         }
 #pragma warning disable CA1031 // Process boundary intentionally hides provider/framework exception details and secrets.
         catch (Exception)
@@ -110,7 +114,11 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider <provider> --model <model> [--prompt <text>]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> [--prompt <text>] [--timeout-seconds 1-300]");
+        standardError.WriteLine(
+            "Ollama defaults to http://127.0.0.1:11434/; override only with --endpoint using an HTTP loopback origin.");
+        standardError.WriteLine(
+            "OpenAI requires --allow-external-ai and reads OPENAI_API_KEY only from the process environment.");
         standardError.WriteLine("Provider and model are mandatory and never inferred or silently defaulted.");
         standardError.WriteLine("Credentials are not accepted by this host command surface.");
     }
