@@ -133,12 +133,16 @@ public static class Program
 
                 standardOutput.WriteLine(result.ToDisplayText());
 
-                if (configuredOptions.WriteDestination is null)
+                if (result.Status is ArchitectureWorkflowStatus.Failed
+                    or ArchitectureWorkflowStatus.ValidationFailed)
                 {
-                    return result.Status is ArchitectureWorkflowStatus.Failed
-                        or ArchitectureWorkflowStatus.ValidationFailed
-                            ? FailureExitCode
-                            : SuccessExitCode;
+                    return FailureExitCode;
+                }
+
+                if (configuredOptions.WriteDestination is null
+                    || result.Status == ArchitectureWorkflowStatus.Cancelled)
+                {
+                    return SuccessExitCode;
                 }
 
                 writeApprovalRunner ??= new WriteApprovalRunner(
