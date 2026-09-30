@@ -1,99 +1,386 @@
-# Servidor MCP stdio, ferramentas de inspeção e política de acesso local
+# Servidor MCP do Repo2C4
 
-A Fase 3 executa o Repo2C4 como servidor MCP local por stdio. A issue #13 estabeleceu transporte e limite de filesystem, a #14 adicionou inspeção/evidências, a #15 adicionou geração/validação LikeC4 protegida e a #16 documenta e testa o fluxo completo com cliente independente de fornecedor.
+O Repo2C4 MCP é o **servidor local Model Context Protocol por stdio** do Repo2C4. Ele expõe evidências limitadas do repositório, geração determinística de LikeC4, relatório de evidências e validação LikeC4 para qualquer cliente MCP compatível, mantendo a interpretação arquitetural fora do servidor.
 
-## Iniciar o servidor
+O servidor MCP **não** seleciona modelo de IA, não armazena credenciais de provider, não infere arquitetura sozinho e não expõe ferramenta genérica de leitura de arquivos. Conteúdo do repositório é dado não confiável. A raiz local autorizada, os schemas das tools e as regras de escrita protegida permanecem sob controle do host.
 
-Compile a solução e informe exatamente uma raiz local autorizada:
+O fluxo normal é:
 
-```bash
-dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
-  --repository-root /caminho/absoluto/do/repositorio
+```text
+cliente MCP
+  -> inspect_repository
+  -> get_evidence / get_snapshot quando necessário
+  -> cliente propõe ArchitectureModel v1
+  -> get_evidence_report
+  -> generate_likec4 (dryRun=true)
+  -> validate_likec4
+  -> revisão humana / fronteira de aprovação do cliente
+  -> generate_likec4 (dryRun=false, write=true)
+  -> validate_likec4(destinationPath=...)
 ```
 
-Como alternativa de configuração local, defina `REPO2C4_REPOSITORY_ROOT` e omita a opção de linha de comando. A linha de comando tem precedência. O servidor não exige chave de provedor de IA, conta externa, endpoint de rede ou configuração de modelo.
+Para configuração específica de clientes, consulte o [quickstart de clientes MCP](mcp-quickstart.pt-BR.md). Para o fluxo evidence-first e o prompt reutilizável, consulte [Usando o Repo2C4 a partir de um cliente MCP](mcp-client.pt-BR.md).
 
-## Limite de protocolo e logs
+## Quick Start
 
-O host usa o SDK .NET mantido `ModelContextProtocol.Core` com transporte stdio. `stdout` fica reservado exclusivamente às mensagens do protocolo MCP. Ajuda, falhas de configuração e diagnósticos controlados são escritos em `stderr`; detalhes de exceção e stack traces não são emitidos no canal do protocolo.
+Pré-requisitos:
 
-O processo trata cancelamento pelo token do host e por Ctrl+C. O fechamento de stdin encerra a sessão e descarta o armazenamento de snapshots em memória. Texto do repositório é dado não confiável e não pode substituir instruções do servidor. O servidor não incorpora provedor de IA e não expõe leitura genérica de arquivos.
+- .NET 10;
+- um cliente MCP local compatível;
+- LikeC4 somente quando `validate_likec4` for utilizado;
+- uma única raiz de repositório explicitamente autorizada.
 
-## Ferramentas de inspeção
+Depois que os pacotes do Repo2C4 estiverem publicados:
 
-A issue #14 expõe exatamente três ferramentas somente leitura:
+```bash
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+npm install --global likec4@1.59.4
 
-| Ferramenta | Finalidade | Entradas principais |
-| --- | --- | --- |
-| `inspect_repository` | Inspeciona um diretório autorizado com o scanner/extrator existente do Core e cria snapshot v1 da sessão. | `repositoryPath` relativo à raiz autorizada, `maxFiles` de 1 a 1.000. |
-| `get_evidence` | Recupera uma página limitada de `Evidence` v1. | `snapshotId`, `category` exata opcional, `pathPrefix` opcional apenas sobre metadados, `pageSize` 1–100, `cursor` opaco. |
-| `get_snapshot` | Recupera metadados de arquivos ou diagnósticos do snapshot. Nunca retorna conteúdo dos arquivos. | `snapshotId`, `section` = `files` ou `diagnostics`, `pathPrefix` opcional, `pageSize` 1–100, `cursor` opaco. |
+repo2c4-mcp --help
+likec4 --version
+```
 
-`inspect_repository` retorna ID do snapshot, IDs de repositório/schema, expiração, contagens, categorias de evidência e uma pequena amostra limitada de fatos/diagnósticos. O cliente usa as ferramentas de recuperação para páginas adicionais, sem receber o repositório ou o código-fonte inteiro em uma única resposta.
+O cliente deve iniciar o servidor MCP por stdio com a menor raiz necessária:
 
-Snapshots existem somente na sessão stdio atual e expiram após 30 minutos. O ID do snapshot é um hash estável do snapshot v1 canônico; possuir um ID obtido em outra sessão não concede acesso, porque cada sessão mantém seu próprio armazenamento. Cursores de paginação são tokens HMAC opacos vinculados à sessão, snapshot, ferramenta e filtros. Cursores alterados, usados com filtros diferentes ou fora de faixa falham com `cursor_invalid`.
+```text
+command: repo2c4-mcp
+args:
+  --repository-root
+  /caminho/absoluto/do/repositorio
+```
+
+O servidor não é uma aplicação de shell interativa. Quando iniciado diretamente no terminal sem um cliente MCP, ele aguarda tráfego do protocolo pela entrada padrão e reserva stdout para frames MCP.
+
+Antes de uma publicação pública, execute o DLL compilado a partir de um checkout confiável:
+
+```bash
+dotnet build Repo2C4.slnx --configuration Release
+
+dotnet src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll \
+  --repository-root "/caminho/absoluto/do/repositorio"
+```
+
+A raiz também pode ser informada por `REPO2C4_REPOSITORY_ROOT`; `--repository-root` explícito tem precedência.
+
+Exemplo em PowerShell:
+
+```powershell
+$env:REPO2C4_REPOSITORY_ROOT = (Resolve-Path ".\examples\fixtures\library-only").Path
+repo2c4-mcp
+```
+
+Não autorize diretório pessoal, raiz do disco ou pasta-pai contendo repositórios não relacionados apenas por conveniência.
+
+## Tools padrão
+
+O servidor local normal expõe seis tools:
+
+| Tool | Finalidade | Entradas importantes | Escrita |
+| --- | --- | --- | --- |
+| `inspect_repository` | Inspeciona um diretório dentro da raiz local autorizada e cria snapshot da sessão. | `repositoryPath` tem default `"."`; `maxFiles` tem default 1.000. | Somente leitura. |
+| `get_evidence` | Pagina evidências v1 de um snapshot. | `snapshotId`, `category` exata opcional, `pathPrefix` opcional de metadados, `pageSize`, `cursor` opaco. | Somente leitura. |
+| `get_snapshot` | Pagina metadados de arquivos ou diagnósticos sem retornar corpos de arquivos. | `snapshotId`, `section` = `files` ou `diagnostics`, `pathPrefix` opcional. | Somente leitura. |
+| `get_evidence_report` | Devolve resumo limitado de proveniência/revisão para um modelo vinculado à sessão. | `snapshotId`, `ArchitectureModel` v1 completo. | Somente leitura. |
+| `generate_likec4` | Gera LikeC4 C1/C2 determinístico e C3 seletivo opcional. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3ContainerId` opcional. | Preview por padrão. Flags explícitas são obrigatórias para escrever. |
+| `validate_likec4` | Valida modelo proposto ou workspace gerado existente pelo adaptador controlado da CLI oficial LikeC4. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3ContainerId` opcional. | Somente leitura. |
+
+`inspect_remote_repository` **não** é exposta por padrão. Ela aparece somente quando o host inicia explicitamente o servidor com `--allow-remote-acquisition`.
+
+## Primeira inspeção local
+
+Para inspecionar a própria raiz autorizada, chame:
+
+```json
+{
+  "repositoryPath": ".",
+  "maxFiles": 1000
+}
+```
+
+`inspect_repository` retorna campos estruturados incluindo:
+
+```jsonc
+{
+  "snapshotId": "<id-do-snapshot-da-sessao>",
+  "repositoryId": "<id-estavel-do-repositorio>",
+  "schemaVersion": "1",
+  "expiresAtUtc": "<timestamp>",
+  "fileCount": 0,
+  "evidenceCount": 0,
+  "diagnosticCount": 0,
+  "evidenceCategories": [],
+  "facts": [],
+  "factsTruncated": false,
+  "diagnostics": [],
+  "diagnosticsTruncated": false
+}
+```
+
+Os valores acima são placeholders; os nomes dos campos correspondem ao contrato real da resposta MCP. `repositoryId` é **retornado pela tool**. Ele não é uma entrada de `inspect_repository`.
+
+Use `snapshotId` em todas as chamadas seguintes da mesma sessão stdio.
+
+Snapshots ficam apenas em memória, são limitados à sessão stdio atual e expiram após 30 minutos. Até 16 snapshots de sessão são mantidos. Reconectar cria um novo armazenamento; um ID de sessão anterior não concede acesso ao snapshot antigo.
+
+## Paginação segura de evidências
+
+Quando a amostra inicial limitada de `facts` não for suficiente, chame `get_evidence`:
+
+```json
+{
+  "snapshotId": "<snapshot-id>",
+  "pageSize": 50
+}
+```
+
+Use `category` somente para categoria exata e `pathPrefix` apenas como filtro de metadados relativo ao repositório. Nenhuma dessas opções abre ou devolve arbitrariamente código-fonte.
+
+Se `nextCursor` for retornado, envie-o novamente sem alterações e com os **mesmos filtros**:
+
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "pageSize": 50,
+  "cursor": "<nextCursor>"
+}
+```
+
+Cursores são tokens HMAC opacos vinculados à sessão, snapshot, tool e filtros. Cursor construído, alterado, usado com filtros diferentes ou fora de faixa falha com `cursor_invalid`.
+
+Use `get_snapshot` quando precisar do inventário de arquivos ou diagnósticos do scanner:
+
+```json
+{
+  "snapshotId": "<snapshot-id>",
+  "section": "diagnostics",
+  "pageSize": 50
+}
+```
+
+A tool nunca retorna corpos de arquivos.
+
+## Fronteira do ArchitectureModel
+
+O servidor MCP não converte evidência em arquitetura sozinho. Um cliente — escrito por pessoa, determinístico ou assistido por IA — envia um `ArchitectureModel` v1 completo.
+
+O modelo deve incorporar exatamente o snapshot canônico referenciado por `snapshotId` na sessão atual. O Repo2C4 valida o modelo e compara o snapshot embutido com o armazenado. Evidência fabricada, desatualizada ou de outra sessão é rejeitada com `snapshot_mismatch` ou `model_invalid`.
+
+Evidência estática continua sendo evidência estática. Em especial:
+
+- `ProjectReference` não prova comunicação em runtime;
+- presença de pacote não prova topologia de deployment;
+- categorias `.candidate` continuam sendo sinais candidatos;
+- evidência estática `dotnet.*` ou `deployment.*` sozinha não pode confirmar uma fronteira C2 de deployment/container nem relação runtime.
+
+Afirmações sem suporte devem permanecer `requiresReview`.
 
 ## Relatório de evidências
 
-A issue #17 adiciona a ferramenta somente leitura `get_evidence_report`. Ela recebe `snapshotId` e um `ArchitectureModel` v1 completo, valida o vínculo com o snapshot da sessão e devolve apenas um resumo limitado: contagens, IDs de afirmações que exigem revisão e códigos de aviso. O Markdown completo permanece como artefato da CLI. A resposta MCP não inclui corpos de código, valores de configuração ou caminhos absolutos, não escreve arquivos e não chama IA.
+Antes da geração ou aprovação, o cliente pode chamar `get_evidence_report` com o `snapshotId` da sessão e o modelo completo. A resposta é apenas metadados e inclui:
+
+- `confirmedAssertions`;
+- `reviewRequiredAssertions`;
+- `scanWarnings`;
+- `missingOrigins`;
+- `reviewRequiredIds` limitado;
+- `warningCodes` limitado.
+
+Ela não retorna corpos de código, valores de configuração ou caminhos absolutos e não grava arquivos.
 
 Consulte [relatório de evidências e revisão arquitetural](evidence-report.md).
 
-## Ferramentas de geração e validação LikeC4
+## Preview, validação e escrita protegida
 
-A issue #15 adiciona duas ferramentas, mantendo a interpretação arquitetural no cliente MCP:
+`generate_likec4` usa preview por padrão:
 
-| Ferramenta | Finalidade | Comportamento de escrita |
-| --- | --- | --- |
-| `generate_likec4` | Recebe um `ArchitectureModel` v1 completo e o `snapshotId` da sessão, confirma que o snapshot embutido é exatamente o snapshot armazenado, preserva os limites de revisão e gera saídas deterministicamente. | O padrão é `dryRun=true`. Com `destinationPath`, a resposta inclui resumo estruturado das mudanças. Escrita exige `dryRun=false`, `write=true`, ausência de conflitos e o mesmo destino explícito. |
-| `validate_likec4` | Executa o adaptador controlado da CLI oficial LikeC4 sobre os arquivos propostos (incluindo `c3ContainerId` opcional) ou sobre um destino autorizado existente. | Somente leitura. Sem `destinationPath`, valida workspace temporário isolado e permite validar a proposta C3 selecionada com `c3ContainerId` antes da escrita; com destino, valida os arquivos de um diretório existente dentro da raiz autorizada. |
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "model": { "...": "ArchitectureModel v1 completo" },
+  "dryRun": true,
+  "write": false,
+  "destinationPath": "docs/architecture/c1"
+}
+```
 
-O servidor não confia no snapshot contido no modelo. O `ContractValidator` precisa aceitar o modelo e o snapshot v1 canônico do modelo deve ser idêntico ao snapshot apontado pelo `snapshotId` da sessão. Isso bloqueia evidência fabricada mesmo quando um modelo fabricado é internamente consistente.
+O modelo abreviado acima é apenas ilustrativo; clientes devem enviar o modelo v1 completo.
 
-A fronteira MCP também preserva a política de mapeamento C4: container C2 ou relação runtime não podem ser `confirmed` quando o suporte consiste apenas em evidências estáticas `dotnet.*` ou `deployment.*`. Essas afirmações permanecem `requiresReview`. O cliente decide como interpretar a evidência e qual IA, se houver, utilizar; o servidor nunca seleciona nem chama provedor de IA.
+Informar `destinationPath` no dry-run é útil porque o Repo2C4 compara os arquivos propostos com o destino e retorna um plano estruturado de mudanças. A resposta inclui `files`, `changes` e `hasConflicts`, mas `written` permanece `false`.
 
-A regeneração protegida resolve apenas diretórios filhos da raiz configurada, rejeita traversal e componentes linkados existentes, mantém `.repo2c4-manifest.json`, compara hashes atuais com o último snapshot gerado e classifica cada arquivo como `added`, `modified`, `unchanged` ou `conflict`. Arquivos editados manualmente ou colisões não gerenciadas nunca são sobrescritos. A escrita é preparada de forma transacional, com rollback em best effort, e o manifesto só é atualizado após a preparação bem-sucedida. Assim como na leitura, verificações gerenciadas não garantem no-follow atômico contra filesystem malicioso concorrente.
+Antes da escrita, valide a proposta sem destino:
 
-## Erros controlados e limites
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "model": { "...": "ArchitectureModel v1 completo" }
+}
+```
 
-Descrições e schemas MCP informam parâmetros e limites. Erros controlados esperados incluem:
+Sem `destinationPath`, `validate_likec4` emite a proposta em workspace temporário isolado, executa o adaptador controlado do LikeC4 e remove o workspace temporário depois.
 
-- `repository_path_invalid` para path fora da raiz, inexistente, traversal ou componente linkado;
-- `repository_unavailable` quando o repositório não pode ser inspecionado com segurança;
-- `max_files_invalid` e `page_size_invalid` para limites inválidos;
-- `snapshot_not_found_or_expired` para snapshot ausente, expirado ou de outra sessão;
-- `cursor_invalid` para cursor malformado, alterado, incompatível ou fora de faixa;
-- `path_filter_invalid`, `category_invalid` e `section_invalid` para filtros inválidos;
-- `model_invalid`, `snapshot_mismatch` e `model_review_required` para modelos inseguros ou sem suporte suficiente;
-- `write_not_authorized`, `destination_required`, `destination_invalid` e `managed_output_conflict` para falhas de escrita/regeneração protegida;
-- `validation_path_invalid` para diretório de validação ausente ou inseguro;
-- `tool_timeout` quando a inspeção excede 30 segundos;
-- `response_limit_exceeded` quando a resposta estruturada ultrapassaria o orçamento MCP de 1 MiB.
+Uma escrita exige simultaneamente as três condições explícitas:
 
-O teto permanece em 1.000 arquivos inspecionados e 1 MiB por resposta MCP. Páginas de recuperação usam 50 itens por padrão e no máximo 100.
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "model": { "...": "ArchitectureModel v1 completo" },
+  "dryRun": false,
+  "write": true,
+  "destinationPath": "docs/architecture/c1"
+}
+```
 
-## Raiz autorizada do repositório
+`dryRun=false` sem `write=true`, `write=true` com `dryRun=true` ou escrita sem destino são rejeitados.
 
-A raiz configurada deve ser um diretório absoluto existente, sem traversal, e não pode ser link simbólico, junction ou reparse point. Paths de leitura/validação são relativos à raiz e devem existir. Destinos de escrita protegida podem ser novos diretórios filhos, mas cada componente já existente é revalidado e os arquivos são criados com semântica sem overwrite.
+Após uma escrita bem-sucedida, valide o workspace existente:
 
-O scanner/extrator existente do Core continua sendo a fonte dos dados. Ele mantém exclusões obrigatórias de arquivos sensíveis e leituras limitadas. `.env`, nomes de credenciais/chaves e outros paths protegidos não são expostos. Corpos de código-fonte, instruções de README, connection strings e secrets brutos não entram nos payloads MCP de evidência.
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "model": { "...": "ArchitectureModel v1 completo" },
+  "destinationPath": "docs/architecture/c1"
+}
+```
 
-Essas verificações reduzem escapes acidentais do checkout aprovado, mas não prometem garantias atômicas contra alterações maliciosas concorrentes no filesystem. Execute o Repo2C4 sobre checkout confiável, estável, preferencialmente somente leitura e com privilégio mínimo.
+Como em qualquer cliente MCP, a experiência de aprovação humana pertence ao cliente. O Repo2C4 exige argumentos explícitos e aplica proteções de filesystem, mas não afirma que uma chamada de protocolo, isoladamente, representa aprovação humana informada. Clientes devem fazer preview, validar e obter aprovação local antes de emitir a escrita protegida.
 
-## Limite arquitetural
+## Regeneração gerenciada
 
-O projeto MCP referencia o Core; o Core não referencia o SDK MCP. Os contratos v1 `RepositorySnapshot` e `Evidence` continuam sendo a fonte de verdade.
+Quando `destinationPath` é informado, o dry-run compara a saída proposta com `.repo2c4-manifest.json` e os arquivos atuais. Cada arquivo é reportado como `added`, `modified`, `unchanged` ou `conflict`.
 
-O servidor não faz inferência arquitetural. Evidência estática, hipótese e fato arquitetural confirmado continuam distintos. `ProjectReference`, referências de pacotes e categorias terminadas em `.candidate` continuam sendo apenas sinais estáticos e não se tornam relações runtime confirmadas por serem expostas via MCP. A interpretação arquitetural continua sendo responsabilidade do cliente MCP.
+O Repo2C4 pode atualizar arquivos que ele próprio gerenciou quando eles ainda correspondem ao estado SHA-256 registrado no manifesto. Ele **não** sobrescreve:
 
-A issue #15 reutiliza emissor e validador do Core sem adicionar IA, operações Git, push/PR automático ou edição semântica de documentação existente. A #16 adiciona configuração genérica de cliente, prompts reutilizáveis e reprodução determinística C1/C2 com cliente de protocolo. Consulte [fluxo com cliente MCP](mcp-client.pt-BR.md).
+- arquivo gerenciado alterado manualmente;
+- arquivo gerenciado removido cujo estado não corresponde mais;
+- alvo linkado/reparse point;
+- arquivo não gerenciado que colida com um nome gerado.
 
+Arquivos desconhecidos nunca são excluídos. As escritas são preparadas como conjunto gerenciado, aplicadas com verificações de conflito e rollback em best effort, e o manifesto é atualizado apenas pelo fluxo de commit gerenciado.
+
+Se o estado mudar entre preview e apply, a escrita falha com `managed_output_conflict`; faça novo preview em vez de forçar.
 
 ## C3 seletivo
 
-A issue #18 mantém o modelo C1/C2 estável e adiciona uma extensão C3 compatível, limitada a um único container C2 explicitamente selecionado. `generate_likec4` aceita o parâmetro opcional `c3ContainerId`; sem ele, o comportamento C1/C2 permanece inalterado. Uma seleção válida deriva uma proposta limitada de componentes das evidências do repositório presentes nos caminhos relativos dos arquivos referenciados pelo container selecionado (inclusive evidências não listadas diretamente nos IDs do container) e inclui os componentes dentro do container selecionado em `model.c4` e gera `c3.views.c4`. Outros containers não recebem C3 automaticamente. Evidências estáticas ou candidatas permanecem `requiresReview`; container inexistente, evidência insuficiente, schema incompatível e limites excedidos geram erros controlados.
+C1/C2 são o padrão. `generate_likec4` e `validate_likec4` em modo de proposta aceitam `c3ContainerId` opcional:
 
+```jsonc
+{
+  "snapshotId": "<snapshot-id>",
+  "model": { "...": "ArchitectureModel v1 C1/C2 completo" },
+  "c3ContainerId": "container_api"
+}
+```
 
-## Regeneração gerenciada e revisão
+O ID deve identificar um container C2 existente no modelo informado. Somente esse container é expandido. Outros containers não recebem C3 automaticamente.
 
-A issue #19 torna a regeneração review-first. `generate_likec4` continua em dry-run por padrão. Quando `destinationPath` é informado, o dry-run compara a proposta com o manifesto local e os arquivos atuais e devolve as mudanças sem tocar no filesystem. A aplicação deve ocorrer somente após revisar mudanças de fronteira e evidências. A escrita só é permitida quando cada arquivo gerenciado existente ainda corresponde ao SHA-256 registrado. Edição humana, arquivo gerenciado removido, arquivo linkado ou colisão com arquivo não gerenciado gera conflito e permanece intocado. Arquivos desconhecidos nunca são excluídos.
+O builder C3 deriva candidatos de componentes limitados a partir das evidências associadas aos caminhos do container selecionado. Sinais candidatos/estáticos continuam revisáveis; container inexistente, evidência insuficiente, schema incompatível ou limites C3 falham de forma controlada em vez de inventar componentes.
+
+Use o mesmo `c3ContainerId` ao validar a proposta gerada com C3.
+
+## Aquisição Git pública opcional
+
+Aquisição remota é desabilitada por padrão porque adiciona acesso de rede e exposição a conteúdo de terceiros.
+
+Somente quando o host realmente precisar, inicie:
+
+```bash
+repo2c4-mcp \
+  --repository-root "/caminho/absoluto/do/repositorio/local/autorizado" \
+  --allow-remote-acquisition
+```
+
+Isso adiciona `inspect_remote_repository`. Ela aceita URL Git HTTPS pública, `gitRef` opcional e `maxFiles`. Credenciais embutidas, URLs SSH/file, repositórios privados/autenticados, submódulos e links simbólicos são rejeitados.
+
+O repositório é adquirido em workspace temporário isolado, inspecionado pela mesma pipeline limitada de evidências e removido em seguida. URL/ref/commit resolvido retornam como proveniência da aquisição, separados das evidências arquiteturais.
+
+Não adicione `--allow-remote-acquisition` à configuração normal do cliente quando inspeção remota não for necessária.
+
+## Limite de protocolo e logs
+
+O Repo2C4 usa o SDK .NET mantido `ModelContextProtocol.Core` sobre stdio.
+
+- `stdout` é exclusivamente tráfego do protocolo MCP.
+- Ajuda, erros de configuração e diagnósticos controlados usam `stderr`.
+- Stack traces e detalhes brutos de exceções não são emitidos no protocolo.
+- Ctrl+C ou cancelamento do host encerra o processo.
+- Fechar stdin encerra a sessão e descarta o armazenamento de snapshots em memória.
+- Nenhuma credencial de provedor de IA é exigida ou consumida pelo servidor.
+
+Texto de repositório, instruções de README, descrições de evidência e diagnósticos são dados, não instruções do servidor.
+
+## Limites
+
+| Limite | Valor |
+| --- | ---: |
+| Timeout de inicialização | 30 segundos |
+| Timeout de execução de tool | 30 segundos |
+| Vida do snapshot | 30 minutos |
+| Snapshots por sessão | 16 |
+| Arquivos por inspeção | 1.000 |
+| Página de recuperação padrão | 50 |
+| Página de recuperação máxima | 100 |
+| Itens em resumos | 20 |
+| Resposta MCP estruturada | 1 MiB |
+
+O scanner subjacente também mantém seus próprios limites de arquivos/bytes/entradas e exclusões de paths sensíveis.
+
+## Erros controlados
+
+Códigos esperados incluem:
+
+- `repository_path_invalid`, `repository_unavailable`;
+- `max_files_invalid`, `page_size_invalid`;
+- `snapshot_not_found_or_expired`, `cursor_invalid`;
+- `path_filter_invalid`, `category_invalid`, `section_invalid`;
+- `model_invalid`, `snapshot_mismatch`, `model_review_required`;
+- `write_not_authorized`, `destination_required`, `destination_invalid`, `managed_output_conflict`, `write_failed`;
+- `validation_path_invalid`;
+- `tool_timeout`;
+- `response_limit_exceeded`.
+
+A aquisição remota acrescenta códigos controlados próprios quando a tool opcional estiver habilitada.
+
+## Raiz autorizada
+
+A raiz configurada deve ser diretório local absoluto existente e não pode ser link simbólico, junction ou outro reparse point.
+
+Paths locais de leitura e validação são resolvidos abaixo dessa raiz. Destinos de escrita protegida podem ser novos subdiretórios, mas componentes já existentes são revalidados. Traversal e componentes linkados existentes são rejeitados.
+
+O scanner preserva exclusões obrigatórias para paths sensíveis/gerados e leituras limitadas. `.env`, nomes de credenciais/chaves, connection strings, secrets brutos e corpos arbitrários de código-fonte não são expostos como payloads MCP de evidência.
+
+Esses controles reduzem escape acidental do filesystem, mas não prometem garantia atômica de no-follow contra filesystem malicioso concorrente. Use checkout confiável, estável e permissões mínimas.
+
+## Troubleshooting
+
+**Comando do servidor não encontrado**  
+Confira `dotnet tool list --global`, o PATH do processo do cliente MCP e `repo2c4-mcp --help`.
+
+**Cliente conecta, mas nenhuma tool aparece**  
+Reinicie/recarregue o servidor pelo cliente e consulte os logs MCP do cliente. Confirme que stdout não está sendo envolvido por script que imprime banners ou diagnósticos.
+
+**Raiz rejeitada**  
+Use diretório absoluto existente que não seja symlink/junction/reparse-point root. Mantenha a raiz o mais restrita possível.
+
+**Snapshot deixa de existir**  
+Snapshots expiram após 30 minutos e desaparecem quando a sessão stdio termina. Execute `inspect_repository` novamente na sessão atual.
+
+**`cursor_invalid`**  
+Reutilize `nextCursor` exatamente e mantenha o mesmo snapshot, tool e filtros.
+
+**Validação LikeC4 não inicia**  
+Instale a CLI LikeC4 documentada e confirme que `likec4` está visível no PATH do processo MCP.
+
+**`snapshot_mismatch`**  
+O modelo completo deve incorporar exatamente o snapshot da sessão MCP atual. Refaça a inspeção e reconstrua/revise o modelo, em vez de reutilizar snapshot antigo.
+
+**`managed_output_conflict`**  
+Preserve a alteração humana, execute novo dry-run e revise o plano resultante. Não contorne o manifesto.
+
+**Tool remota não aparece**  
+Isso é esperado sem `--allow-remote-acquisition` explícito no processo do host.
+
+## Limite arquitetural
+
+`Repo2C4.Mcp` referencia Core; Core não referencia o SDK MCP. Os contratos versionados de repositório/evidência/modelo permanecem a fonte de verdade.
+
+O servidor MCP é infraestrutura determinística ao redor desses contratos. Seleção de modelo, orquestração de IA, interpretação semântica da arquitetura e UX de aprovação humana pertencem aos clientes, como `Repo2C4.Agent`, clientes hospedados por VS Code/Claude ou outros consumidores MCP.
