@@ -62,6 +62,13 @@ public static class Program
         AgentHostOptions configuredOptions = options!;
         cancellationToken.ThrowIfCancellationRequested();
 
+        using CancellationTokenSource? deadline =
+            configuredOptions.Goal is null
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline?.CancelAfter(configuredOptions.Timeout);
+        CancellationToken executionToken = deadline?.Token ?? cancellationToken;
+
         chatClientFactory ??= new ProviderAgentChatClientFactory();
         agentFactory ??= new Repo2C4AgentFactory();
         sessionRunner ??= new AgentSessionRunner();
@@ -71,7 +78,7 @@ public static class Program
         try
         {
             AgentChatClientCreation chatCreation = await chatClientFactory
-                .CreateAsync(configuredOptions, cancellationToken)
+                .CreateAsync(configuredOptions, executionToken)
                 .ConfigureAwait(false);
 
             if (chatCreation.ChatClient is null)
@@ -85,7 +92,7 @@ public static class Program
             using IChatClient chatClient = chatCreation.ChatClient;
 
             AgentMcpSessionCreation mcpCreation = await mcpSessionFactory
-                .CreateAsync(configuredOptions, cancellationToken)
+                .CreateAsync(configuredOptions, executionToken)
                 .ConfigureAwait(false);
 
             if (mcpCreation.Session is null)
@@ -99,6 +106,11 @@ public static class Program
             IAgentMcpSession mcpSession = mcpCreation.Session;
             await using (mcpSession.ConfigureAwait(false))
             {
+                if (configuredOptions.Goal is not null)
+                {
+                    mcpSession.InvocationState.Execution.ConfigureStructuredLogging(standardError);
+                }
+
                 AIAgent agent = agentFactory.Create(
                     chatClient,
                     configuredOptions,
@@ -114,7 +126,7 @@ public static class Program
                         agent,
                         configuredOptions,
                         mcpSession,
-                        cancellationToken)
+                        executionToken)
                     .ConfigureAwait(false);
 
                 standardOutput.WriteLine(result.ToDisplayText());
@@ -138,7 +150,7 @@ public static class Program
                         configuredOptions,
                         mcpSession,
                         result,
-                        cancellationToken)
+                        executionToken)
                     .ConfigureAwait(false);
 
                 standardOutput.WriteLine();
@@ -151,8 +163,10 @@ public static class Program
                         : SuccessExitCode;
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (executionToken.IsCancellationRequested)
         {
+            standardError.WriteLine(
+                "Repo2C4 Agent execution was cancelled or exceeded its total-duration budget.");
             return SuccessExitCode;
         }
         catch (AgentProviderException exception)
@@ -174,9 +188,11 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--write-destination <relative-root>] [--c3-container <container-id>] [--max-validation-attempts 1-3] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--write-destination <relative-root>] [--c3-container <container-id>] [--max-validation-attempts 1-3] [--max-tool-calls 1-100] [--max-workflow-iterations 1-3] [--max-evidence-pages 1-50] [--max-response-chars 1024-100000] [--max-context-chars 4096-200000] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
         standardError.WriteLine(
-            "Agent Framework Workflows orchestrates proposal -> evidence report -> dry-run preview -> validation with a bounded validation-attempt budget (default 2, maximum 3).");
+            "Agent Framework Workflows orchestrates proposal -> evidence report -> dry-run preview -> validation with bounded validation attempts and workflow iterations.");
+        standardError.WriteLine(
+            "--timeout-seconds is the total execution-duration budget. Tool calls, evidence pages, response/context size and workflow iterations also have safe configurable limits.");
         standardError.WriteLine(
             "Optional --write-destination enables a separate Agent Framework HITL approval after successful validation; C1/C2 are written under <destination>/c1 and <destination>/c2 only after explicit local approval.");
         standardError.WriteLine(
