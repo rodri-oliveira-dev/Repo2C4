@@ -50,8 +50,10 @@ public sealed class AgentExecutionContext
 {
     public const string ActivitySourceName = "Repo2C4.Agent";
 
-    public static ActivitySource TelemetryActivitySource { get; } =
-        new(ActivitySourceName, "1.0.0");
+    public static ActivitySource TelemetryActivitySource
+    {
+        get;
+    } = new(ActivitySourceName, "1.0.0");
 
     private readonly AgentExecutionBudgets budgets;
     private readonly object logGate = new();
