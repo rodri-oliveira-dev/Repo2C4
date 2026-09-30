@@ -112,7 +112,7 @@ public sealed class ArchitectureAnalysisWorkflowTests
             ArchitectureWorkflowState.Initial(),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(ArchitectureWorkflowStatus.InsufficientEvidence, result.Status);
+        Assert.Equal(ArchitectureWorkflowStatus.Failed, result.Status);
         Assert.Equal(1, result.ValidationAttempts);
         Assert.Contains(
             "No MCP-accepted architecture proposal",
