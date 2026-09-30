@@ -182,24 +182,27 @@ public sealed class ArchitectureAnalysisWorkflow
 
         try
         {
-            await using Run run = await InProcessExecution
+            Run run = await InProcessExecution
                 .RunAsync(
                     workflow,
                     initialState,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
-            ArchitectureWorkflowResult? result = run.NewEvents
-                .OfType<WorkflowOutputEvent>()
-                .Select(output => output.Data)
-                .OfType<ArchitectureWorkflowResult>()
-                .LastOrDefault();
+            await using (run.ConfigureAwait(false))
+            {
+                ArchitectureWorkflowResult? result = run.NewEvents
+                    .OfType<WorkflowOutputEvent>()
+                    .Select(output => output.Data)
+                    .OfType<ArchitectureWorkflowResult>()
+                    .LastOrDefault();
 
-            return result ?? new ArchitectureWorkflowResult(
-                ArchitectureWorkflowStatus.Failed,
-                0,
-                string.Empty,
-                ["Workflow completed without a structured result."]);
+                return result ?? new ArchitectureWorkflowResult(
+                    ArchitectureWorkflowStatus.Failed,
+                    0,
+                    string.Empty,
+                    ["Workflow completed without a structured result."]);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -454,7 +457,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
         ArchitectureWorkflowState state,
         CancellationToken cancellationToken) =>
         RunProposalAsync(
-            state with { Attempt = 1 },
+            state with
+            {
+                Attempt = 1,
+            },
             EvidenceFirstAnalysisPrompt.BuildForWorkflow(options),
             cancellationToken);
 
@@ -489,7 +495,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
                 reports.Add(proposal.Level + " evidence report completed.");
             }
 
-            return state with { EvidenceReports = reports };
+            return state with
+            {
+                EvidenceReports = reports,
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -545,7 +554,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
                 previews.Add(proposal.Level + " LikeC4 preview completed.");
             }
 
-            return state with { PreviewSummaries = previews };
+            return state with
+            {
+                PreviewSummaries = previews,
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
