@@ -289,13 +289,36 @@ public sealed class ArchitectureAnalysisWorkflow
                         ["Workflow execution was cancelled."]);
                 }
 
-                ArchitectureWorkflowResult? result = run.NewEvents
+                WorkflowEvent[] events = [.. run.NewEvents];
+                ArchitectureWorkflowResult? result = events
                     .OfType<WorkflowOutputEvent>()
                     .Select(output => output.Data)
                     .OfType<ArchitectureWorkflowResult>()
                     .LastOrDefault();
 
-                return result ?? new ArchitectureWorkflowResult(
+                if (result is not null)
+                {
+                    return result;
+                }
+
+                AgentBudgetExceededException? eventBudgetException = events
+                    .Select(GetEventException)
+                    .Where(exception => exception is not null)
+                    .Select(exception => FindBudgetException(exception!))
+                    .FirstOrDefault(exception => exception is not null);
+                if (eventBudgetException is not null)
+                {
+                    return new ArchitectureWorkflowResult(
+                        ArchitectureWorkflowStatus.Failed,
+                        0,
+                        string.Empty,
+                        [eventBudgetException.Message])
+                    {
+                        TerminalReason = eventBudgetException.Code,
+                    };
+                }
+
+                return new ArchitectureWorkflowResult(
                     ArchitectureWorkflowStatus.Failed,
                     0,
                     string.Empty,
@@ -348,6 +371,14 @@ public sealed class ArchitectureAnalysisWorkflow
                 ["Workflow execution failed unexpectedly."]);
         }
     }
+
+    private static Exception? GetEventException(WorkflowEvent workflowEvent) =>
+        workflowEvent switch
+        {
+            WorkflowErrorEvent error => error.Exception,
+            ExecutorFailedEvent failed => failed.Data,
+            _ => null,
+        };
 
     private static AgentBudgetExceededException? FindBudgetException(Exception exception)
     {
@@ -642,13 +673,18 @@ internal sealed class AgentArchitectureWorkflowOperations(
             List<string> reports = [];
             foreach (AgentArchitectureProposal proposal in state.Proposals)
             {
-                _ = await tool.InvokeAsync(
+                object? result = await tool.InvokeAsync(
                     new AIFunctionArguments
                     {
                         ["snapshotId"] = proposal.SnapshotId,
                         ["model"] = proposal.Model,
                     },
                     cancellationToken).ConfigureAwait(false);
+
+                if (!TryGetSuccessfulStructuredContent(result, out _))
+                {
+                    return Fail(state, "Evidence-report tool rejected the proposal.");
+                }
 
                 reports.Add(proposal.Level + " evidence report completed.");
             }
@@ -706,8 +742,12 @@ internal sealed class AgentArchitectureWorkflowOperations(
                     },
                     cancellationToken).ConfigureAwait(false);
 
-                if (TryGetStructuredContent(result, out JsonElement content)
-                    && content.TryGetProperty("written", out JsonElement written)
+                if (!TryGetSuccessfulStructuredContent(result, out JsonElement content))
+                {
+                    return Fail(state, "LikeC4 preview tool rejected the proposal.");
+                }
+
+                if (content.TryGetProperty("written", out JsonElement written)
                     && written.ValueKind == JsonValueKind.True)
                 {
                     return Fail(state, "Safety policy rejected an unexpected write result.");
@@ -769,7 +809,7 @@ internal sealed class AgentArchitectureWorkflowOperations(
                     },
                     cancellationToken).ConfigureAwait(false);
 
-                if (!TryGetStructuredContent(result, out JsonElement content)
+                if (!TryGetSuccessfulStructuredContent(result, out JsonElement content)
                     || !content.TryGetProperty("isValid", out JsonElement isValid)
                     || isValid.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                 {
@@ -910,25 +950,32 @@ internal sealed class AgentArchitectureWorkflowOperations(
             ValidationDiagnostics = [diagnostic],
         };
 
-    private static bool TryGetStructuredContent(
+    private static bool TryGetSuccessfulStructuredContent(
         object? result,
         out JsonElement content)
     {
-        if (result is JsonElement element)
+        if (result is not JsonElement element
+            || element.ValueKind != JsonValueKind.Object)
         {
-            if (element.ValueKind == JsonValueKind.Object
-                && element.TryGetProperty("structuredContent", out JsonElement structured))
-            {
-                content = structured;
-                return true;
-            }
-
-            content = element;
-            return true;
+            content = default;
+            return false;
         }
 
-        content = default;
-        return false;
+        if (element.TryGetProperty("isError", out JsonElement isError)
+            && isError.ValueKind == JsonValueKind.True)
+        {
+            content = default;
+            return false;
+        }
+
+        if (element.TryGetProperty("structuredContent", out JsonElement structured))
+        {
+            content = structured;
+            return structured.ValueKind == JsonValueKind.Object;
+        }
+
+        content = element;
+        return true;
     }
 
     private static void AddValidationDiagnostics(
