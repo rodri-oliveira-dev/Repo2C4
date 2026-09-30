@@ -209,7 +209,9 @@ public sealed class AgentProviderTests
             workflowRunner: new DirectSessionWorkflowRunner());
 
         Assert.Equal(0, exitCode);
-        Assert.Equal(string.Empty, output.ToString());
+        Assert.Contains("Status: cancelled", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Terminal reason: cancelled", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Run ID:", output.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("timed out", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
