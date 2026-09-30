@@ -11,7 +11,13 @@ dotnet tool install --global Repo2C4.Cli --version 1.0.0
 npm install --global likec4@1.59.4
 ```
 
-Run from the Repo2C4 checkout so the fixture path is available.
+Run from the Repo2C4 checkout so the fixture path is available. Confirm that Ollama is running and that the selected model is installed:
+
+```bash
+ollama list
+# If needed:
+ollama pull YOUR_LOCAL_MODEL
+```
 
 ## 2. Analysis only
 
@@ -29,6 +35,23 @@ The Agent launches `repo2c4-mcp` over stdio, asks MCP for repository evidence, p
 
 For this fixture, a model must not promote a runtime/deployment boundary to `confirmed`: the repository contains only a library project.
 
+No managed `.c4` file is created in this step. A successful run prints `Status: completed` or `Status: requires_review`, followed by the run ID and bounded execution counters.
+
+### Optional selective C3
+
+If a reviewed C2 proposal contains a container with architecture ID `container_api`, authorize only that container:
+
+```bash
+repo2c4-agent \
+  --provider ollama \
+  --model YOUR_LOCAL_MODEL \
+  --repository-root "$(pwd)/examples/fixtures/library-only" \
+  --c3-container "container_api" \
+  --goal "Produce C1/C2 and propose C3 only for container_api when evidence supports it."
+```
+
+Do not derive the ID from a project name. It must already identify a C2 container; otherwise C3 is omitted.
+
 ## 3. Optional protected write
 
 Choose a repository-relative destination explicitly:
@@ -41,6 +64,8 @@ repo2c4-agent \
   --goal "Prepare conservative C1/C2 documentation for local review." \
   --write-destination "docs/generated"
 ```
+
+With `--write-destination "docs/generated"`, the approved C1 and C2 workspaces are written under `docs/generated/c1` and `docs/generated/c2`.
 
 The expected control sequence is:
 
