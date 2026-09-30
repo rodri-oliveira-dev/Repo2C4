@@ -91,7 +91,12 @@ public sealed class Repo2C4AgentFactory : IRepo2C4AgentFactory
             },
         };
 
-        return new ChatClientAgent(chatClient, agentOptions);
+        return new ChatClientAgent(chatClient, agentOptions)
+            .AsBuilder()
+            .UseOpenTelemetry(
+                sourceName: AgentExecutionContext.ActivitySourceName,
+                configure: telemetry => telemetry.EnableSensitiveData = false)
+            .Build();
     }
 }
 
