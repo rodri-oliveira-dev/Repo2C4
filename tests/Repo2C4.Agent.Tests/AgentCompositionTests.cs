@@ -29,7 +29,8 @@ public sealed class AgentCompositionTests
             Repo2C4AgentInstructions.Version,
             chatClient.LastOptions.Instructions,
             StringComparison.Ordinal);
-        Assert.Contains(chatClient.LastOptions.Tools, tool => tool.Name == "marker_tool");
+        Assert.NotNull(chatClient.LastOptions.Tools);
+        Assert.Contains(chatClient.LastOptions.Tools!, tool => tool.Name == "marker_tool");
         Assert.NotNull(chatClient.LastMessages);
         Assert.Contains(
             chatClient.LastMessages,
