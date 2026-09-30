@@ -199,7 +199,8 @@ public sealed class AgentProviderTests
             error,
             cancellation.Token,
             factory,
-            mcpSessionFactory: new TestMcpSessionFactory());
+            mcpSessionFactory: new TestMcpSessionFactory(),
+            workflowRunner: new DirectSessionWorkflowRunner());
 
         Assert.Equal(0, exitCode);
         Assert.Equal(string.Empty, output.ToString());
@@ -218,7 +219,8 @@ public sealed class AgentProviderTests
             error,
             TestContext.Current.CancellationToken,
             factory,
-            mcpSessionFactory: new TestMcpSessionFactory());
+            mcpSessionFactory: new TestMcpSessionFactory(),
+            workflowRunner: new DirectSessionWorkflowRunner());
         return (exitCode, output.ToString(), error.ToString());
     }
 
@@ -233,6 +235,30 @@ public sealed class AgentProviderTests
             throw new InvalidOperationException("MCP session must not be created.");
         }
     }
+
+    private sealed class DirectSessionWorkflowRunner : IArchitectureAnalysisWorkflowRunner
+    {
+        private readonly AgentSessionRunner runner = new();
+
+        public async Task<ArchitectureWorkflowResult> RunAsync(
+            Microsoft.Agents.AI.AIAgent agent,
+            AgentHostOptions options,
+            IAgentMcpSession mcpSession,
+            CancellationToken cancellationToken)
+        {
+            _ = mcpSession;
+            string response = await runner
+                .RunAsync(agent, options.Goal!, cancellationToken)
+                .ConfigureAwait(false);
+
+            return new ArchitectureWorkflowResult(
+                ArchitectureWorkflowStatus.Completed,
+                1,
+                response,
+                []);
+        }
+    }
+
 
     private sealed class DelegatingTestChatClient(
         Func<IEnumerable<ChatMessage>, ChatOptions?, CancellationToken, Task<ChatResponse>> response)
