@@ -1,0 +1,65 @@
+name: Agent Provider Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: OpenAI model ID to exercise with the real provider
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  openai-agent-smoke:
+    name: Optional real-provider agent smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      REPO2C4_AGENT_MODEL: ${{ inputs.model }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validar configuração manual
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY:-}" || {
+            echo "Configure o secret OPENAI_API_KEY antes de executar este smoke manual."
+            exit 1
+          }
+          [[ "$REPO2C4_AGENT_MODEL" =~ ^[A-Za-z0-9._:/-]{1,128}$ ]] || {
+            echo "O model ID informado não atende ao contrato seguro do Agent host."
+            exit 1
+          }
+
+      - name: Restaurar e compilar
+        run: |
+          dotnet restore Repo2C4.slnx --locked-mode
+          dotnet build Repo2C4.slnx --configuration Release --no-restore
+
+      - name: Configurar Node.js para LikeC4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+
+      - name: Instalar LikeC4 CLI pinada
+        run: npm install --global --no-audit --no-fund likec4@1.59.4
+
+      - name: Executar smoke do provider real
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet src/Repo2C4.Agent/bin/Release/net10.0/Repo2C4.Agent.dll             --provider openai             --model "$REPO2C4_AGENT_MODEL"             --allow-external-ai             --repository-root "$GITHUB_WORKSPACE/examples/fixtures/library-only"             --mcp-server-path "$GITHUB_WORKSPACE/src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll"             --goal "Produce a conservative review-only C1/C2 architecture proposal from Repo2C4 MCP evidence."             --timeout-seconds 60             --max-duration-seconds 180
