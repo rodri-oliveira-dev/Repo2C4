@@ -27,6 +27,18 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     }
 
+    public string? RepositoryRoot
+    {
+        get;
+        init;
+    }
+
+    public string? McpServerPath
+    {
+        get;
+        init;
+    }
+
     public static bool TryParse(
         string[] args,
         out AgentHostOptions? options,
@@ -38,6 +50,8 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? model = null;
         string? prompt = null;
         string? endpoint = null;
+        string? repositoryRoot = null;
+        string? mcpServerPath = null;
         int timeoutSeconds = 90;
         bool timeoutSpecified = false;
         bool allowExternalAi = false;
@@ -84,6 +98,38 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     endpoint = endpointValue;
+                    break;
+
+                case "--repository-root":
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            repositoryRoot,
+                            "--repository-root",
+                            out string? repositoryRootValue,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    repositoryRoot = repositoryRootValue;
+                    break;
+
+                case "--mcp-server-path":
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            mcpServerPath,
+                            "--mcp-server-path",
+                            out string? mcpServerPathValue,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    mcpServerPath = mcpServerPathValue;
                     break;
 
                 case "--timeout-seconds":
@@ -183,6 +229,8 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             Endpoint = configuredEndpoint,
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
             AllowExternalAi = allowExternalAi,
+            RepositoryRoot = repositoryRoot?.Trim(),
+            McpServerPath = mcpServerPath?.Trim(),
         };
         error = null;
         return true;

@@ -37,7 +37,8 @@ public static class Program
         CancellationToken cancellationToken,
         IAgentChatClientFactory? chatClientFactory = null,
         IRepo2C4AgentFactory? agentFactory = null,
-        IAgentSessionRunner? sessionRunner = null)
+        IAgentSessionRunner? sessionRunner = null,
+        IAgentMcpSessionFactory? mcpSessionFactory = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(standardOutput);
@@ -61,23 +62,41 @@ public static class Program
         chatClientFactory ??= new ProviderAgentChatClientFactory();
         agentFactory ??= new Repo2C4AgentFactory();
         sessionRunner ??= new AgentSessionRunner();
+        mcpSessionFactory ??= new Repo2C4McpSessionFactory();
 
         try
         {
-            AgentChatClientCreation creation = await chatClientFactory
+            AgentChatClientCreation chatCreation = await chatClientFactory
                 .CreateAsync(configuredOptions, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (creation.ChatClient is null)
+            if (chatCreation.ChatClient is null)
             {
                 standardError.WriteLine(
-                    creation.Diagnostic ??
+                    chatCreation.Diagnostic ??
                     "Repo2C4 Agent configuration error: the configured provider could not be created.");
                 return UsageExitCode;
             }
 
-            using IChatClient chatClient = creation.ChatClient;
-            AIAgent agent = agentFactory.Create(chatClient, configuredOptions);
+            using IChatClient chatClient = chatCreation.ChatClient;
+
+            AgentMcpSessionCreation mcpCreation = await mcpSessionFactory
+                .CreateAsync(configuredOptions, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (mcpCreation.Session is null)
+            {
+                standardError.WriteLine(
+                    mcpCreation.Diagnostic ??
+                    "Repo2C4 Agent MCP configuration error: the local MCP session could not be created.");
+                return UsageExitCode;
+            }
+
+            await using IAgentMcpSession mcpSession = mcpCreation.Session;
+            AIAgent agent = agentFactory.Create(
+                chatClient,
+                configuredOptions,
+                mcpSession.Tools);
 
             if (configuredOptions.Prompt is null)
             {
@@ -100,7 +119,7 @@ public static class Program
             standardError.WriteLine(exception.Message);
             return FailureExitCode;
         }
-#pragma warning disable CA1031 // Process boundary intentionally hides provider/framework exception details and secrets.
+#pragma warning disable CA1031 // Process boundary intentionally hides provider/framework/MCP exception details and secrets.
         catch (Exception)
 #pragma warning restore CA1031
         {
@@ -114,11 +133,15 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> [--prompt <text>] [--timeout-seconds 1-300]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> [--mcp-server-path <absolute-path>] [--prompt <text>] [--timeout-seconds 1-300]");
+        standardError.WriteLine(
+            "The agent starts the local Repo2C4 MCP server over stdio, validates its required tools and exposes generation only through forced dry-run preview.");
+        standardError.WriteLine(
+            "If --mcp-server-path is omitted, the installed repo2c4-mcp command is used. A .dll path is launched with dotnet.");
         standardError.WriteLine(
             "Ollama defaults to http://127.0.0.1:11434/; override only with --endpoint using an HTTP loopback origin.");
         standardError.WriteLine(
-            "OpenAI requires --allow-external-ai and reads OPENAI_API_KEY only from the process environment.");
+            "OpenAI requires --allow-external-ai and reads OPENAI_API_KEY only from the Agent process environment; the MCP child does not inherit it.");
         standardError.WriteLine("Provider and model are mandatory and never inferred or silently defaulted.");
         standardError.WriteLine("Credentials are not accepted by this host command surface.");
     }

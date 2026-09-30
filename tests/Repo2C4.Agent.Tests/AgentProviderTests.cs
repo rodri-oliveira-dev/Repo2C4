@@ -75,7 +75,7 @@ public sealed class AgentProviderTests
     }
 
     [Fact]
-    public async Task OpenAiMissingEnvironmentCredentialFailsBeforeClientCreation()
+    public async Task OpenAiMissingEnvironmentCredentialFailsBeforeMcpSession()
     {
         int creations = 0;
         ProviderAgentChatClientFactory factory = new(
@@ -86,18 +86,24 @@ public sealed class AgentProviderTests
             },
             getEnvironmentVariable: _ => null);
 
-        (int exitCode, string output, string error) = await RunAsync(
+        using StringWriter output = new();
+        using StringWriter error = new();
+        int exitCode = await Program.RunAsync(
             [
                 "--provider", "openai",
                 "--model", "cloud-model",
                 "--allow-external-ai",
             ],
-            factory);
+            output,
+            error,
+            TestContext.Current.CancellationToken,
+            factory,
+            mcpSessionFactory: new ThrowingMcpSessionFactory());
 
         Assert.Equal(2, exitCode);
         Assert.Equal(0, creations);
-        Assert.Equal(string.Empty, output);
-        Assert.Contains("OPENAI_API_KEY", error, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, output.ToString());
+        Assert.Contains("OPENAI_API_KEY", error.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -192,7 +198,8 @@ public sealed class AgentProviderTests
             output,
             error,
             cancellation.Token,
-            factory);
+            factory,
+            mcpSessionFactory: new TestMcpSessionFactory());
 
         Assert.Equal(0, exitCode);
         Assert.Equal(string.Empty, output.ToString());
@@ -210,8 +217,21 @@ public sealed class AgentProviderTests
             output,
             error,
             TestContext.Current.CancellationToken,
-            factory);
+            factory,
+            mcpSessionFactory: new TestMcpSessionFactory());
         return (exitCode, output.ToString(), error.ToString());
+    }
+
+    private sealed class ThrowingMcpSessionFactory : IAgentMcpSessionFactory
+    {
+        public ValueTask<AgentMcpSessionCreation> CreateAsync(
+            AgentHostOptions options,
+            CancellationToken cancellationToken)
+        {
+            _ = options;
+            _ = cancellationToken;
+            throw new InvalidOperationException("MCP session must not be created.");
+        }
     }
 
     private sealed class DelegatingTestChatClient(

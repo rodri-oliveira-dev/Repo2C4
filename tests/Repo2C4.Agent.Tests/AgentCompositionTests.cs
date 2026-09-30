@@ -7,14 +7,15 @@ namespace Repo2C4.Agent.Tests;
 public sealed class AgentCompositionTests
 {
     [Fact]
-    public async Task FrameworkAgentUsesInjectedChatClientVersionedInstructionsAndConfiguredModel()
+    public async Task FrameworkAgentUsesInjectedChatClientVersionedInstructionsModelAndTools()
     {
         AgentHostOptions options = new("fake", "unit-model", "Summarize the supplied evidence.");
         using TestChatClient chatClient = new("session-complete");
+        AIFunction markerTool = AIFunctionFactory.Create(() => "ok", "marker_tool");
         Repo2C4AgentFactory factory = new();
         AgentSessionRunner runner = new();
 
-        AIAgent agent = factory.Create(chatClient, options);
+        AIAgent agent = factory.Create(chatClient, options, [markerTool]);
         string response = await runner.RunAsync(
             agent,
             options.Prompt!,
@@ -28,6 +29,7 @@ public sealed class AgentCompositionTests
             Repo2C4AgentInstructions.Version,
             chatClient.LastOptions.Instructions,
             StringComparison.Ordinal);
+        Assert.Contains(chatClient.LastOptions.Tools, tool => tool.Name == "marker_tool");
         Assert.NotNull(chatClient.LastMessages);
         Assert.Contains(
             chatClient.LastMessages,
@@ -36,7 +38,7 @@ public sealed class AgentCompositionTests
     }
 
     [Fact]
-    public void AgentAssemblyDoesNotReferenceCoreCliOrMcp()
+    public void AgentAssemblyDoesNotReferenceCoreCliOrMcpProjects()
     {
         string?[] references = typeof(Repo2C4AgentFactory)
             .Assembly
