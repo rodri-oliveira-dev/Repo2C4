@@ -1,4 +1,6 @@
+using System.Reflection;
 using Microsoft.Extensions.AI;
+using OllamaSharp;
 using Xunit;
 
 namespace Repo2C4.Agent.Tests;
@@ -139,6 +141,32 @@ public sealed class AgentProviderTests
         Assert.Equal(
             [AgentHostOptions.DefaultOllamaEndpoint, new Uri("http://localhost:11435/")],
             endpoints);
+    }
+
+    [Fact]
+    public async Task OllamaTransportHasNoIndependentHttpTimeout()
+    {
+        ProviderAgentChatClientFactory factory = new();
+        AgentHostOptions options = new("ollama", "local-model", null)
+        {
+            Endpoint = new Uri("http://127.0.0.1:11434/"),
+            Timeout = TimeSpan.FromSeconds(180),
+        };
+
+        AgentChatClientCreation creation = await factory.CreateAsync(
+            options,
+            TestContext.Current.CancellationToken);
+
+        using IChatClient chatClient = Assert.IsAssignableFrom<IChatClient>(creation.ChatClient);
+        OllamaApiClient ollama = Assert.IsType<OllamaApiClient>(
+            chatClient.GetService(typeof(OllamaApiClient)));
+        FieldInfo transportField = typeof(OllamaApiClient).GetField(
+            "_client",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Ollama transport field is unavailable.");
+        HttpClient transport = Assert.IsType<HttpClient>(transportField.GetValue(ollama));
+
+        Assert.Equal(Timeout.InfiniteTimeSpan, transport.Timeout);
     }
 
     [Fact]
