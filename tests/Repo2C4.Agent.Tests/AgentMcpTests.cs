@@ -130,9 +130,7 @@ public sealed class AgentMcpTests
                     ["destinationPath"] = "must-not-exist",
                 },
                 cancellationToken);
-            CallToolResult previewResult = Assert.IsType<CallToolResult>(previewObject);
-            Assert.False(previewResult.IsError is true);
-            JsonElement previewContent = previewResult.StructuredContent!.Value;
+            JsonElement previewContent = Assert.IsType<JsonElement>(previewObject);
             Assert.True(previewContent.GetProperty("dryRun").GetBoolean());
             Assert.False(previewContent.GetProperty("written").GetBoolean());
             Assert.False(Directory.Exists(Path.Combine(fixture.Path, "must-not-exist")));
