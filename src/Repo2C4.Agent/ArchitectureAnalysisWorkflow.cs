@@ -191,6 +191,15 @@ public sealed class ArchitectureAnalysisWorkflow
 
             await using (run.ConfigureAwait(false))
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return new ArchitectureWorkflowResult(
+                        ArchitectureWorkflowStatus.Cancelled,
+                        0,
+                        string.Empty,
+                        ["Workflow execution was cancelled."]);
+                }
+
                 ArchitectureWorkflowResult? result = run.NewEvents
                     .OfType<WorkflowOutputEvent>()
                     .Select(output => output.Data)
