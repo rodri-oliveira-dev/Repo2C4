@@ -213,7 +213,6 @@ public sealed class ArchitectureAnalysisWorkflowRunner(
         execution.Complete(ToStatusText(enriched.Status), terminalReason);
         return enriched;
     }
-}
 
     private static string ResolveTerminalReason(ArchitectureWorkflowStatus status) =>
         status switch
