@@ -124,6 +124,22 @@ public sealed class ArchitectureAnalysisWorkflowTests
     }
 
     [Fact]
+    public async Task ExecutorBudgetFailurePreservesTerminalReason()
+    {
+        ArchitectureAnalysisWorkflow subject = new(
+            new BudgetFailingOperations(),
+            maxValidationAttempts: 2);
+
+        ArchitectureWorkflowResult result = await subject.RunAsync(
+            ArchitectureWorkflowState.Initial(),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ArchitectureWorkflowStatus.Failed, result.Status);
+        Assert.Equal("workflow_iterations_exceeded", result.TerminalReason);
+        Assert.Contains("iteration", result.Diagnostics.Single(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CancellationReturnsControlledResultAndStopsWorkflow()
     {
         using CancellationTokenSource cancellation = new();
@@ -220,6 +236,41 @@ public sealed class ArchitectureAnalysisWorkflowTests
     {
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
+    }
+
+    private sealed class BudgetFailingOperations : IArchitectureWorkflowOperations
+    {
+        public ValueTask<ArchitectureWorkflowState> AnalyzeAsync(
+            ArchitectureWorkflowState state,
+            CancellationToken cancellationToken)
+        {
+            _ = state;
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new AgentBudgetExceededException(
+                "workflow_iterations_exceeded",
+                "Workflow-iteration budget exceeded.");
+        }
+
+        public ValueTask<ArchitectureWorkflowState> GetEvidenceReportAsync(
+            ArchitectureWorkflowState state,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException();
+
+        public ValueTask<ArchitectureWorkflowState> PreviewAsync(
+            ArchitectureWorkflowState state,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException();
+
+        public ValueTask<ArchitectureWorkflowState> ValidateAsync(
+            ArchitectureWorkflowState state,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException();
+
+        public ValueTask<ArchitectureWorkflowState> CorrectAsync(
+            ArchitectureWorkflowState state,
+            int attempt,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException();
     }
 
     private sealed class FakeOperations(params bool[] validationResults)
