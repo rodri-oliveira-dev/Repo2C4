@@ -45,6 +45,16 @@ public interface IAgentMcpSession : IAsyncDisposable
 /// <summary>Versioned capability requirements for the Repo2C4 MCP used by the agent.</summary>
 public static class Repo2C4McpCapabilities
 {
+    private static readonly string[] RequiredNames =
+    [
+        "inspect_repository",
+        "get_evidence",
+        "get_snapshot",
+        "get_evidence_report",
+        "generate_likec4",
+        "validate_likec4",
+    ];
+
     private static readonly IReadOnlyDictionary<string, string[]> RequiredSchemas =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
@@ -56,7 +66,7 @@ public static class Repo2C4McpCapabilities
             ["validate_likec4"] = ["snapshotId", "model"],
         };
 
-    public static IReadOnlyCollection<string> RequiredToolNames => RequiredSchemas.Keys;
+    public static IReadOnlyCollection<string> RequiredToolNames => RequiredNames;
 
     public static bool TryValidate(
         IEnumerable<AITool> tools,
@@ -175,8 +185,10 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             }
 
             IReadOnlyList<AITool> safeTools = CreateSafeAgentTools(discovered);
-            return AgentMcpSessionCreation.Success(
-                new Repo2C4McpSession(client, safeTools));
+#pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
+            IAgentMcpSession session = new Repo2C4McpSession(client, safeTools);
+#pragma warning restore CA2000
+            return AgentMcpSessionCreation.Success(session);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

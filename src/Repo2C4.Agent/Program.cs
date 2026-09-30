@@ -92,23 +92,26 @@ public static class Program
                 return UsageExitCode;
             }
 
-            await using IAgentMcpSession mcpSession = mcpCreation.Session;
-            AIAgent agent = agentFactory.Create(
-                chatClient,
-                configuredOptions,
-                mcpSession.Tools);
-
-            if (configuredOptions.Prompt is null)
+            IAgentMcpSession mcpSession = mcpCreation.Session;
+            await using (mcpSession.ConfigureAwait(false))
             {
+                AIAgent agent = agentFactory.Create(
+                    chatClient,
+                    configuredOptions,
+                    mcpSession.Tools);
+
+                if (configuredOptions.Prompt is null)
+                {
+                    return SuccessExitCode;
+                }
+
+                string response = await sessionRunner
+                    .RunAsync(agent, configuredOptions.Prompt, cancellationToken)
+                    .ConfigureAwait(false);
+
+                standardOutput.WriteLine(response);
                 return SuccessExitCode;
             }
-
-            string response = await sessionRunner
-                .RunAsync(agent, configuredOptions.Prompt, cancellationToken)
-                .ConfigureAwait(false);
-
-            standardOutput.WriteLine(response);
-            return SuccessExitCode;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
