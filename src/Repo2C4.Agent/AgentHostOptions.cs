@@ -580,9 +580,10 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         out int value,
         out string? error)
     {
+        value = default;
+
         if (specified)
         {
-            value = default;
             error = "Repo2C4 Agent configuration error: " + option + " may be specified only once.";
             return false;
         }
