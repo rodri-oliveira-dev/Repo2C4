@@ -97,7 +97,7 @@ public sealed record ArchitectureWorkflowResult(
             ArchitectureWorkflowStatus.Completed => "completed",
             ArchitectureWorkflowStatus.RequiresReview => "requires_review",
             ArchitectureWorkflowStatus.ValidationFailed => "validation_failed",
-            ArchitectureWorkflowStatus.InsufficientEvidence => "insufficient_evidence",
+            ArchitectureWorkflowStatus.InsufficientEvidence => "failed",
             ArchitectureWorkflowStatus.Cancelled => "cancelled",
             _ => "failed",
         };
