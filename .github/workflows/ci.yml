@@ -247,9 +247,13 @@ jobs:
         run: dotnet build Repo2C4.slnx --configuration Release --no-restore
 
       - name: Executar testes com MTP
+        env:
+          OPENAI_API_KEY: ''
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
       - name: Coletar cobertura com Coverlet MTP
+        env:
+          OPENAI_API_KEY: ''
         run: dotnet test Repo2C4.slnx --configuration Release --no-build --coverlet --coverlet-output-format cobertura
 
       - name: Preparar artefato de cobertura
@@ -325,6 +329,7 @@ jobs:
 
       - name: Validar integração real com LikeC4
         env:
+          OPENAI_API_KEY: ''
           REPO2C4_LIKEC4_INTEGRATION: '1'
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
