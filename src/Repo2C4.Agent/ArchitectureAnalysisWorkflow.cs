@@ -199,6 +199,17 @@ public sealed class ArchitectureAnalysisWorkflowRunner(
             .RunAsync(ArchitectureWorkflowState.Initial(), cancellationToken)
             .ConfigureAwait(false);
 
+        if (result.Status == ArchitectureWorkflowStatus.Cancelled
+            && execution.IsDeadlineExceeded)
+        {
+            result = result with
+            {
+                Status = ArchitectureWorkflowStatus.Failed,
+                TerminalReason = "total_duration_exceeded",
+                Diagnostics = ["Total execution-duration budget exceeded."],
+            };
+        }
+
         string terminalReason = string.IsNullOrWhiteSpace(result.TerminalReason)
             ? ResolveTerminalReason(result.Status)
             : result.TerminalReason;
