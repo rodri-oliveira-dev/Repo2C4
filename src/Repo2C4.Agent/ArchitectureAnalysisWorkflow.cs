@@ -887,12 +887,9 @@ internal sealed class AgentArchitectureWorkflowOperations(
 
         try
         {
-            AgentExecutionContext execution = mcpSession.InvocationState.Execution;
-
             string summary = await sessionRunner
                 .RunAsync(agent, prompt, cancellationToken)
                 .ConfigureAwait(false);
-            execution.ObserveResponse(summary);
 
             IReadOnlyList<AgentArchitectureProposal> proposals =
                 mcpSession.InvocationState.SnapshotProposals();
