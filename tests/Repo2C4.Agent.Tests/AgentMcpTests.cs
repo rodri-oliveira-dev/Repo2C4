@@ -149,7 +149,10 @@ public sealed class AgentMcpTests
                 EvidenceFirstAnalysisPrompt.Build(options),
                 cancellationToken);
 
-            Assert.Equal("analysis-complete", response);
+            Assert.Contains("Confirmed facts", response, StringComparison.Ordinal);
+            Assert.Contains("Requires review", response, StringComparison.Ordinal);
+            Assert.Contains("Diagnostics/blockers", response, StringComparison.Ordinal);
+            Assert.Contains("Proposal", response, StringComparison.Ordinal);
             Assert.True(chatClient.SawMcpTool);
             Assert.True(chatClient.SawFunctionResult);
             Assert.True(chatClient.SawPreviewResult);
