@@ -47,15 +47,19 @@ NuGet ownership verification depends on the package README containing this exact
 
 The marker is packaged from `src/Repo2C4.Mcp/README.md`. The distribution smoke verifies the registry name, package/version binding, required root argument and ownership marker before a release can proceed.
 
-The Official MCP Registry stores metadata rather than the NuGet artifact, so publish the NuGet package **first**. After the exact version is publicly available on NuGet.org, install the official `mcp-publisher` and run from the repository root:
+The Official MCP Registry stores metadata rather than the NuGet artifact, so the matching NuGet package must be public first. The protected release workflow enforces that ordering: it publishes GitHub Release/NuGet, verifies that the public `Repo2C4.Mcp` package can be installed, and only then runs the registry publication job.
+
+Registry authentication uses the Official MCP Registry's GitHub Actions OIDC flow. The registry job receives only `contents: read` and `id-token: write`; it does not require a PAT or long-lived MCP Registry secret. The job downloads a pinned `mcp-publisher` release, verifies its SHA-256, validates `server.json`, checks whether that exact server/version already exists, publishes only when absent, and verifies that the version becomes readable through the registry API.
+
+For local validation or recovery, maintainers may still run:
 
 ```bash
-mcp-publisher validate
+mcp-publisher validate server.json
 mcp-publisher login github
-mcp-publisher publish
+mcp-publisher publish server.json
 ```
 
-GitHub authentication grants the personal `io.github.rodri-oliveira-dev/*` namespace. Registry publication remains a separate maintainer action while the Official MCP Registry is in preview; the normal Repo2C4 release workflow does not introduce an additional long-lived registry credential.
+A duplicate immutable version must not be republished. If the registry job fails after NuGet/GitHub publication, rerun the failed registry job from the same released commit; do not rebuild or change `server.json` for that version.
 
 When preparing a later Repo2C4 release, update `Directory.Build.props` and both version fields in `server.json` to the same exact SemVer before running distribution/release verification.
 
@@ -124,7 +128,7 @@ MCP uses protocol messages on stdout and diagnostics on stderr; do not pipe bann
 
 ## Versioned release: verification first, publication separately authorized
 
-[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the three tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact four release assets, creates/publishes the versioned GitHub Release and pushes only `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent` to NuGet.org using the environment-provided `NUGET_API_KEY`. A final read-only job then installs that exact version from NuGet.org as an external consumer and executes all three public commands. Failed publication or propagation is reported without printing the API key. NuGet publication is not transactional across the three package IDs: if a later push fails after an earlier package is accepted, rerun only from the same protected `main` commit and the exact validated payload. The workflow's hash verification treats an already-published package with the same SHA-256 as satisfied and rejects a same-version package with different bytes; never rebuild or replace one package of a partially published version.
+[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the three tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact four release assets, creates/publishes the versioned GitHub Release and pushes only `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent` to NuGet.org using the environment-provided `NUGET_API_KEY`. A final read-only consumer job installs that exact version from NuGet.org and executes all three public commands. After that succeeds, a separate OIDC-scoped job publishes the matching `Repo2C4.Mcp` metadata to the Official MCP Registry and verifies the exact version through the registry API. Failed publication or propagation is reported without printing the API key. NuGet publication is not transactional across the three package IDs: if a later push fails after an earlier package is accepted, rerun only from the same protected `main` commit and the exact validated payload. The workflow's hash verification treats an already-published package with the same SHA-256 as satisfied and rejects a same-version package with different bytes; never rebuild or replace one package of a partially published version.
 
 The regular [CI](../.github/workflows/ci.yml) performs the same pack/clean-install smoke on push and PR without any AI key or release write permission. [CodeQL](../.github/workflows/codeql.yml), [Dependency Review](../.github/workflows/dependency-review.yml) and security/audit checks must remain green before the Phase 5 PR is merged. The dedicated [documentation PR workflow](architecture-pr.md) is a separate manual process, not release publication.
 
