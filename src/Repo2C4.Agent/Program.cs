@@ -162,9 +162,15 @@ public static class Program
                 standardOutput.WriteLine();
                 standardOutput.WriteLine(writeResult.ToDisplayText());
 
+                bool deadlineExceededDuringWrite =
+                    writeResult.Status == WriteApprovalStatus.Cancelled
+                    && execution?.IsDeadlineExceeded is true
+                    && !cancellationToken.IsCancellationRequested;
+
                 return writeResult.Status is WriteApprovalStatus.Failed
                     or WriteApprovalStatus.StalePreview
                     or WriteApprovalStatus.Conflict
+                    || deadlineExceededDuringWrite
                         ? FailureExitCode
                         : SuccessExitCode;
             }
