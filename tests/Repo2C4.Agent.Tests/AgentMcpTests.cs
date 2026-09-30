@@ -99,13 +99,12 @@ public sealed class AgentMcpTests
                 ],
                 toolNames);
 
-            McpClientTool inspect = Assert.IsType<McpClientTool>(
+            AIFunction inspect = Assert.IsAssignableFrom<AIFunction>(
                 session.Tools.Single(tool => tool.Name == "inspect_repository"));
-            CallToolResult inspectResult = await inspect.CallAsync(
-                new Dictionary<string, object?> { ["repositoryPath"] = "." },
-                cancellationToken: cancellationToken);
-            Assert.False(inspectResult.IsError is true);
-            JsonElement inspectContent = inspectResult.StructuredContent!.Value;
+            JsonElement inspectContent = await InvokeStructuredAsync(
+                inspect,
+                new AIFunctionArguments { ["repositoryPath"] = "." },
+                cancellationToken);
             string snapshotId = inspectContent.GetProperty("snapshotId").GetString()!;
 
             using JsonDocument modelDocument = JsonDocument.Parse(
@@ -197,12 +196,13 @@ public sealed class AgentMcpTests
         IAgentMcpSession session = creation.Session;
         try
         {
-            McpClientTool inspect = Assert.IsType<McpClientTool>(
+            AIFunction inspect = Assert.IsAssignableFrom<AIFunction>(
                 session.Tools.Single(tool => tool.Name == "inspect_repository"));
-            CallToolResult inspectResult = await inspect.CallAsync(
-                new Dictionary<string, object?> { ["repositoryPath"] = "." },
-                cancellationToken: cancellationToken);
-            string snapshotId = inspectResult.StructuredContent!.Value
+            JsonElement inspectContent = await InvokeStructuredAsync(
+                inspect,
+                new AIFunctionArguments { ["repositoryPath"] = "." },
+                cancellationToken);
+            string snapshotId = inspectContent
                 .GetProperty("snapshotId")
                 .GetString()!;
 
@@ -270,6 +270,18 @@ public sealed class AgentMcpTests
         }
 
         await session.Completion.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
+    private static async Task<JsonElement> InvokeStructuredAsync(
+        AIFunction function,
+        AIFunctionArguments arguments,
+        CancellationToken cancellationToken)
+    {
+        object? result = await function.InvokeAsync(arguments, cancellationToken);
+        JsonElement envelope = Assert.IsType<JsonElement>(result);
+        return envelope.TryGetProperty("structuredContent", out JsonElement structuredContent)
+            ? structuredContent
+            : envelope;
     }
 
     private static string FindRepositoryRoot()
