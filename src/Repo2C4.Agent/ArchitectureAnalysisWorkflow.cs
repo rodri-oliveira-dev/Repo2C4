@@ -22,6 +22,24 @@ public sealed record ArchitectureWorkflowResult(
     string Summary,
     IReadOnlyList<string> Diagnostics)
 {
+    public string RunId
+    {
+        get;
+        init;
+    } = string.Empty;
+
+    public AgentExecutionCounters Counters
+    {
+        get;
+        init;
+    } = new(0, 0, 0, 0, 0);
+
+    public string TerminalReason
+    {
+        get;
+        init;
+    } = string.Empty;
+
     public string ToDisplayText()
     {
         StringBuilder builder = new();
@@ -29,6 +47,29 @@ public sealed record ArchitectureWorkflowResult(
         builder.AppendLine(ToStatusText(Status));
         builder.Append("Validation attempts: ");
         builder.AppendLine(ValidationAttempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        if (!string.IsNullOrWhiteSpace(RunId))
+        {
+            builder.Append("Run ID: ");
+            builder.AppendLine(RunId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(TerminalReason))
+        {
+            builder.Append("Terminal reason: ");
+            builder.AppendLine(TerminalReason);
+        }
+
+        builder.Append("Tool calls: ");
+        builder.AppendLine(Counters.ToolCalls.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.Append("Workflow iterations: ");
+        builder.AppendLine(Counters.WorkflowIterations.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.Append("Evidence pages: ");
+        builder.AppendLine(Counters.EvidencePages.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.Append("Response characters: ");
+        builder.AppendLine(Counters.ResponseCharacters.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.Append("Context characters: ");
+        builder.AppendLine(Counters.ContextCharacters.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         if (!string.IsNullOrWhiteSpace(Summary))
         {
@@ -141,20 +182,58 @@ public sealed class ArchitectureAnalysisWorkflowRunner(
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(mcpSession);
 
-        AgentArchitectureWorkflowOperations operations = new(
+        AgentExecutionContext execution = mcpSession.InvocationState.Execution;
+        AgentArchitectureWorkflowOperations coreOperations = new(
             agent,
             options,
             mcpSession,
             sessionRunner);
+        IArchitectureWorkflowOperations operations =
+            new GovernedArchitectureWorkflowOperations(coreOperations, execution);
 
         ArchitectureAnalysisWorkflow workflow = new(
             operations,
             options.MaxValidationAttempts);
 
-        return await workflow
+        ArchitectureWorkflowResult result = await workflow
             .RunAsync(ArchitectureWorkflowState.Initial(), cancellationToken)
             .ConfigureAwait(false);
+
+        string terminalReason = string.IsNullOrWhiteSpace(result.TerminalReason)
+            ? ResolveTerminalReason(result.Status)
+            : result.TerminalReason;
+
+        ArchitectureWorkflowResult enriched = result with
+        {
+            RunId = execution.RunId,
+            Counters = execution.SnapshotCounters(),
+            TerminalReason = terminalReason,
+        };
+
+        execution.Complete(ToStatusText(enriched.Status), terminalReason);
+        return enriched;
     }
+}
+
+    private static string ResolveTerminalReason(ArchitectureWorkflowStatus status) =>
+        status switch
+        {
+            ArchitectureWorkflowStatus.Completed => "workflow_completed",
+            ArchitectureWorkflowStatus.RequiresReview => "human_review_required",
+            ArchitectureWorkflowStatus.ValidationFailed => "validation_failed",
+            ArchitectureWorkflowStatus.Cancelled => "cancelled",
+            _ => "workflow_failed",
+        };
+
+    private static string ToStatusText(ArchitectureWorkflowStatus status) =>
+        status switch
+        {
+            ArchitectureWorkflowStatus.Completed => "completed",
+            ArchitectureWorkflowStatus.RequiresReview => "requires_review",
+            ArchitectureWorkflowStatus.ValidationFailed => "validation_failed",
+            ArchitectureWorkflowStatus.Cancelled => "cancelled",
+            _ => "failed",
+        };
 }
 
 public sealed class ArchitectureAnalysisWorkflow
@@ -217,6 +296,17 @@ public sealed class ArchitectureAnalysisWorkflow
         {
             return CancelledResult();
         }
+        catch (AgentBudgetExceededException exception)
+        {
+            return new ArchitectureWorkflowResult(
+                ArchitectureWorkflowStatus.Failed,
+                0,
+                string.Empty,
+                [exception.Message])
+            {
+                TerminalReason = exception.Code,
+            };
+        }
 #pragma warning disable CA1031 // Workflow runtime may wrap cancellation; token state is authoritative at this boundary.
         catch (Exception) when (cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
@@ -240,7 +330,10 @@ public sealed class ArchitectureAnalysisWorkflow
             ArchitectureWorkflowStatus.Cancelled,
             0,
             string.Empty,
-            ["Workflow execution was cancelled."]);
+            ["Workflow execution was cancelled."])
+        {
+            TerminalReason = "cancelled",
+        };
 
     public static Workflow Build(
         IArchitectureWorkflowOperations operations,
@@ -403,7 +496,9 @@ public sealed class ArchitectureAnalysisWorkflow
         {
             if (state.TerminalStatus is not null)
             {
-                return state.TerminalStatus.Value;
+                return state.TerminalStatus == ArchitectureWorkflowStatus.InsufficientEvidence
+                    ? ArchitectureWorkflowStatus.Failed
+                    : state.TerminalStatus.Value;
             }
 
             if (state.ValidationSucceeded is false)
@@ -518,6 +613,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
         {
             throw;
         }
+        catch (AgentBudgetExceededException)
+        {
+            throw;
+        }
 #pragma warning disable CA1031 // MCP details are intentionally hidden behind a controlled workflow diagnostic.
         catch (Exception)
 #pragma warning restore CA1031
@@ -574,6 +673,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (AgentBudgetExceededException)
         {
             throw;
         }
@@ -649,6 +752,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
         {
             throw;
         }
+        catch (AgentBudgetExceededException)
+        {
+            throw;
+        }
 #pragma warning disable CA1031 // MCP details are intentionally hidden behind a controlled workflow diagnostic.
         catch (Exception)
 #pragma warning restore CA1031
@@ -691,9 +798,13 @@ internal sealed class AgentArchitectureWorkflowOperations(
 
         try
         {
+            AgentExecutionContext execution = mcpSession.InvocationState.Execution;
+            execution.ObserveContext(prompt);
+
             string summary = await sessionRunner
                 .RunAsync(agent, prompt, cancellationToken)
                 .ConfigureAwait(false);
+            execution.ObserveResponse(summary);
 
             IReadOnlyList<AgentArchitectureProposal> proposals =
                 mcpSession.InvocationState.SnapshotProposals();
@@ -722,6 +833,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (AgentBudgetExceededException)
         {
             throw;
         }
