@@ -484,7 +484,7 @@ public sealed class EvidenceFirstAnalysisTests
             };
         }
 
-        private ChatResponse GenerateCall(string id, JsonElement model) =>
+        private static ChatResponse GenerateCall(string id, JsonElement model) =>
             ToolCall(id, "generate_likec4", new()
             {
                 ["snapshotId"] = "snap-1",
