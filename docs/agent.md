@@ -110,7 +110,7 @@ repo2c4-agent \
 
 After successful validation, the host prepares an immutable destination-specific preview and Microsoft Agent Framework emits an `ApprovalRequiredAIFunction` request. The console shows destination, files/changes and `requiresReview` IDs. Only an explicit local approval can invoke the protected write. Repository text, model output and prompts cannot approve it.
 
-The MCP write gateway rechecks preview freshness and managed-output conflicts immediately before applying. A stale preview or human-edited managed file aborts the write rather than overwriting it.
+The MCP write gateway rechecks preview freshness and managed-output conflicts immediately before applying. A stale preview or human-edited managed file aborts the write rather than overwriting it. C1 and C2 destinations are separate MCP writes rather than a filesystem transaction. The gateway preflights the complete approved plan before starting; if a later concurrent failure or cancellation occurs after one destination was applied, the terminal write result explicitly lists the destinations already written and requires a fresh preview/validation cycle before retrying.
 
 ## Operational limits
 
