@@ -36,8 +36,10 @@ public sealed class AgentProviderTests
 
         Assert.Equal(0, ollamaExit);
         Assert.Equal(0, openAiExit);
-        Assert.Equal("ollama-response" + Environment.NewLine, ollamaOutput);
-        Assert.Equal("openai-response" + Environment.NewLine, openAiOutput);
+        Assert.Contains("Status: completed", ollamaOutput, StringComparison.Ordinal);
+        Assert.Contains("ollama-response", ollamaOutput, StringComparison.Ordinal);
+        Assert.Contains("Status: completed", openAiOutput, StringComparison.Ordinal);
+        Assert.Contains("openai-response", openAiOutput, StringComparison.Ordinal);
         Assert.Equal(string.Empty, ollamaError);
         Assert.Equal(string.Empty, openAiError);
         Assert.Contains(("ollama", "local-model"), created);
@@ -69,7 +71,8 @@ public sealed class AgentProviderTests
 
         Assert.Equal(0, exitCode);
         Assert.Equal(secret, receivedSecret);
-        Assert.Equal("ok" + Environment.NewLine, output);
+        Assert.Contains("Status: completed", output, StringComparison.Ordinal);
+        Assert.Contains("ok", output, StringComparison.Ordinal);
         Assert.DoesNotContain(secret, output, StringComparison.Ordinal);
         Assert.DoesNotContain(secret, error, StringComparison.Ordinal);
     }
