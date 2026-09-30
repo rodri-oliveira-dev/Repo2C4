@@ -40,8 +40,11 @@ public sealed class AgentProviderTests
         Assert.Contains("ollama-response", ollamaOutput, StringComparison.Ordinal);
         Assert.Contains("Status: completed", openAiOutput, StringComparison.Ordinal);
         Assert.Contains("openai-response", openAiOutput, StringComparison.Ordinal);
-        Assert.Equal(string.Empty, ollamaError);
-        Assert.Equal(string.Empty, openAiError);
+        Assert.Contains("\"runId\"", ollamaError, StringComparison.Ordinal);
+        Assert.Contains("\"runId\"", openAiError, StringComparison.Ordinal);
+        Assert.DoesNotContain("hello", ollamaError, StringComparison.Ordinal);
+        Assert.DoesNotContain("hello", openAiError, StringComparison.Ordinal);
+        Assert.DoesNotContain("environment-secret", openAiError, StringComparison.Ordinal);
         Assert.Contains(("ollama", "local-model"), created);
         Assert.Contains(("openai", "cloud-model"), created);
     }
