@@ -24,6 +24,39 @@ if [[ "$resolved" != "$version" ]]; then
   exit 2
 fi
 
+python3 - "$version" <<'PY'
+import json
+import pathlib
+import sys
+
+version = sys.argv[1]
+metadata = json.loads(pathlib.Path("server.json").read_text(encoding="utf-8"))
+
+assert metadata["name"] == "io.github.rodri-oliveira-dev/repo2c4-mcp"
+assert metadata["version"] == version
+packages = metadata["packages"]
+assert len(packages) == 1
+package = packages[0]
+assert package["registryType"] == "nuget"
+assert package["registryBaseUrl"] == "https://api.nuget.org/v3/index.json"
+assert package["identifier"] == "Repo2C4.Mcp"
+assert package["version"] == version
+assert package["runtimeHint"] == "dnx"
+assert package["transport"]["type"] == "stdio"
+
+arguments = package.get("packageArguments", [])
+repository_root = next(
+    (item for item in arguments if item.get("type") == "named" and item.get("name") == "--repository-root"),
+    None,
+)
+assert repository_root is not None
+assert repository_root.get("format") == "filepath"
+assert repository_root.get("isRequired") is True
+
+mcp_readme = pathlib.Path("src/Repo2C4.Mcp/README.md").read_text(encoding="utf-8")
+assert "<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->" in mcp_readme
+PY
+
 dotnet pack src/Repo2C4.Cli/Repo2C4.Cli.csproj --configuration Release --no-build --no-restore --output "$packages_dir"
 dotnet pack src/Repo2C4.Mcp/Repo2C4.Mcp.csproj --configuration Release --no-build --no-restore --output "$packages_dir"
 dotnet pack src/Repo2C4.Agent/Repo2C4.Agent.csproj --configuration Release --no-build --no-restore --output "$packages_dir"
@@ -36,7 +69,14 @@ for product in Repo2C4.Cli Repo2C4.Mcp Repo2C4.Agent; do
   grep -Fq "<id>$product</id>" <<<"$nuspec"
   grep -Fq "<version>$version</version>" <<<"$nuspec"
   grep -Fq "<readme>README.md</readme>" <<<"$nuspec"
-  unzip -p "$archive" README.md | grep -Fq "# Repo2C4"
+  package_readme="$(unzip -p "$archive" README.md)"
+  grep -Fq "# Repo2C4" <<<"$package_readme"
+  if [[ "$product" == "Repo2C4.Mcp" ]]; then
+    grep -Fq "<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->" <<<"$package_readme"
+    grep -Fq "# Repo2C4 MCP" <<<"$package_readme"
+  elif [[ "$product" == "Repo2C4.Agent" ]]; then
+    grep -Fq "# Repo2C4 Agent" <<<"$package_readme"
+  fi
   if grep -Eq '<id>(Template|DotNetLibraryTemplate)([.<]|$)' <<<"$nuspec"; then
     echo "Placeholder package identity detected." >&2
     exit 1
