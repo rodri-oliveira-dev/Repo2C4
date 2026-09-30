@@ -9,7 +9,7 @@ on:
         required: true
         default: '1.0.0'
       publish_release:
-        description: 'Explicitly publish the GitHub Release and both .NET tools to NuGet.org'
+        description: 'Explicitly publish the GitHub Release and all three .NET tools to NuGet.org'
         type: boolean
         required: true
         default: false
@@ -79,8 +79,10 @@ jobs:
           declared="$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)"
           test "$declared" = "$VERSION"
           test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)" = "$VERSION"
+          test "$(dotnet msbuild src/Repo2C4.Agent/Repo2C4.Agent.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)" = "$VERSION"
           test "$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Cli
           test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Mcp
+          test "$(dotnet msbuild src/Repo2C4.Agent/Repo2C4.Agent.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Agent
           test "$(dotnet msbuild src/Repo2C4.Core/Repo2C4.Core.csproj -nologo -getProperty:IsPackable | tr -d '\r' | tail -n 1)" = false
 
       - name: Restore, format, build and test
@@ -114,9 +116,9 @@ jobs:
           set -euo pipefail
           bash scripts/verify-distribution.sh artifacts/distribution "$VERSION"
           cd artifacts/distribution
-          sha256sum Repo2C4.Cli."$VERSION".nupkg Repo2C4.Mcp."$VERSION".nupkg > SHA256SUMS
+          sha256sum Repo2C4.Cli."$VERSION".nupkg Repo2C4.Mcp."$VERSION".nupkg Repo2C4.Agent."$VERSION".nupkg > SHA256SUMS
           sha256sum --check SHA256SUMS
-          echo "Both versioned tools are installable and runnable from a clean local feed; no publication in the dry-run job."
+          echo "All three versioned tools are installable and runnable from a clean local feed; no publication in the dry-run job."
 
       - name: Retain validated release payload only after explicit opt-in
         if: ${{ steps.inputs.outputs.publishing == 'true' }}
@@ -148,9 +150,10 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
             --name repo2c4-release-payload --dir "$RUNNER_TEMP/payload"
           cd "$RUNNER_TEMP/payload"
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 3
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 4
           test -s "Repo2C4.Cli.$VERSION.nupkg"
           test -s "Repo2C4.Mcp.$VERSION.nupkg"
+          test -s "Repo2C4.Agent.$VERSION.nupkg"
           sha256sum --check SHA256SUMS
 
       - name: Verify main has not moved and create release at validated SHA
@@ -170,6 +173,7 @@ jobs:
           expected_assets=(
             "Repo2C4.Cli.$VERSION.nupkg"
             "Repo2C4.Mcp.$VERSION.nupkg"
+            "Repo2C4.Agent.$VERSION.nupkg"
             "SHA256SUMS"
           )
 
@@ -206,8 +210,10 @@ jobs:
               '~~~bash' \
               "dotnet tool install --global Repo2C4.Cli --version $VERSION" \
               "dotnet tool install --global Repo2C4.Mcp --version $VERSION" \
+              "dotnet tool install --global Repo2C4.Agent --version $VERSION" \
               "repo2c4 --help" \
               "repo2c4-mcp --help" \
+              "repo2c4-agent --help" \
               '~~~' \
               "" \
               "The attached .nupkg files are the exact validated payload published to NuGet.org." \
@@ -245,7 +251,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$VERSION"
-          expected="$(printf '%s\n' "Repo2C4.Cli.$VERSION.nupkg" "Repo2C4.Mcp.$VERSION.nupkg" "SHA256SUMS" | sort)"
+          expected="$(printf '%s\n' "Repo2C4.Cli.$VERSION.nupkg" "Repo2C4.Mcp.$VERSION.nupkg" "Repo2C4.Agent.$VERSION.nupkg" "SHA256SUMS" | sort)"
           if [ -z "${NUGET_API_KEY:-}" ]; then
             echo "::error::The protected release environment must provide NUGET_API_KEY."
             exit 1
@@ -280,6 +286,7 @@ jobs:
 
           push_verified Repo2C4.Cli "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg"
           push_verified Repo2C4.Mcp "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg"
+          push_verified Repo2C4.Agent "$RUNNER_TEMP/payload/Repo2C4.Agent.$VERSION.nupkg"
 
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
           final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
@@ -335,6 +342,7 @@ jobs:
 
           install_with_retry Repo2C4.Cli "$work/cli"
           install_with_retry Repo2C4.Mcp "$work/mcp"
+          install_with_retry Repo2C4.Agent "$work/agent"
 
           "$work/cli/repo2c4" --help | grep -Fq 'Repo2C4 CLI'
           if ! "$work/mcp/repo2c4-mcp" --help >"$work/mcp.stdout" 2>"$work/mcp.stderr"; then
@@ -343,5 +351,8 @@ jobs:
           fi
           test ! -s "$work/mcp.stdout"
           grep -Fq 'stdout is reserved exclusively for MCP protocol messages' "$work/mcp.stderr"
+          "$work/agent/repo2c4-agent" --help >"$work/agent.stdout" 2>"$work/agent.stderr"
+          test ! -s "$work/agent.stdout"
+          grep -Fq 'Repo2C4 Agent host' "$work/agent.stderr"
 
-          echo "Published Repo2C4 CLI and MCP $VERSION installed and executed successfully from NuGet.org."
+          echo "Published Repo2C4 CLI, MCP and Agent $VERSION installed and executed successfully from NuGet.org."
