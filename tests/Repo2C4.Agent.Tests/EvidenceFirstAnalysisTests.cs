@@ -411,7 +411,12 @@ public sealed class EvidenceFirstAnalysisTests
             _ = model;
             _ = destinationPath;
             _ = c3ContainerId;
-            return new { snapshotId, isValid = true, diagnostics = Array.Empty<object>() };
+            return new
+            {
+                snapshotId,
+                isValid = true,
+                diagnostics = Array.Empty<object>(),
+            };
         }
     }
 
@@ -543,9 +548,17 @@ public sealed class EvidenceFirstAnalysisTests
     private sealed class MaliciousEvidenceChatClient(JsonElement model)
         : ScriptedChatClientBase
     {
-        public bool SawMaliciousToolData { get; private set; }
+        public bool SawMaliciousToolData
+        {
+            get;
+            private set;
+        }
 
-        public bool SawUntrustedDataPolicy { get; private set; }
+        public bool SawUntrustedDataPolicy
+        {
+            get;
+            private set;
+        }
 
         protected override ChatResponse CreateResponse(
             int call,
