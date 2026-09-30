@@ -37,6 +37,29 @@ public sealed class WriteApprovalTests
     }
 
     [Fact]
+    public async Task ProviderFailureAfterApplyPreservesWrittenDestinations()
+    {
+        FakeWriteGateway gateway = new(AgentWriteApplyStatus.Applied);
+        TestMcpSession session = CreateSession(gateway);
+        using ApprovalCallingChatClient chatClient = new(failAfterFunctionResult: true);
+        RecordingApprovalPrompt prompt = new(
+            HumanApprovalDecision.Approve,
+            () => gateway.ApplyCalls);
+
+        WriteApprovalResult result = await new WriteApprovalRunner(prompt).RunAsync(
+            chatClient,
+            CreateOptions(),
+            session,
+            CreateValidatedWorkflowResult(),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(WriteApprovalStatus.Applied, result.Status);
+        Assert.Equal(["architecture/c2"], result.Destinations);
+        Assert.Equal(1, gateway.ApplyCalls);
+        Assert.Equal(1, gateway.Writes);
+    }
+
+    [Fact]
     public async Task DenyDoesNotInvokeProtectedWriteTool()
     {
         FakeWriteGateway gateway = new(AgentWriteApplyStatus.Applied);
@@ -359,8 +382,9 @@ public sealed class WriteApprovalTests
         }
     }
 
-    private sealed class ApprovalCallingChatClient : IChatClient
+    private sealed class ApprovalCallingChatClient(bool failAfterFunctionResult = false) : IChatClient
     {
+        private readonly bool failAfterFunctionResult = failAfterFunctionResult;
         private int calls;
 
         public Task<ChatResponse> GetResponseAsync(
@@ -392,6 +416,12 @@ public sealed class WriteApprovalTests
             bool hasFunctionResult = chatMessages
                 .SelectMany(message => message.Contents)
                 .Any(content => content is FunctionResultContent);
+
+            if (hasFunctionResult && failAfterFunctionResult)
+            {
+                throw new InvalidOperationException(
+                    "Deterministic provider failure after protected apply.");
+            }
 
             return Task.FromResult(
                 new ChatResponse(
