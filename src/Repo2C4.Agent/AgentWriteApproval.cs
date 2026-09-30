@@ -60,11 +60,15 @@ public interface IAgentMcpWriteGateway
         CancellationToken cancellationToken);
 }
 
-internal sealed class Repo2C4McpWriteGateway(McpClientTool generateLikeC4)
+internal sealed class Repo2C4McpWriteGateway(
+    McpClientTool generateLikeC4,
+    AgentExecutionContext execution)
     : IAgentMcpWriteGateway
 {
     private readonly McpClientTool generateLikeC4 =
         generateLikeC4 ?? throw new ArgumentNullException(nameof(generateLikeC4));
+    private readonly AgentExecutionContext execution =
+        execution ?? throw new ArgumentNullException(nameof(execution));
 
     public async ValueTask<AgentWriteApprovalPlan> PrepareAsync(
         IReadOnlyList<AgentArchitectureProposal> proposals,
@@ -152,7 +156,7 @@ internal sealed class Repo2C4McpWriteGateway(McpClientTool generateLikeC4)
 
             try
             {
-                CallToolResult result = await generateLikeC4.CallAsync(
+                CallToolResult result = await CallGenerateLikeC4Async(
                     new Dictionary<string, object?>
                     {
                         ["snapshotId"] = approved.SnapshotId,
@@ -162,7 +166,7 @@ internal sealed class Repo2C4McpWriteGateway(McpClientTool generateLikeC4)
                         ["destinationPath"] = approved.DestinationPath,
                         ["c3ContainerId"] = approved.C3ContainerId,
                     },
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                    cancellationToken).ConfigureAwait(false);
 
                 if (result.IsError is true)
                 {
@@ -219,12 +223,46 @@ internal sealed class Repo2C4McpWriteGateway(McpClientTool generateLikeC4)
             null);
     }
 
+    private async ValueTask<CallToolResult> CallGenerateLikeC4Async(
+        Dictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        using AgentOperationScope operation = execution.BeginTool("generate_likec4");
+        try
+        {
+            CallToolResult result = await generateLikeC4
+                .CallAsync(arguments, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            execution.ObserveToolResponse(result.StructuredContent);
+            operation.Succeed();
+            return result;
+        }
+        catch (AgentBudgetExceededException exception)
+        {
+            operation.Fail(exception.Code);
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            operation.Cancel();
+            throw;
+        }
+#pragma warning disable CA1031 // Only a controlled error code is recorded before rethrowing.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            operation.Fail("tool_failed");
+            throw;
+        }
+    }
+
     private async ValueTask<AgentWritePlanItem> PreviewAsync(
         AgentArchitectureProposal proposal,
         string destinationPath,
         CancellationToken cancellationToken)
     {
-        CallToolResult result = await generateLikeC4.CallAsync(
+        CallToolResult result = await CallGenerateLikeC4Async(
             new Dictionary<string, object?>
             {
                 ["snapshotId"] = proposal.SnapshotId,
@@ -234,7 +272,7 @@ internal sealed class Repo2C4McpWriteGateway(McpClientTool generateLikeC4)
                 ["destinationPath"] = destinationPath,
                 ["c3ContainerId"] = proposal.C3ContainerId,
             },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         if (result.IsError is true || result.StructuredContent is not JsonElement content)
         {
