@@ -225,7 +225,7 @@ Safe defaults are configurable only inside bounded ranges:
 | Provider request timeout | `--timeout-seconds` | 90 s | 1–300 |
 | Tool calls | `--max-tool-calls` | 40 | 1–100 |
 | Workflow iterations | `--max-workflow-iterations` | 3 | 1–3 |
-| Validation attempts | `--max-validation-attempts` | 3 | 1–3 |
+| Validation attempts | `--max-validation-attempts` | 2 | 1–3 |
 | Evidence pages | `--max-evidence-pages` | 20 | 1–50 |
 | Accumulated response | `--max-response-chars` | 32000 | 1024–100000 |
 | Accumulated context | `--max-context-chars` | 64000 | 4096–200000 |
