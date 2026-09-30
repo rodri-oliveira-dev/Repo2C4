@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Human-in-the-loop LikeC4 application using the Agent Framework `ApprovalRequiredAIFunction`: validated destination-specific C1/C2 previews show file/change summaries and `requiresReview` IDs, bind the local human decision to the framework approval request, recheck preview freshness/conflicts before any `write=true` MCP call and never auto-approve from repository/model content.
 - Explicit Microsoft Agent Framework Workflow orchestration for Agent analysis with typed analysis/evidence-report/preview/validation executors, a finite configurable 1-3 validation-attempt graph, sanitized correction feedback, structured terminal results and dry-run-only MCP enforcement.
 - Evidence-first Agent analysis entrypoint with explicit `--goal`, host-gated optional C3 selection, C1/C2 preview guidance, review-status rules, prompt-injection resistance and final fact/hypothesis/diagnostic summaries driven only through MCP tools.
 - Local Repo2C4 MCP stdio integration for the Agent through the official C# MCP SDK, with required-tool/schema startup validation, direct MCP function-tool exposure to Agent Framework, a forced preview-only generation wrapper, explicit repository-root authorization, child environment isolation and lifecycle/cancellation coverage without an Agent-to-Core/MCP project reference.

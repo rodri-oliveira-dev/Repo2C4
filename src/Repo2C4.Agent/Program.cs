@@ -39,7 +39,9 @@ public static class Program
         IRepo2C4AgentFactory? agentFactory = null,
         IAgentSessionRunner? sessionRunner = null,
         IAgentMcpSessionFactory? mcpSessionFactory = null,
-        IArchitectureAnalysisWorkflowRunner? workflowRunner = null)
+        IArchitectureAnalysisWorkflowRunner? workflowRunner = null,
+        IWriteApprovalRunner? writeApprovalRunner = null,
+        TextReader? standardInput = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(standardOutput);
@@ -116,8 +118,35 @@ public static class Program
                     .ConfigureAwait(false);
 
                 standardOutput.WriteLine(result.ToDisplayText());
-                return result.Status is ArchitectureWorkflowStatus.Failed
-                    or ArchitectureWorkflowStatus.ValidationFailed
+
+                if (configuredOptions.WriteDestination is null)
+                {
+                    return result.Status is ArchitectureWorkflowStatus.Failed
+                        or ArchitectureWorkflowStatus.ValidationFailed
+                            ? FailureExitCode
+                            : SuccessExitCode;
+                }
+
+                writeApprovalRunner ??= new WriteApprovalRunner(
+                    new ConsoleWriteApprovalPrompt(
+                        standardInput ?? Console.In,
+                        standardError));
+
+                WriteApprovalResult writeResult = await writeApprovalRunner
+                    .RunAsync(
+                        chatClient,
+                        configuredOptions,
+                        mcpSession,
+                        result,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                standardOutput.WriteLine();
+                standardOutput.WriteLine(writeResult.ToDisplayText());
+
+                return writeResult.Status is WriteApprovalStatus.Failed
+                    or WriteApprovalStatus.StalePreview
+                    or WriteApprovalStatus.Conflict
                         ? FailureExitCode
                         : SuccessExitCode;
             }
@@ -145,9 +174,11 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--c3-container <container-id>] [--max-validation-attempts 1-3] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--write-destination <relative-root>] [--c3-container <container-id>] [--max-validation-attempts 1-3] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
         standardError.WriteLine(
             "Agent Framework Workflows orchestrates proposal -> evidence report -> dry-run preview -> validation with a bounded validation-attempt budget (default 2, maximum 3).");
+        standardError.WriteLine(
+            "Optional --write-destination enables a separate Agent Framework HITL approval after successful validation; C1/C2 are written under <destination>/c1 and <destination>/c2 only after explicit local approval.");
         standardError.WriteLine(
             "C3 is disabled unless --c3-container selects one container; the host never allows the model to select a different C3 target.");
         standardError.WriteLine(

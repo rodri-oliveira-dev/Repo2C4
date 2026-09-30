@@ -4,12 +4,13 @@ namespace Repo2C4.Agent.Tests;
 
 internal sealed class TestMcpSessionFactory(
     IReadOnlyList<AITool>? tools = null,
-    string? diagnostic = null) : IAgentMcpSessionFactory
+    string? diagnostic = null,
+    IAgentMcpWriteGateway? writeGateway = null) : IAgentMcpSessionFactory
 {
     public TestMcpSession Session
     {
         get;
-    } = new(tools ?? []);
+    } = new(tools ?? [], writeGateway ?? new TestMcpWriteGateway());
 
     public AgentHostOptions? Options
     {
@@ -31,7 +32,9 @@ internal sealed class TestMcpSessionFactory(
     }
 }
 
-internal sealed class TestMcpSession(IReadOnlyList<AITool> tools) : IAgentMcpSession
+internal sealed class TestMcpSession(
+    IReadOnlyList<AITool> tools,
+    IAgentMcpWriteGateway writeGateway) : IAgentMcpSession
 {
     public IReadOnlyList<AITool> Tools
     {
@@ -42,6 +45,11 @@ internal sealed class TestMcpSession(IReadOnlyList<AITool> tools) : IAgentMcpSes
     {
         get;
     } = new();
+
+    public IAgentMcpWriteGateway WriteGateway
+    {
+        get;
+    } = writeGateway;
 
     public Task Completion => Task.CompletedTask;
 
@@ -55,5 +63,33 @@ internal sealed class TestMcpSession(IReadOnlyList<AITool> tools) : IAgentMcpSes
     {
         IsDisposed = true;
         return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class TestMcpWriteGateway : IAgentMcpWriteGateway
+{
+    public ValueTask<AgentWriteApprovalPlan> PrepareAsync(
+        IReadOnlyList<AgentArchitectureProposal> proposals,
+        string destinationRoot,
+        CancellationToken cancellationToken)
+    {
+        _ = proposals;
+        _ = destinationRoot;
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(
+            new AgentWriteApprovalPlan(destinationRoot, []));
+    }
+
+    public ValueTask<AgentWriteApplyResult> ApplyAsync(
+        AgentWriteApprovalPlan plan,
+        CancellationToken cancellationToken)
+    {
+        _ = plan;
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(
+            new AgentWriteApplyResult(
+                AgentWriteApplyStatus.Failed,
+                [],
+                "Test gateway has no write plan."));
     }
 }

@@ -41,6 +41,11 @@ public interface IAgentMcpSession : IAsyncDisposable
         get;
     }
 
+    IAgentMcpWriteGateway WriteGateway
+    {
+        get;
+    }
+
     Task Completion
     {
         get;
@@ -262,11 +267,19 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 discovered,
                 options.C3ContainerId,
                 invocationState);
+            McpClientTool generateLikeC4 = discovered.Single(
+                tool => string.Equals(
+                    tool.Name,
+                    "generate_likec4",
+                    StringComparison.Ordinal));
+            IAgentMcpWriteGateway writeGateway =
+                new Repo2C4McpWriteGateway(generateLikeC4);
 #pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
             IAgentMcpSession session = new Repo2C4McpSession(
                 client,
                 safeTools,
-                invocationState);
+                invocationState,
+                writeGateway);
 #pragma warning restore CA2000
             return AgentMcpSessionCreation.Success(session);
         }
@@ -361,7 +374,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
     private sealed class Repo2C4McpSession(
         McpClient client,
         IReadOnlyList<AITool> tools,
-        AgentMcpInvocationState invocationState) : IAgentMcpSession
+        AgentMcpInvocationState invocationState,
+        IAgentMcpWriteGateway writeGateway) : IAgentMcpSession
     {
         private readonly McpClient client =
             client ?? throw new ArgumentNullException(nameof(client));
@@ -375,6 +389,11 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
         {
             get;
         } = invocationState ?? throw new ArgumentNullException(nameof(invocationState));
+
+        public IAgentMcpWriteGateway WriteGateway
+        {
+            get;
+        } = writeGateway ?? throw new ArgumentNullException(nameof(writeGateway));
 
         public Task Completion
         {

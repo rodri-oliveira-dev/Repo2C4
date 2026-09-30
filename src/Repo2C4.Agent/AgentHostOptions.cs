@@ -53,6 +53,12 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     } = 2;
 
+    public string? WriteDestination
+    {
+        get;
+        init;
+    }
+
     public static bool TryParse(
         string[] args,
         out AgentHostOptions? options,
@@ -68,6 +74,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? repositoryRoot = null;
         string? mcpServerPath = null;
         string? c3ContainerId = null;
+        string? writeDestination = null;
         int timeoutSeconds = 90;
         int maxValidationAttempts = 2;
         bool timeoutSpecified = false;
@@ -181,6 +188,22 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     c3ContainerId = c3ContainerValue;
+                    break;
+
+                case "--write-destination":
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            writeDestination,
+                            "--write-destination",
+                            out string? writeDestinationValue,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    writeDestination = writeDestinationValue;
                     break;
 
                 case "--max-validation-attempts":
@@ -304,16 +327,36 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                 out error);
         }
 
+        string? configuredWriteDestination = writeDestination?.Trim();
+        if (configuredWriteDestination is not null
+            && !TryNormalizeRelativeDestination(
+                configuredWriteDestination,
+                out configuredWriteDestination))
+        {
+            return Fail(
+                "--write-destination must be a safe repository-relative directory.",
+                out options,
+                out error);
+        }
+
+        if (configuredWriteDestination is not null && string.IsNullOrWhiteSpace(prompt))
+        {
+            return Fail(
+                "--write-destination requires --goal.",
+                out options,
+                out error);
+        }
+
         _ = goalOption;
         options = new AgentHostOptions(provider, model, prompt?.Trim())
-        {
-            Endpoint = configuredEndpoint,
+        {            Endpoint = configuredEndpoint,
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
             AllowExternalAi = allowExternalAi,
             RepositoryRoot = repositoryRoot?.Trim(),
             McpServerPath = mcpServerPath?.Trim(),
             C3ContainerId = configuredC3ContainerId,
             MaxValidationAttempts = maxValidationAttempts,
+            WriteDestination = configuredWriteDestination,
         };
         error = null;
         return true;
@@ -332,6 +375,37 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             character is >= 'a' and <= 'z'
             or >= '0' and <= '9'
             or '.' or '_' or '-');
+
+    private static bool TryNormalizeRelativeDestination(
+        string value,
+        out string? normalized)
+    {
+        normalized = value.Replace('\\', '/').Trim().Trim('/');
+
+        if (normalized.Length is < 1 or > 240
+            || Path.IsPathFullyQualified(value)
+            || normalized.Any(char.IsControl))
+        {
+            normalized = null;
+            return false;
+        }
+
+        string[] segments = normalized.Split(
+            '/',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length == 0
+            || segments.Any(segment =>
+                segment is "." or ".."
+                || segment.Contains(':', StringComparison.Ordinal)))
+        {
+            normalized = null;
+            return false;
+        }
+
+        normalized = string.Join("/", segments);
+        return true;
+    }
 
     private static bool TryCreateOllamaEndpoint(string? value, out Uri? endpoint)
     {
