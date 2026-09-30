@@ -91,10 +91,12 @@ public sealed class Repo2C4AgentFactory : IRepo2C4AgentFactory
             },
         };
 
+#pragma warning disable CA2000 // The wrapper becomes part of the ChatClientAgent pipeline; the host owns the provider client lifetime.
         FunctionInvokingChatClient governedFunctionClient = new(chatClient)
         {
             MaximumConsecutiveErrorsPerRequest = 0,
         };
+#pragma warning restore CA2000
 
         return new ChatClientAgent(governedFunctionClient, agentOptions)
             .AsBuilder()
