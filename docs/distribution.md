@@ -17,6 +17,49 @@ repo2c4-agent --help
 
 LikeC4 is still an independent dependency for validation/rendering and must be installed separately.
 
+## Public distribution surfaces
+
+The release uses different channels for artifact hosting and product discovery:
+
+| Product | Artifact distribution | Discovery |
+| --- | --- | --- |
+| `Repo2C4.Cli` | NuGet.org + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Mcp` | NuGet.org + GitHub Release | Official MCP Registry metadata in `server.json` |
+| `Repo2C4.Agent` | NuGet.org + GitHub Release | GitHub/NuGet |
+
+The Agent is intentionally not published as an MCP server or platform-specific agent package. It remains a local .NET Tool and an independent MCP client.
+
+### Official MCP Registry
+
+The repository contains a versioned root `server.json` for the MCP Registry name:
+
+```text
+io.github.rodri-oliveira-dev/repo2c4-mcp
+```
+
+It points to the public NuGet package `Repo2C4.Mcp`, uses `dnx` as the .NET 10 runtime hint, stdio transport and declares `--repository-root` as a required local `filepath` argument. Remote acquisition is deliberately not part of the registry's default execution metadata.
+
+NuGet ownership verification depends on the package README containing this exact marker:
+
+```html
+<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->
+```
+
+The marker is packaged from `src/Repo2C4.Mcp/README.md`. The distribution smoke verifies the registry name, package/version binding, required root argument and ownership marker before a release can proceed.
+
+The Official MCP Registry stores metadata rather than the NuGet artifact, so publish the NuGet package **first**. After the exact version is publicly available on NuGet.org, install the official `mcp-publisher` and run from the repository root:
+
+```bash
+mcp-publisher validate
+mcp-publisher login github
+mcp-publisher publish
+```
+
+GitHub authentication grants the personal `io.github.rodri-oliveira-dev/*` namespace. Registry publication remains a separate maintainer action while the Official MCP Registry is in preview; the normal Repo2C4 release workflow does not introduce an additional long-lived registry credential.
+
+When preparing a later Repo2C4 release, update `Directory.Build.props` and both version fields in `server.json` to the same exact SemVer before running distribution/release verification.
+
+
 For maintainers or offline verification from a trusted checkout, install the .NET 10 SDK from `global.json` and the pinned official LikeC4 CLI (CI uses Node.js 22.23.3 and `likec4@1.59.4`):
 
 ```bash
