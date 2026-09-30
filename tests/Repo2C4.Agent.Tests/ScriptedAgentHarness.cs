@@ -58,7 +58,7 @@ internal sealed record ScriptedChatInvocation(
 internal sealed class ScriptedChatClient(
     params Func<ScriptedChatInvocation, ChatMessage>[] turns) : IChatClient
 {
-    private readonly IReadOnlyList<Func<ScriptedChatInvocation, ChatMessage>> turns = turns;
+    private readonly Func<ScriptedChatInvocation, ChatMessage>[] turns = turns;
     private readonly List<ScriptedChatInvocation> invocations = [];
     private int calls;
 
@@ -201,14 +201,14 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         string repositoryRoot = FindRepositoryRoot();
-        string source = Path.Combine(
+        string source = System.IO.Path.Combine(
             repositoryRoot,
             "examples",
             "fixtures",
             fixtureName);
         TempRepositoryFixture fixture = TempRepositoryFixture.Create(source);
 
-        string mcpServerPath = Path.Combine(
+        string mcpServerPath = System.IO.Path.Combine(
             repositoryRoot,
             "src",
             "Repo2C4.Mcp",
@@ -520,7 +520,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Repo2C4.slnx")))
+            if (File.Exists(System.IO.Path.Combine(directory.FullName, "Repo2C4.slnx")))
             {
                 return directory.FullName;
             }
@@ -624,7 +624,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             }
 
             string parent = Directory.CreateTempSubdirectory("repo2c4-agent-e2e-").FullName;
-            string destination = Path.Combine(parent, "repository");
+            string destination = System.IO.Path.Combine(parent, "repository");
             Directory.CreateDirectory(destination);
 
             foreach (string sourceFile in Directory.EnumerateFiles(
@@ -632,9 +632,9 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
                          "*",
                          SearchOption.AllDirectories))
             {
-                string relative = Path.GetRelativePath(source, sourceFile);
-                string target = Path.Combine(destination, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                string relative = System.IO.Path.GetRelativePath(source, sourceFile);
+                string target = System.IO.Path.Combine(destination, relative);
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
                 File.Copy(sourceFile, target);
             }
 
