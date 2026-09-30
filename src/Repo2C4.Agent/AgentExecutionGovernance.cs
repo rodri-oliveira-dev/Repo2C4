@@ -152,10 +152,13 @@ public sealed class AgentExecutionContext
         return BeginOperation(stage, toolName: null);
     }
 
-    public void ObserveContext(string? context)
+    public void ObserveContext(string? context) =>
+        ObserveContextCharacters(context?.Length ?? 0);
+
+    public void ObserveContextCharacters(long characters)
     {
-        int length = context?.Length ?? 0;
-        long total = Interlocked.Add(ref contextCharacters, length);
+        ArgumentOutOfRangeException.ThrowIfNegative(characters);
+        long total = Interlocked.Add(ref contextCharacters, characters);
 
         if (total > budgets.MaxContextCharacters)
         {
