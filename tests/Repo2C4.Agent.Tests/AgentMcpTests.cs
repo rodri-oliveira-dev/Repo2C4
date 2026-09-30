@@ -48,6 +48,86 @@ public sealed class AgentMcpTests
     }
 
     [Fact]
+    public async Task SafeInspectionForcesAuthorizedRepositoryRoot()
+    {
+        string? observedPath = null;
+        AIFunction inspect = AIFunctionFactory.Create(
+            (string repositoryPath) =>
+            {
+                observedPath = repositoryPath;
+                return JsonSerializer.SerializeToElement(new
+                {
+                    structuredContent = new { snapshotId = "snap-1" },
+                });
+            },
+            "inspect_repository");
+
+        AIFunction safeInspect = Assert.IsAssignableFrom<AIFunction>(
+            AgentMcpToolPolicy.CreateSafeTools([inspect], null).Single());
+
+        _ = await safeInspect.InvokeAsync(
+            new AIFunctionArguments { ["repositoryPath"] = "src/only-this-subtree" },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(".", observedPath);
+    }
+
+    [Fact]
+    public async Task FailedPreviewIsNotCapturedAsArchitectureProposal()
+    {
+        AIFunction generate = AIFunctionFactory.Create(
+            (
+                string snapshotId,
+                JsonElement model,
+                bool dryRun,
+                bool write,
+                string? destinationPath,
+                string? c3ContainerId) =>
+            {
+                _ = snapshotId;
+                _ = model;
+                _ = dryRun;
+                _ = write;
+                _ = destinationPath;
+                _ = c3ContainerId;
+                return JsonSerializer.SerializeToElement(new
+                {
+                    isError = true,
+                    structuredContent = new { code = "proposal_rejected" },
+                });
+            },
+            "generate_likec4");
+        AgentMcpInvocationState state = new();
+
+        AIFunction safeGenerate = Assert.IsAssignableFrom<AIFunction>(
+            AgentMcpToolPolicy.CreateSafeTools([generate], null, state).Single());
+        using JsonDocument modelDocument = JsonDocument.Parse(
+            """
+            {
+              "schemaVersion": "1.0",
+              "level": "C1",
+              "snapshot": { "schemaVersion": "1.0", "repositoryId": "repo", "files": [], "evidence": [], "diagnostics": [] },
+              "elements": [],
+              "relations": []
+            }
+            """);
+
+        _ = await safeGenerate.InvokeAsync(
+            new AIFunctionArguments
+            {
+                ["snapshotId"] = "snap-1",
+                ["model"] = modelDocument.RootElement.Clone(),
+                ["dryRun"] = true,
+                ["write"] = false,
+                ["destinationPath"] = null,
+                ["c3ContainerId"] = null,
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(state.SnapshotProposals());
+    }
+
+    [Fact]
     public async Task RealMcpSessionListsToolsInvokesThroughAgentFrameworkAndForcesPreviewOnly()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
