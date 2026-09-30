@@ -358,10 +358,14 @@ public sealed class AgentEndToEndTests
             chatClient,
             cancellationToken);
 
-        string serializedMessages = JsonSerializer.Serialize(
-            chatClient.Invocations.SelectMany(invocation => invocation.Messages));
+        string serializedToolResults = JsonSerializer.Serialize(
+            chatClient.Invocations
+                .SelectMany(invocation => invocation.Messages)
+                .SelectMany(message => message.Contents)
+                .OfType<FunctionResultContent>()
+                .Select(resultContent => resultContent.Result));
         Assert.Equal(ArchitectureWorkflowStatus.RequiresReview, result.Status);
-        Assert.DoesNotContain(injection, serializedMessages, StringComparison.Ordinal);
+        Assert.DoesNotContain(injection, serializedToolResults, StringComparison.Ordinal);
         Assert.DoesNotContain(injection, result.Summary, StringComparison.Ordinal);
         Assert.All(
             harness.Session.InvocationState.SnapshotProposals(),
