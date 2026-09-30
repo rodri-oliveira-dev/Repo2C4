@@ -349,7 +349,8 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
 
         _ = goalOption;
         options = new AgentHostOptions(provider, model, prompt?.Trim())
-        {            Endpoint = configuredEndpoint,
+        {
+            Endpoint = configuredEndpoint,
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
             AllowExternalAi = allowExternalAi,
             RepositoryRoot = repositoryRoot?.Trim(),
