@@ -634,8 +634,11 @@ public sealed class WriteApprovalRunner(IWriteApprovalPrompt prompt)
             (Func<CancellationToken, Task<string>>)ApplyApprovedPreviewAsync,
             ApplyToolName,
             "Apply exactly the host-captured, successfully validated LikeC4 preview. The preview, destination and model are immutable and cannot be supplied by the model.");
+        AIFunction governedApplyFunction = new GovernedMcpFunction(
+            applyFunction,
+            mcpSession.InvocationState.Execution);
 #pragma warning disable MEAI001 // ApprovalRequiredAIFunction is the official Agent Framework HITL mechanism.
-        AIFunction approvalRequired = new ApprovalRequiredAIFunction(applyFunction);
+        AIFunction approvalRequired = new ApprovalRequiredAIFunction(governedApplyFunction);
 #pragma warning restore MEAI001
 
         ChatClientAgent approvalAgent = new(
