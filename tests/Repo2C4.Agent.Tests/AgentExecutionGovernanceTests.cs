@@ -164,7 +164,10 @@ public sealed class AgentExecutionGovernanceTests
 
         AgentBudgetExceededException exception =
             await Assert.ThrowsAsync<AgentBudgetExceededException>(
-                () => client.GetResponseAsync([message], options));
+                () => client.GetResponseAsync(
+                    [message],
+                    options,
+                    TestContext.Current.CancellationToken));
 
         Assert.Equal("context_size_exceeded", exception.Code);
         Assert.True(execution.SnapshotCounters().ContextCharacters > 40);
