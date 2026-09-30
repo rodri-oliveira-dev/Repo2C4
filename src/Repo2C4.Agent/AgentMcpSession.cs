@@ -64,10 +64,10 @@ public sealed class AgentMcpInvocationState
 {
     private readonly object gate = new();
 
-    public AgentMcpInvocationState(AgentExecutionBudgets? budgets = null)
+    public AgentMcpInvocationState(AgentExecutionContext? execution = null)
     {
-        Execution = new AgentExecutionContext(
-            budgets ?? new AgentExecutionBudgets(
+        Execution = execution ?? new AgentExecutionContext(
+            new AgentExecutionBudgets(
                 TimeSpan.FromSeconds(90),
                 40,
                 3,
@@ -279,8 +279,10 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 return AgentMcpSessionCreation.Failure(capabilityError!);
             }
 
-            AgentMcpInvocationState invocationState = new(
-                AgentExecutionBudgets.FromOptions(options));
+            AgentExecutionContext execution =
+                options.ExecutionContext
+                ?? new AgentExecutionContext(AgentExecutionBudgets.FromOptions(options));
+            AgentMcpInvocationState invocationState = new(execution);
             IReadOnlyList<AITool> safeTools = AgentMcpToolPolicy.CreateSafeTools(
                 discovered,
                 options.C3ContainerId,
