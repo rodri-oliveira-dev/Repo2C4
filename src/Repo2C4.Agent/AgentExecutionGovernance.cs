@@ -61,6 +61,7 @@ public sealed class AgentExecutionContext
     private int evidencePages;
     private long responseCharacters;
     private long contextCharacters;
+    private int deadlineExceeded;
 
     public AgentExecutionContext(AgentExecutionBudgets budgets, string? runId = null)
     {
@@ -76,6 +77,8 @@ public sealed class AgentExecutionContext
     }
 
     public AgentExecutionBudgets Budgets => budgets;
+
+    public bool IsDeadlineExceeded => Volatile.Read(ref deadlineExceeded) != 0;
 
     public void ConfigureStructuredLogging(TextWriter writer)
     {
@@ -97,6 +100,14 @@ public sealed class AgentExecutionContext
     public CancellationTokenSource CreateDeadlineSource(CancellationToken parentToken)
     {
         CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(parentToken);
+        _ = source.Token.Register(
+            () =>
+            {
+                if (!parentToken.IsCancellationRequested)
+                {
+                    Interlocked.Exchange(ref deadlineExceeded, 1);
+                }
+            });
         source.CancelAfter(budgets.TotalDuration);
         return source;
     }
@@ -142,9 +153,9 @@ public sealed class AgentExecutionContext
     public void ObserveContext(string? context)
     {
         int length = context?.Length ?? 0;
-        Interlocked.Add(ref contextCharacters, length);
+        long total = Interlocked.Add(ref contextCharacters, length);
 
-        if (length > budgets.MaxContextCharacters)
+        if (total > budgets.MaxContextCharacters)
         {
             ThrowBudget("context_size_exceeded", "Context-size budget exceeded.");
         }
@@ -153,9 +164,9 @@ public sealed class AgentExecutionContext
     public void ObserveResponse(string? response)
     {
         int length = response?.Length ?? 0;
-        Interlocked.Add(ref responseCharacters, length);
+        long total = Interlocked.Add(ref responseCharacters, length);
 
-        if (length > budgets.MaxResponseCharacters)
+        if (total > budgets.MaxResponseCharacters)
         {
             ThrowBudget("response_size_exceeded", "Response-size budget exceeded.");
         }
@@ -171,8 +182,8 @@ public sealed class AgentExecutionContext
             _ => 0,
         };
 
-        Interlocked.Add(ref responseCharacters, length);
-        if (length > budgets.MaxResponseCharacters)
+        long total = Interlocked.Add(ref responseCharacters, length);
+        if (total > budgets.MaxResponseCharacters)
         {
             ThrowBudget("response_size_exceeded", "Response-size budget exceeded.");
         }
