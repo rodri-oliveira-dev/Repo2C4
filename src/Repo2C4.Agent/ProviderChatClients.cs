@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
 
@@ -97,17 +98,21 @@ public sealed class ProviderAgentChatClientFactory : IAgentChatClientFactory
 
     private static IChatClient CreateOllamaClient(Uri endpoint, string model)
     {
+#pragma warning disable CA2000 // Ownership transfers to OwnedHttpClientChatClient on the successful return path.
         HttpClient transport = new()
         {
             BaseAddress = endpoint,
             Timeout = Timeout.InfiniteTimeSpan,
         };
+#pragma warning restore CA2000
 
         try
         {
+#pragma warning disable CA2000 // Ownership transfers to OwnedHttpClientChatClient together with the transport.
             return new OwnedHttpClientChatClient(
                 new OllamaApiClient(transport, model),
                 transport);
+#pragma warning restore CA2000
         }
         catch
         {
