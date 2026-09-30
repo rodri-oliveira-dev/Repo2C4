@@ -62,11 +62,18 @@ public static class Program
         AgentHostOptions configuredOptions = options!;
         cancellationToken.ThrowIfCancellationRequested();
 
-        using CancellationTokenSource? deadline =
+        AgentExecutionContext? execution =
             configuredOptions.Goal is null
                 ? null
-                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline?.CancelAfter(configuredOptions.Timeout);
+                : new AgentExecutionContext(AgentExecutionBudgets.FromOptions(configuredOptions));
+        execution?.ConfigureStructuredLogging(standardError);
+        configuredOptions = configuredOptions with
+        {
+            ExecutionContext = execution,
+        };
+
+        using CancellationTokenSource? deadline =
+            execution?.CreateDeadlineSource(cancellationToken);
         CancellationToken executionToken = deadline?.Token ?? cancellationToken;
 
         chatClientFactory ??= new ProviderAgentChatClientFactory();
@@ -106,11 +113,6 @@ public static class Program
             IAgentMcpSession mcpSession = mcpCreation.Session;
             await using (mcpSession.ConfigureAwait(false))
             {
-                if (configuredOptions.Goal is not null)
-                {
-                    mcpSession.InvocationState.Execution.ConfigureStructuredLogging(standardError);
-                }
-
                 AIAgent agent = agentFactory.Create(
                     chatClient,
                     configuredOptions,
@@ -165,8 +167,27 @@ public static class Program
         }
         catch (OperationCanceledException) when (executionToken.IsCancellationRequested)
         {
-            standardError.WriteLine(
-                "Repo2C4 Agent execution was cancelled or exceeded its total-duration budget.");
+            string terminalReason = cancellationToken.IsCancellationRequested
+                ? "cancelled"
+                : "total_duration_exceeded";
+
+            if (execution is not null)
+            {
+                ArchitectureWorkflowResult cancelled = new(
+                    ArchitectureWorkflowStatus.Cancelled,
+                    0,
+                    string.Empty,
+                    ["Agent execution was cancelled or exceeded its total-duration budget."])
+                {
+                    RunId = execution.RunId,
+                    Counters = execution.SnapshotCounters(),
+                    TerminalReason = terminalReason,
+                };
+
+                standardOutput.WriteLine(cancelled.ToDisplayText());
+                execution.Complete("cancelled", terminalReason);
+            }
+
             return SuccessExitCode;
         }
         catch (AgentProviderException exception)
