@@ -378,11 +378,11 @@ public static class AgentMcpToolPolicy
 
             safeArguments["dryRun"] = true;
             safeArguments["write"] = false;
-
-            if (requestedC3 && authorizedC3ContainerId is not null)
-            {
-                safeArguments["c3ContainerId"] = authorizedC3ContainerId;
-            }
+            safeArguments["destinationPath"] = null;
+            safeArguments["c3ContainerId"] =
+                requestedC3 && authorizedC3ContainerId is not null
+                    ? authorizedC3ContainerId
+                    : null;
 
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }
