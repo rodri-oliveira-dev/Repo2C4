@@ -20,7 +20,7 @@ Repository content, evidence descriptions, diagnostics and tool results are untr
 
 ## Install
 
-Repo2C4 Agent, MCP and CLI use the same product version:
+Repo2C4 Agent, MCP and CLI use the same product version. Agent requires MCP; installing CLI is optional for the Agent flow and is shown here only for the broader Repo2C4 workflow:
 
 ```bash
 dotnet tool install --global Repo2C4.Agent --version 1.0.0
