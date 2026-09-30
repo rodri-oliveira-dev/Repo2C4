@@ -378,6 +378,9 @@ public sealed class ArchitectureAnalysisWorkflow
         }
 
         builder.WithOutputFrom(finalize);
+        builder.WithOpenTelemetry(
+            configure: telemetry => telemetry.EnableSensitiveData = false,
+            activitySource: AgentExecutionContext.TelemetryActivitySource);
         return builder.Build();
     }
 
