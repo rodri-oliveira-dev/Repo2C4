@@ -421,7 +421,7 @@ jobs:
           test "$conflict_exit" -eq 5
           grep -Fq "// human edit" "$workdir/c2/model.c4"
 
-      - name: Empacotar e instalar ferramentas CLI e MCP em ambiente isolado
+      - name: Empacotar e instalar ferramentas CLI, MCP e Agent em ambiente isolado
         shell: bash
         run: |
           set -euo pipefail
