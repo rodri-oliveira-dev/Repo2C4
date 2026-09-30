@@ -91,7 +91,12 @@ public sealed class Repo2C4AgentFactory : IRepo2C4AgentFactory
             },
         };
 
-        return new ChatClientAgent(chatClient, agentOptions)
+        FunctionInvokingChatClient governedFunctionClient = new(chatClient)
+        {
+            MaximumConsecutiveErrorsPerRequest = 0,
+        };
+
+        return new ChatClientAgent(governedFunctionClient, agentOptions)
             .AsBuilder()
             .UseOpenTelemetry(
                 sourceName: AgentExecutionContext.ActivitySourceName,
