@@ -538,7 +538,6 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
     {
         private readonly IAgentMcpSession inner =
             inner ?? throw new ArgumentNullException(nameof(inner));
-        private readonly Queue<bool> validationResults = new(validationResults);
 
         public IReadOnlyList<AITool> Tools
         {
