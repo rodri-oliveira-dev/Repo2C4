@@ -67,10 +67,12 @@ public sealed class ProviderAgentChatClientFactory : IAgentChatClientFactory
                             "Repo2C4 Agent configuration error: supported providers are ollama and openai."));
             }
 
+#pragma warning disable CA2000 // Ownership transfers to AgentChatClientCreation and is disposed by the host.
             IChatClient bounded = new BoundedProviderChatClient(
                 inner,
                 providerDisplayName,
                 options.Timeout);
+#pragma warning restore CA2000
             inner = null;
             return ValueTask.FromResult(AgentChatClientCreation.Success(bounded));
         }
@@ -186,12 +188,14 @@ internal sealed class BoundedProviderChatClient(
             throw Sanitize(exception, cancellationToken);
         }
 
-        await using IAsyncEnumerator<ChatResponseUpdate> enumerator =
+        IAsyncEnumerator<ChatResponseUpdate> enumerator =
             updates.GetAsyncEnumerator(deadline.Token);
-
-        while (await MoveNextAsync(enumerator, cancellationToken).ConfigureAwait(false))
+        await using (enumerator.ConfigureAwait(false))
         {
-            yield return enumerator.Current;
+            while (await MoveNextAsync(enumerator, cancellationToken).ConfigureAwait(false))
+            {
+                yield return enumerator.Current;
+            }
         }
     }
 
