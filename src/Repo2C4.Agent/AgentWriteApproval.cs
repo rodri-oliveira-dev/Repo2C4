@@ -183,7 +183,9 @@ internal sealed class Repo2C4McpWriteGateway(
                         ? new AgentWriteApplyResult(
                             AgentWriteApplyStatus.Conflict,
                             written,
-                            "Managed output conflict prevented the approved write.")
+                            PartialWriteDiagnostic(
+                                written,
+                                "Managed output conflict prevented the approved write."))
                         : new AgentWriteApplyResult(
                             AgentWriteApplyStatus.Failed,
                             written,
