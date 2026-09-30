@@ -848,7 +848,6 @@ internal sealed class AgentArchitectureWorkflowOperations(
         try
         {
             AgentExecutionContext execution = mcpSession.InvocationState.Execution;
-            execution.ObserveContext(prompt);
 
             string summary = await sessionRunner
                 .RunAsync(agent, prompt, cancellationToken)
