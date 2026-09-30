@@ -1,8 +1,6 @@
 using System.Text.Json;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 using Xunit;
 
 namespace Repo2C4.Agent.Tests;
