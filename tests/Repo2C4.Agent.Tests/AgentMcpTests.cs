@@ -139,19 +139,20 @@ public sealed class AgentMcpTests
             Assert.False(previewContent.GetProperty("written").GetBoolean());
             Assert.False(Directory.Exists(Path.Combine(fixture.Path, "must-not-exist")));
 
-            using FunctionCallingTestChatClient chatClient = new();
+            using FunctionCallingTestChatClient chatClient = new(snapshotId, model);
             Repo2C4AgentFactory agentFactory = new();
             AgentSessionRunner runner = new();
             AIAgent agent = agentFactory.Create(chatClient, options, session.Tools);
 
             string response = await runner.RunAsync(
                 agent,
-                options.Prompt!,
+                EvidenceFirstAnalysisPrompt.Build(options),
                 cancellationToken);
 
             Assert.Equal("analysis-complete", response);
             Assert.True(chatClient.SawMcpTool);
             Assert.True(chatClient.SawFunctionResult);
+            Assert.True(chatClient.SawPreviewResult);
         }
         finally
         {
@@ -177,7 +178,9 @@ public sealed class AgentMcpTests
         throw new DirectoryNotFoundException("Could not locate the Repo2C4 repository root.");
     }
 
-    private sealed class FunctionCallingTestChatClient : IChatClient
+    private sealed class FunctionCallingTestChatClient(
+        string snapshotId,
+        JsonElement model) : IChatClient
     {
         private int calls;
 
@@ -188,6 +191,12 @@ public sealed class AgentMcpTests
         }
 
         public bool SawFunctionResult
+        {
+            get;
+            private set;
+        }
+
+        public bool SawPreviewResult
         {
             get;
             private set;
@@ -210,7 +219,7 @@ public sealed class AgentMcpTests
                     ChatRole.Assistant,
                     [
                         new FunctionCallContent(
-                            "call-1",
+                            "call-inspect",
                             "inspect_repository",
                             new Dictionary<string, object?>
                             {
@@ -223,8 +232,51 @@ public sealed class AgentMcpTests
                 .SelectMany(message => message.Contents)
                 .Any(content => content is FunctionResultContent);
 
+            if (calls == 2)
+            {
+                return Task.FromResult(new ChatResponse(new ChatMessage(
+                    ChatRole.Assistant,
+                    [
+                        new FunctionCallContent(
+                            "call-preview",
+                            "generate_likec4",
+                            new Dictionary<string, object?>
+                            {
+                                ["snapshotId"] = snapshotId,
+                                ["model"] = model,
+                                ["dryRun"] = true,
+                                ["write"] = false,
+                                ["destinationPath"] = null,
+                                ["c3ContainerId"] = null,
+                            }),
+                    ])));
+            }
+
+            string serializedResults = JsonSerializer.Serialize(
+                chatMessages
+                    .SelectMany(message => message.Contents)
+                    .OfType<FunctionResultContent>()
+                    .Select(result => result.Result));
+            SawPreviewResult = serializedResults.Contains(
+                "\"dryRun\":true",
+                StringComparison.OrdinalIgnoreCase);
+
             return Task.FromResult(
-                new ChatResponse(new ChatMessage(ChatRole.Assistant, "analysis-complete")));
+                new ChatResponse(new ChatMessage(
+                    ChatRole.Assistant,
+                    """
+                    Confirmed facts
+                    Repository evidence was obtained through MCP.
+
+                    Requires review
+                    The library-only focal boundary remains review-required.
+
+                    Diagnostics/blockers
+                    No executable container evidence is present.
+
+                    Proposal
+                    A safe C1 preview was produced through the real MCP session.
+                    """)));
         }
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

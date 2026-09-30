@@ -100,13 +100,14 @@ public static class Program
                     configuredOptions,
                     mcpSession.Tools);
 
-                if (configuredOptions.Prompt is null)
+                if (configuredOptions.Goal is null)
                 {
                     return SuccessExitCode;
                 }
 
+                string analysisPrompt = EvidenceFirstAnalysisPrompt.Build(configuredOptions);
                 string response = await sessionRunner
-                    .RunAsync(agent, configuredOptions.Prompt, cancellationToken)
+                    .RunAsync(agent, analysisPrompt, cancellationToken)
                     .ConfigureAwait(false);
 
                 standardOutput.WriteLine(response);
@@ -136,9 +137,11 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> [--mcp-server-path <absolute-path>] [--prompt <text>] [--timeout-seconds 1-300]");
+            "Usage: dotnet run --project src/Repo2C4.Agent -- --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--c3-container <container-id>] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
         standardError.WriteLine(
-            "The agent starts the local Repo2C4 MCP server over stdio, validates its required tools and exposes generation only through forced dry-run preview.");
+            "The agent starts from inspect_repository, queries MCP evidence/snapshot pages as needed, proposes C1/C2 as dry-run previews and summarizes confirmed facts, review items and diagnostics.");
+        standardError.WriteLine(
+            "C3 is disabled unless --c3-container selects one container; the host never allows the model to select a different C3 target.");
         standardError.WriteLine(
             "If --mcp-server-path is omitted, the installed repo2c4-mcp command is used. A .dll path is launched with dotnet.");
         standardError.WriteLine(

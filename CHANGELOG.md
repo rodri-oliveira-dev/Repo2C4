@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Evidence-first Agent analysis entrypoint with explicit `--goal`, host-gated optional C3 selection, C1/C2 preview guidance, review-status rules, prompt-injection resistance and final fact/hypothesis/diagnostic summaries driven only through MCP tools.
 - Local Repo2C4 MCP stdio integration for the Agent through the official C# MCP SDK, with required-tool/schema startup validation, direct MCP function-tool exposure to Agent Framework, a forced preview-only generation wrapper, explicit repository-root authorization, child environment isolation and lifecycle/cancellation coverage without an Agent-to-Core/MCP project reference.
 - Configurable Repo2C4 Agent model providers through the shared `IChatClient` contract: local-loopback Ollama via OllamaSharp and explicit-consent OpenAI via Microsoft.Extensions.AI.OpenAI, with environment-only credentials, bounded timeouts/cancellation and sanitized provider failures.
 - Foundational .NET 10 `Repo2C4.Agent` host built on Microsoft Agent Framework and `IChatClient`, with explicit provider/model configuration, versioned evidence-first instructions, testable agent/session seams, controlled diagnostics and no dependency on Core/CLI/MCP.

@@ -39,6 +39,14 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     }
 
+    public string? Goal => Prompt;
+
+    public string? C3ContainerId
+    {
+        get;
+        init;
+    }
+
     public static bool TryParse(
         string[] args,
         out AgentHostOptions? options,
@@ -49,9 +57,11 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? provider = null;
         string? model = null;
         string? prompt = null;
+        string? goalOption = null;
         string? endpoint = null;
         string? repositoryRoot = null;
         string? mcpServerPath = null;
+        string? c3ContainerId = null;
         int timeoutSeconds = 90;
         bool timeoutSpecified = false;
         bool allowExternalAi = false;
@@ -80,14 +90,31 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     model = modelValue;
                     break;
 
+                case "--goal":
                 case "--prompt":
-                    if (!TryReadUniqueValue(args, ref index, prompt, "--prompt", out string? promptValue, out error))
+                    if (prompt is not null)
+                    {
+                        return Fail(
+                            "provide only one analysis objective using --goal (or the legacy --prompt alias).",
+                            out options,
+                            out error);
+                    }
+
+                    string currentGoalOption = args[index];
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            prompt,
+                            currentGoalOption,
+                            out string? promptValue,
+                            out error))
                     {
                         options = null;
                         return false;
                     }
 
                     prompt = promptValue;
+                    goalOption = currentGoalOption;
                     break;
 
                 case "--endpoint":
@@ -130,6 +157,22 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     mcpServerPath = mcpServerPathValue;
+                    break;
+
+                case "--c3-container":
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            c3ContainerId,
+                            "--c3-container",
+                            out string? c3ContainerValue,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    c3ContainerId = c3ContainerValue;
                     break;
 
                 case "--timeout-seconds":
@@ -224,6 +267,16 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             }
         }
 
+        string? configuredC3ContainerId = c3ContainerId?.Trim();
+        if (configuredC3ContainerId is not null && !IsValidArchitectureId(configuredC3ContainerId))
+        {
+            return Fail(
+                "--c3-container must be a valid lowercase architecture element ID.",
+                out options,
+                out error);
+        }
+
+        _ = goalOption;
         options = new AgentHostOptions(provider, model, prompt?.Trim())
         {
             Endpoint = configuredEndpoint,
@@ -231,6 +284,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             AllowExternalAi = allowExternalAi,
             RepositoryRoot = repositoryRoot?.Trim(),
             McpServerPath = mcpServerPath?.Trim(),
+            C3ContainerId = configuredC3ContainerId,
         };
         error = null;
         return true;
@@ -241,6 +295,14 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         && model.All(character =>
             char.IsAsciiLetterOrDigit(character)
             || character is '.' or '_' or '-' or ':' or '/');
+
+    private static bool IsValidArchitectureId(string id) =>
+        id.Length is >= 1 and <= 128
+        && id[0] is >= 'a' and <= 'z'
+        && id.All(character =>
+            character is >= 'a' and <= 'z'
+            or >= '0' and <= '9'
+            or '.' or '_' or '-');
 
     private static bool TryCreateOllamaEndpoint(string? value, out Uri? endpoint)
     {

@@ -184,7 +184,9 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 return AgentMcpSessionCreation.Failure(capabilityError!);
             }
 
-            IReadOnlyList<AITool> safeTools = CreateSafeAgentTools(discovered);
+            IReadOnlyList<AITool> safeTools = AgentMcpToolPolicy.CreateSafeTools(
+                discovered,
+                options.C3ContainerId);
 #pragma warning disable CA2000 // Ownership transfers to AgentMcpSessionCreation and is disposed by the host.
             IAgentMcpSession session = new Repo2C4McpSession(client, safeTools);
 #pragma warning restore CA2000
@@ -201,27 +203,6 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             return AgentMcpSessionCreation.Failure(
                 "Repo2C4 Agent MCP connection error: the local Repo2C4 MCP server could not be started or initialized.");
         }
-    }
-
-    private static IReadOnlyList<AITool> CreateSafeAgentTools(
-        IEnumerable<McpClientTool> discovered)
-    {
-        List<AITool> tools = [];
-
-        foreach (McpClientTool tool in discovered)
-        {
-            if (!Repo2C4McpCapabilities.RequiredToolNames.Contains(tool.Name, StringComparer.Ordinal))
-            {
-                continue;
-            }
-
-            tools.Add(
-                string.Equals(tool.Name, "generate_likec4", StringComparison.Ordinal)
-                    ? new PreviewOnlyMcpFunction(tool)
-                    : tool);
-        }
-
-        return tools;
     }
 
     private static bool TryValidateRepositoryRoot(
@@ -324,11 +305,52 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
         }
     }
 
-    private sealed class PreviewOnlyMcpFunction(AIFunction inner)
+
+}
+
+/// <summary>Applies host-enforced safety policy to MCP tools before exposing them to the model.</summary>
+public static class AgentMcpToolPolicy
+{
+    public static IReadOnlyList<AITool> CreateSafeTools(
+        IEnumerable<AITool> discovered,
+        string? authorizedC3ContainerId)
+    {
+        ArgumentNullException.ThrowIfNull(discovered);
+
+        List<AITool> tools = [];
+        foreach (AITool tool in discovered)
+        {
+            if (!Repo2C4McpCapabilities.RequiredToolNames.Contains(tool.Name, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(tool.Name, "generate_likec4", StringComparison.Ordinal))
+            {
+                if (tool is not AIFunction function)
+                {
+                    continue;
+                }
+
+                tools.Add(new PreviewOnlyMcpFunction(function, authorizedC3ContainerId));
+                continue;
+            }
+
+            tools.Add(tool);
+        }
+
+        return tools;
+    }
+
+    private sealed class PreviewOnlyMcpFunction(
+        AIFunction inner,
+        string? authorizedC3ContainerId)
         : DelegatingAIFunction(inner)
     {
         public override string Description =>
-            "Preview deterministic LikeC4 for a session-bound model. This Agent wrapper always forces dryRun=true and write=false and ignores any destinationPath.";
+            authorizedC3ContainerId is null
+                ? "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and disables C3."
+                : "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and permits C3 only for the user-selected container.";
 
         protected override ValueTask<object?> InvokeCoreAsync(
             AIFunctionArguments arguments,
@@ -337,10 +359,17 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             ArgumentNullException.ThrowIfNull(arguments);
 
             AIFunctionArguments safeArguments = [];
+            bool requestedC3 = false;
             foreach ((string key, object? value) in arguments)
             {
                 if (key is "dryRun" or "write" or "destinationPath")
                 {
+                    continue;
+                }
+
+                if (key == "c3ContainerId")
+                {
+                    requestedC3 = value is not null;
                     continue;
                 }
 
@@ -349,6 +378,11 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
 
             safeArguments["dryRun"] = true;
             safeArguments["write"] = false;
+
+            if (requestedC3 && authorizedC3ContainerId is not null)
+            {
+                safeArguments["c3ContainerId"] = authorizedC3ContainerId;
+            }
 
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }
