@@ -50,7 +50,8 @@ public sealed class AgentExecutionContext
 {
     public const string ActivitySourceName = "Repo2C4.Agent";
 
-    private static readonly ActivitySource ActivitySource = new(ActivitySourceName, "1.0.0");
+    public static ActivitySource TelemetryActivitySource { get; } =
+        new(ActivitySourceName, "1.0.0");
 
     private readonly AgentExecutionBudgets budgets;
     private readonly object logGate = new();
@@ -199,7 +200,7 @@ public sealed class AgentExecutionContext
 
     private AgentOperationScope BeginOperation(string stage, string? toolName)
     {
-        Activity? activity = ActivitySource.StartActivity(
+        Activity? activity = TelemetryActivitySource.StartActivity(
             toolName is null ? "repo2c4.agent." + stage : "repo2c4.agent.tool",
             ActivityKind.Internal);
 
