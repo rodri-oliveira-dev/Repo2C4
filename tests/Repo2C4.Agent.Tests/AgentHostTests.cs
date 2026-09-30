@@ -169,6 +169,38 @@ public sealed class AgentHostTests
         Assert.DoesNotContain(endpoint, error.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(ArchitectureWorkflowStatus.Failed)]
+    [InlineData(ArchitectureWorkflowStatus.ValidationFailed)]
+    public async Task FailedWorkflowWithWriteDestinationReturnsFailureBeforeApproval(
+        ArchitectureWorkflowStatus status)
+    {
+        using TestChatClient chatClient = new("unused");
+        TestMcpSessionFactory mcpFactory = new();
+        RecordingWriteApprovalRunner approvalRunner = new();
+        using StringWriter output = new();
+        using StringWriter error = new();
+
+        int exitCode = await Program.RunAsync(
+            [
+                "--provider", "ollama",
+                "--model", "model",
+                "--goal", "Document architecture",
+                "--write-destination", "architecture",
+            ],
+            output,
+            error,
+            TestContext.Current.CancellationToken,
+            new RecordingChatClientFactory(chatClient),
+            mcpSessionFactory: mcpFactory,
+            workflowRunner: new FixedWorkflowRunner(status),
+            writeApprovalRunner: approvalRunner);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal(0, approvalRunner.Calls);
+        Assert.Contains("Status:", output.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task OpenAiRequiresExplicitConsentBeforeProviderCreation()
     {
@@ -238,6 +270,57 @@ public sealed class AgentHostTests
             _ = mcpSession;
             cancellation.Cancel();
             return Task.FromCanceled<ArchitectureWorkflowResult>(cancellationToken);
+        }
+    }
+
+    private sealed class FixedWorkflowRunner(ArchitectureWorkflowStatus status)
+        : IArchitectureAnalysisWorkflowRunner
+    {
+        public Task<ArchitectureWorkflowResult> RunAsync(
+            AIAgent agent,
+            AgentHostOptions options,
+            IAgentMcpSession mcpSession,
+            CancellationToken cancellationToken)
+        {
+            _ = agent;
+            _ = options;
+            _ = mcpSession;
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
+                new ArchitectureWorkflowResult(
+                    status,
+                    1,
+                    "controlled result",
+                    ["controlled diagnostic"]));
+        }
+    }
+
+    private sealed class RecordingWriteApprovalRunner : IWriteApprovalRunner
+    {
+        public int Calls
+        {
+            get;
+            private set;
+        }
+
+        public Task<WriteApprovalResult> RunAsync(
+            IChatClient chatClient,
+            AgentHostOptions options,
+            IAgentMcpSession mcpSession,
+            ArchitectureWorkflowResult workflowResult,
+            CancellationToken cancellationToken)
+        {
+            _ = chatClient;
+            _ = options;
+            _ = mcpSession;
+            _ = workflowResult;
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            return Task.FromResult(
+                new WriteApprovalResult(
+                    WriteApprovalStatus.Denied,
+                    [],
+                    "unused"));
         }
     }
 
