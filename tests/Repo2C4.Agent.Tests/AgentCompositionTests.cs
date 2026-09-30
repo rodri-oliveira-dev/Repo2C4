@@ -38,6 +38,22 @@ public sealed class AgentCompositionTests
     }
 
     [Fact]
+    public void FrameworkAgentStopsOnFirstToolInvocationError()
+    {
+        AgentHostOptions options = new("fake", "unit-model", "Document architecture.");
+        using TestChatClient chatClient = new("unused");
+        Repo2C4AgentFactory factory = new();
+
+        AIAgent agent = factory.Create(chatClient, options, []);
+
+        FunctionInvokingChatClient? functionClient =
+            agent.GetService<FunctionInvokingChatClient>();
+
+        Assert.NotNull(functionClient);
+        Assert.Equal(0, functionClient.MaximumConsecutiveErrorsPerRequest);
+    }
+
+    [Fact]
     public void AgentAssemblyDoesNotReferenceCoreCliOrMcpProjects()
     {
         string?[] references = typeof(Repo2C4AgentFactory)
