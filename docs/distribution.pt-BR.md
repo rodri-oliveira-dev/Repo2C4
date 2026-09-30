@@ -4,7 +4,7 @@ O Repo2C4 versão 1.0.0 fornece três ferramentas .NET 10 separadas: `Repo2C4.Cl
 
 ## Instalação pública e teste local
 
-As releases publicadas disponibilizam as duas ferramentas pelo NuGet.org. Instale a versão exata indicada na release:
+As releases publicadas disponibilizam as três ferramentas pelo NuGet.org. Instale a versão exata indicada na release:
 
 ```bash
 dotnet tool install --global Repo2C4.Cli --version 1.0.0
