@@ -255,18 +255,14 @@ public sealed class ArchitectureAnalysisWorkflow
             }
 
             CorrectionExecutor correction = new(operations, attempt + 1);
-            builder.AddEdge(
+            builder.AddEdge<ArchitectureWorkflowState>(
                 validation,
                 finalize,
-                condition: message =>
-                    message is ArchitectureWorkflowState state
-                    && state.ShouldFinalize);
-            builder.AddEdge(
+                condition: state => state?.ShouldFinalize is true);
+            builder.AddEdge<ArchitectureWorkflowState>(
                 validation,
                 correction,
-                condition: message =>
-                    message is ArchitectureWorkflowState state
-                    && state.ShouldRetry);
+                condition: state => state?.ShouldRetry is true);
 
             previous = correction;
         }
