@@ -151,9 +151,11 @@ internal sealed class BoundedProviderChatClient(
         using CancellationTokenSource deadline = CreateDeadline(cancellationToken);
         try
         {
-            return await inner
+            ChatResponse response = await inner
                 .GetResponseAsync(messages, options, deadline.Token)
                 .ConfigureAwait(false);
+            ObserveProviderResponse(response);
+            return response;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -260,6 +262,26 @@ internal sealed class BoundedProviderChatClient(
         return new AgentProviderException(
             providerDisplayName + " request failed.",
             exception);
+    }
+
+    private void ObserveProviderResponse(ChatResponse response)
+    {
+        if (execution is null)
+        {
+            return;
+        }
+
+        long characters = 0;
+        foreach (ChatMessage message in response.Messages)
+        {
+            characters += message.Role.ToString().Length;
+            foreach (AIContent content in message.Contents)
+            {
+                characters += CountContentCharacters(content);
+            }
+        }
+
+        execution.ObserveResponseCharacters(characters);
     }
 
     private void ObserveProviderContext(
