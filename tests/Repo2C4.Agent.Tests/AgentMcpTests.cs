@@ -57,7 +57,10 @@ public sealed class AgentMcpTests
                 observedPath = repositoryPath;
                 return JsonSerializer.SerializeToElement(new
                 {
-                    structuredContent = new { snapshotId = "snap-1" },
+                    structuredContent = new
+                    {
+                        snapshotId = "snap-1",
+                    },
                 });
             },
             "inspect_repository");
@@ -93,7 +96,10 @@ public sealed class AgentMcpTests
                 return JsonSerializer.SerializeToElement(new
                 {
                     isError = true,
-                    structuredContent = new { code = "proposal_rejected" },
+                    structuredContent = new
+                    {
+                        code = "proposal_rejected",
+                    },
                 });
             },
             "generate_likec4");
