@@ -18,15 +18,72 @@ objetivo explícito
 
 Conteúdo do repositório, descrições de evidência, diagnósticos e resultados de tools são dados não confiáveis. Eles nunca autorizam escrita nem substituem a política do host.
 
+## Quick Start com Ollama
+
+Para o caminho local mais curto, tenha .NET 10, Node.js/npm, LikeC4, Ollama e um modelo local disponíveis. Antes de executar o Agent, confirme que o Ollama reconhece o modelo:
+
+```bash
+ollama list
+# Se necessário:
+ollama pull SEU_MODELO_LOCAL
+```
+
+Depois que os pacotes do Repo2C4 estiverem publicados, instale o Agent e o servidor MCP obrigatório:
+
+```bash
+dotnet tool install --global Repo2C4.Agent --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+npm install --global likec4@1.59.4
+
+repo2c4-agent \
+  --provider ollama \
+  --model SEU_MODELO_LOCAL \
+  --repository-root "/caminho/absoluto/do/repositorio" \
+  --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
+```
+
+Essa primeira execução é **somente análise**: sem `--write-destination`, o Agent não cria arquivos `.c4` gerenciados. Ele imprime no terminal o status do workflow, run ID, contadores, diagnósticos e o resumo produzido pelo modelo.
+
+Uma análise bem-sucedida normalmente termina com campos como:
+
+```text
+Status: requires_review
+Validation attempts: 1
+Run ID: <run-id>
+Terminal reason: requires_review
+Tool calls: <quantidade>
+Workflow iterations: <quantidade>
+Evidence pages: <quantidade>
+Response characters: <quantidade>
+Context characters: <quantidade>
+```
+
+`completed` significa que a proposta validou sem afirmações `requiresReview` pendentes. `requires_review` significa que o LikeC4 validou, mas ainda existem afirmações arquiteturais que precisam de revisão humana.
+
 ## Instalação
 
-Agent, MCP e CLI usam a mesma versão do produto:
+Agent, MCP e CLI usam a mesma versão do produto. O Agent **exige o MCP**, mas a CLI é opcional para o fluxo do Agent; ela aparece aqui apenas para o fluxo mais amplo do Repo2C4.
+
+Os comandos abaixo representam o **caminho por pacotes publicados no NuGet** e pressupõem que a versão `1.0.0` esteja disponível no feed configurado:
 
 ```bash
 dotnet tool install --global Repo2C4.Agent --version 1.0.0
 dotnet tool install --global Repo2C4.Mcp --version 1.0.0
 dotnet tool install --global Repo2C4.Cli --version 1.0.0
 repo2c4-agent --help
+```
+
+Antes de uma publicação pública, execute a partir de um checkout confiável do código-fonte:
+
+```bash
+dotnet build Repo2C4.slnx
+
+dotnet src/Repo2C4.Agent/bin/Debug/net10.0/Repo2C4.Agent.dll \
+  --provider ollama \
+  --model SEU_MODELO_LOCAL \
+  --repository-root "$(pwd)/examples/fixtures/library-only" \
+  --mcp-server-path "$(pwd)/src/Repo2C4.Mcp/bin/Debug/net10.0/Repo2C4.Mcp.dll" \
+  --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
 ```
 
 O Agent exige .NET 10. O MCP precisa estar disponível como comando instalado `repo2c4-mcp` ou por caminho absoluto em `--mcp-server-path`. O LikeC4 continua sendo dependência independente para validação; o CI fixa `likec4@1.59.4`.
@@ -43,7 +100,9 @@ repo2c4-agent \
   --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
 ```
 
-Provider e modelo são sempre explícitos. O Repo2C4 não escolhe nem baixa modelo silenciosamente.
+Provider e modelo são sempre explícitos. O Repo2C4 não escolhe nem baixa modelo silenciosamente. Se `ollama list` não mostrar o modelo selecionado, baixe ou configure o modelo no Ollama antes de executar o Repo2C4.
+
+Sem `--write-destination`, esse modo nunca persiste arquivos de arquitetura gerenciados. Esse é o modo recomendado para a primeira execução em um repositório.
 
 ## OpenAI: consentimento externo explícito
 
@@ -61,6 +120,33 @@ repo2c4-agent \
 ```
 
 `--allow-external-ai` é obrigatório. A chave é lida somente do ambiente do processo do Agent, nunca é aceita como argumento e não é herdada pelo processo filho MCP. Logs estruturados não incluem prompt completo, evidência bruta, argumentos de tools nem secrets.
+
+### Exemplos em PowerShell
+
+No PowerShell, use a sintaxe de variável de ambiente do Windows e resolva a raiz do repositório para um caminho absoluto:
+
+```powershell
+$repo = (Resolve-Path ".\examples\fixtures\library-only").Path
+
+repo2c4-agent `
+  --provider ollama `
+  --model SEU_MODELO_LOCAL `
+  --repository-root $repo `
+  --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
+```
+
+Para OpenAI:
+
+```powershell
+$env:OPENAI_API_KEY = "fornecida-pelo-seu-secret-store"
+
+repo2c4-agent `
+  --provider openai `
+  --model SEU_MODELO_OPENAI `
+  --allow-external-ai `
+  --repository-root $repo `
+  --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
+```
 
 ## Conexão MCP e independência
 
@@ -93,6 +179,21 @@ Os status públicos são `completed`, `requires_review`, `validation_failed`, `c
 
 Um workspace LikeC4 válido **não** prova que as afirmações arquiteturais são verdadeiras. Qualidade da evidência e estado de revisão continuam visíveis.
 
+## C3 seletivo com o Agent
+
+C1/C2 continuam sendo o padrão. Para solicitar C3, primeiro identifique o ID exato de um container já existente na proposta C2 revisada e autorize somente esse container na execução:
+
+```bash
+repo2c4-agent \
+  --provider ollama \
+  --model SEU_MODELO_LOCAL \
+  --repository-root "/caminho/absoluto/do/repositorio" \
+  --c3-container "container_api" \
+  --goal "Documente C1/C2 e, somente com evidência suficiente, proponha C3 para container_api."
+```
+
+O valor deve ser o ID arquitetural/do modelo do container C2, não um nome de projeto inferido do repositório. O host fixa essa seleção: conteúdo do repositório e o modelo não podem trocar o C3 para outro container. Se o container não existir na proposta C2 ou a evidência for insuficiente, o C3 é omitido em vez de inventado.
+
 ## Aprovação humana e escrita
 
 Sem `--write-destination`, o Agent não pede escrita.
@@ -107,6 +208,8 @@ repo2c4-agent \
   --goal "Documente C1/C2 e prepare uma atualização local para aprovação." \
   --write-destination "docs/architecture"
 ```
+
+Com `--write-destination "docs/architecture"`, C1 e C2 são preparados respectivamente em `docs/architecture/c1` e `docs/architecture/c2`. O destino é relativo ao repositório e continua sujeito às proteções de saída do MCP.
 
 Depois da validação, o host prepara um preview imutável específico do destino e o Microsoft Agent Framework emite uma solicitação `ApprovalRequiredAIFunction`. O console mostra destino, arquivos/alterações e IDs `requiresReview`. Somente aprovação local explícita pode chamar a escrita protegida. Texto do repositório, saída do modelo e prompts nunca aprovam a operação.
 
