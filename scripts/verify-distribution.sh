@@ -251,6 +251,6 @@ grep -Fq '"model":"repo2c4-distribution-smoke"' "$request_file" \
   || grep -Fq '"model": "repo2c4-distribution-smoke"' "$request_file"
 grep -Fq 'Status: failed' "$work/agent.stdout"
 grep -Fq 'Terminal reason: insufficient_evidence' "$work/agent.stdout"
-test ! -e "$repo_root/examples/fixtures/library-only/generated"
+test -z "$(git -C "$repo_root" status --porcelain -- examples/fixtures/library-only)"
 
 printf 'Versioned .NET tools installed and exercised from a clean local feed: CLI, MCP and Agent %s.\n' "$version"
