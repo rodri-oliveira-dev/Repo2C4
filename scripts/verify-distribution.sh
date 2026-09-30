@@ -45,13 +45,21 @@ done
 test "$(find "$packages_dir" -maxdepth 1 -type f -name '*.nupkg' | wc -l)" -eq 3
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+ollama_pid=""
+cleanup() {
+  if [ -n "$ollama_pid" ]; then
+    kill "$ollama_pid" 2>/dev/null || true
+    wait "$ollama_pid" 2>/dev/null || true
+  fi
+  rm -rf "$work"
+}
+trap cleanup EXIT
 cat > "$work/NuGet.Config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration><packageSources><clear/><add key="local" value="$packages_dir"/></packageSources></configuration>
 EOF
 
-# Use only the two freshly built packages: no live feed, SDK source restore or global tool state.
+# Use only the three freshly built packages: no live feed, SDK source restore or global tool state.
 dotnet tool install --tool-path "$work/cli" Repo2C4.Cli --version "$version" --configfile "$work/NuGet.Config"
 dotnet tool install --tool-path "$work/mcp" Repo2C4.Mcp --version "$version" --configfile "$work/NuGet.Config"
 dotnet tool install --tool-path "$work/agent" Repo2C4.Agent --version "$version" --configfile "$work/NuGet.Config"
@@ -220,16 +228,27 @@ test -s "$port_file"
 ollama_port="$(cat "$port_file")"
 
 set +e
-"$work/agent/repo2c4-agent"   --provider ollama   --model repo2c4-distribution-smoke   --endpoint "http://127.0.0.1:$ollama_port/"   --repository-root "$repo_root/examples/fixtures/library-only"   --mcp-server-path "$work/mcp/repo2c4-mcp"   --goal "Distribution smoke: inspect the fixture conservatively."   --timeout-seconds 10   --max-duration-seconds 30   >"$work/agent.stdout" 2>"$work/agent.stderr"
+"$work/agent/repo2c4-agent" \
+  --provider ollama \
+  --model repo2c4-distribution-smoke \
+  --endpoint "http://127.0.0.1:$ollama_port/" \
+  --repository-root "$repo_root/examples/fixtures/library-only" \
+  --mcp-server-path "$work/mcp/repo2c4-mcp" \
+  --goal "Distribution smoke: inspect the fixture conservatively." \
+  --timeout-seconds 10 \
+  --max-duration-seconds 30 \
+  >"$work/agent.stdout" 2>"$work/agent.stderr"
 agent_exit="$?"
 set -e
 
 kill "$ollama_pid" 2>/dev/null || true
 wait "$ollama_pid" 2>/dev/null || true
+ollama_pid=""
 
 test "$agent_exit" -eq 1
 test -s "$request_file"
-grep -Fq '"model":"repo2c4-distribution-smoke"' "$request_file"   || grep -Fq '"model": "repo2c4-distribution-smoke"' "$request_file"
+grep -Fq '"model":"repo2c4-distribution-smoke"' "$request_file" \
+  || grep -Fq '"model": "repo2c4-distribution-smoke"' "$request_file"
 grep -Fq 'Status: failed' "$work/agent.stdout"
 grep -Fq 'Terminal reason: insufficient_evidence' "$work/agent.stdout"
 test ! -e "$repo_root/examples/fixtures/library-only/generated"
