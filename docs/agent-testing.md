@@ -21,7 +21,7 @@ When `REPO2C4_LIKEC4_INTEGRATION=1`, an additional E2E path uses the real `valid
 
 ## Security invariants
 
-Mandatory tests run without `OPENAI_API_KEY`. They verify that no managed LikeC4 file is written before a real Agent Framework approval request receives an explicit local approval, that rejected requests write nothing, conflicts preserve human content, unsupported architecture remains `requiresReview`, and prompt-like repository content never becomes agent instructions.
+Mandatory CI tests explicitly set `OPENAI_API_KEY` to an empty value; local test runs do not mutate the caller's environment. They verify that no managed LikeC4 file is written before a real Agent Framework approval request receives an explicit local approval, that rejected requests write nothing, conflicts preserve human content, unsupported architecture remains `requiresReview`, and prompt-like repository content never becomes agent instructions.
 
 ## Optional provider smoke
 
