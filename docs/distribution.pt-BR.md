@@ -1,6 +1,6 @@
 # Distribuição e release verificável do Repo2C4
 
-O Repo2C4 versão 1.0.0 fornece duas ferramentas .NET 10 separadas: pacote `Repo2C4.Cli`, comando `repo2c4`, e pacote `Repo2C4.Mcp`, comando `repo2c4-mcp`. O Core permanece como referência interna, sem pacote próprio. A versão compartilhada vem de `Directory.Build.props`. O LikeC4 é um validador externo, não é instalado pelo Repo2C4.
+O Repo2C4 versão 1.0.0 fornece três ferramentas .NET 10 separadas: `Repo2C4.Cli` (`repo2c4`), `Repo2C4.Mcp` (`repo2c4-mcp`) e `Repo2C4.Agent` (`repo2c4-agent`). O Core permanece como referência interna, sem pacote próprio. O Agent é cliente do executável MCP por stdio e não depende de Core/MCP como biblioteca de domínio. A versão compartilhada vem de `Directory.Build.props`. O LikeC4 é um validador externo, não é instalado pelo Repo2C4.
 
 ## Instalação pública e teste local
 
@@ -9,8 +9,10 @@ As releases publicadas disponibilizam as duas ferramentas pelo NuGet.org. Instal
 ```bash
 dotnet tool install --global Repo2C4.Cli --version 1.0.0
 dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Agent --version 1.0.0
 repo2c4 --help
 repo2c4-mcp --help
+repo2c4-agent --help
 ```
 
 O LikeC4 continua sendo uma dependência independente para validação/renderização e deve ser instalado separadamente.
@@ -25,9 +27,9 @@ npm install --global likec4@1.59.4
 bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
 ```
 
-O script cria apenas os dois pacotes de produto, confere identidade e versão, usa um feed NuGet local isolado com fontes externas desabilitadas, instala os dois comandos e testa `inspect → generate --apply → validate` e o comportamento do MCP por stdio. Não cria tag, release, publicação NuGet nem chamada de IA. Os diretórios temporários são excluídos e os pacotes permanecem em `artifacts/distribution/`, ignorado pelo Git. No Windows, instale os pacotes com `dotnet tool install --tool-path` em diretórios separados, ajuste os caminhos e invoque `repo2c4.exe` e `repo2c4-mcp.exe`.
+O script cria os três pacotes de produto, confere identidade e versão, usa um feed NuGet local isolado com fontes externas desabilitadas e instala os três comandos. Ele testa `inspect → generate --apply → validate`, o protocolo MCP por stdio e o Agent empacotado contra a fixture `library-only` usando um fake compatível com Ollama em loopback mais o MCP real instalado. O fake não propõe arquitetura de propósito; o resultado esperado é `insufficient_evidence` controlado e zero escrita. Não cria tag, release, publicação NuGet nem chamada de IA. Os diretórios temporários são excluídos e os pacotes permanecem em `artifacts/distribution/`, ignorado pelo Git. No Windows, instale os pacotes com `dotnet tool install --tool-path` em diretórios separados, ajuste os caminhos e invoque `repo2c4.exe` e `repo2c4-mcp.exe`.
 
-Os pacotes anexados à GitHub Release correspondente são exatamente o payload validado enviado ao NuGet.org e incluem `SHA256SUMS`. Prefira instalar a versão exata documentada na release em vez de depender de uma versão mais recente implícita.
+Os três pacotes anexados à GitHub Release correspondente são exatamente o payload validado enviado ao NuGet.org e incluem `SHA256SUMS`. Prefira instalar a versão exata documentada na release em vez de depender de uma versão mais recente implícita.
 
 ## Repositório .NET até C1/C2 e C3 seletivo
 
@@ -70,11 +72,11 @@ Configure o MCP para stdio com comando instalado e uma raiz local absoluta e aut
 }
 ```
 
-O servidor rejeita raízes inexistentes, links simbólicos/junções e acessos fora da raiz. `stdout` é exclusivo do protocolo MCP; diagnósticos ficam no `stderr`. O cliente inspeciona evidências limitadas e paginadas, propõe o modelo e solicita geração/validação com autorização explícita de escrita. Consulte [fluxo do cliente MCP](mcp-client.pt-BR.md) e [política de acesso](mcp.pt-BR.md). Não use um checkout mutável/não confiável exposto a trocas concorrentes de links.
+O servidor rejeita raízes inexistentes, links simbólicos/junções e acessos fora da raiz. `stdout` é exclusivo do protocolo MCP; diagnósticos ficam no `stderr`. O cliente inspeciona evidências limitadas e paginadas, propõe o modelo e solicita geração/validação com autorização explícita de escrita. O `repo2c4-agent` é um desses clientes MCP, adicionando workflow/HITL via Microsoft Agent Framework; o MCP continua utilizável independentemente por outros hosts. Consulte também o [guia do Agent](agent.pt-BR.md). Consulte [fluxo do cliente MCP](mcp-client.pt-BR.md) e [política de acesso](mcp.pt-BR.md). Não use um checkout mutável/não confiável exposto a trocas concorrentes de links.
 
 ## Release manual e validação
 
-O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das duas ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente, habilite `publish_release=true` **e** digite `publication_confirmation=PUBLISH`. O job com escrita roda no environment protegido `release`, confirma que a `main` não mudou, valida os três artefatos esperados, cria/publica a GitHub Release versionada e envia somente `Repo2C4.Cli` e `Repo2C4.Mcp` ao NuGet.org usando `NUGET_API_KEY` fornecida pelo environment. Depois, um job somente leitura instala essa mesma versão diretamente do NuGet.org e executa os dois comandos como consumidor externo. Falhas de publicação ou propagação são reportadas sem expor a credencial.
+O workflow [Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) roda somente por `workflow_dispatch` na `main` confiável. A versão SemVer deve coincidir com a versão MSBuild já declarada. Sempre executa restore, formatação, build, testes, validação LikeC4, empacotamento e instalação isolada das três ferramentas. **Por padrão, apenas valida: não cria tag, release, pacote público ou publicação NuGet.** Para publicar deliberadamente, habilite `publish_release=true` **e** digite `publication_confirmation=PUBLISH`. O job com escrita roda no environment protegido `release`, confirma que a `main` não mudou, valida os quatro artefatos esperados, cria/publica a GitHub Release versionada e envia somente `Repo2C4.Cli`, `Repo2C4.Mcp` e `Repo2C4.Agent` ao NuGet.org usando `NUGET_API_KEY` fornecida pelo environment. Depois, um job somente leitura instala essa mesma versão diretamente do NuGet.org e executa os três comandos como consumidor externo. Falhas de publicação ou propagação são reportadas sem expor a credencial.
 
 O CI regular testa empacotamento e instalação sem credencial cloud nem permissão de release. CodeQL, Dependency Review e auditoria de dependências continuam obrigatórios. O workflow de [PR revisável de documentação](architecture-pr.pt-BR.md) é um fluxo manual distinto, sem merge automático.
 
