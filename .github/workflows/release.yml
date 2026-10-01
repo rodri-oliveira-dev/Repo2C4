@@ -177,13 +177,42 @@ jobs:
             "SHA256SUMS"
           )
 
-          existing_tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
-          if [ -n "$existing_tag_sha" ]; then
+          tag_response_file="$RUNNER_TEMP/tag-ref.response"
+          tag_error_file="$RUNNER_TEMP/tag-ref.err"
+          if gh api --include "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" \
+              >"$tag_response_file" 2>"$tag_error_file"; then
+            tag_status="$(awk '$1 ~ /^HTTP\// { print $2; exit }' "$tag_response_file")"
+            if [ "$tag_status" != "200" ]; then
+              echo "::error::Failed to query tag $tag (HTTP ${tag_status:-unknown}): $(cat "$tag_error_file")"
+              exit 1
+            fi
+
+            tag_ref_json="$(awk 'body { print } /^[[:space:]\r]*$/ { body = 1 }' "$tag_response_file")"
+            existing_tag_type="$(jq -r '.object.type' <<<"$tag_ref_json")"
+            existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_ref_json")"
+
+            while [ "$existing_tag_type" = "tag" ]; do
+              tag_object_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing_tag_sha")"
+              existing_tag_type="$(jq -r '.object.type' <<<"$tag_object_json")"
+              existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_object_json")"
+            done
+
+            if [ "$existing_tag_type" != "commit" ]; then
+              echo "::error::Existing tag $tag does not resolve directly to a commit; refusing publication."
+              exit 1
+            fi
+
             if [ "$existing_tag_sha" != "$GITHUB_SHA" ]; then
               echo "::error::Existing tag $tag points to a different commit; refusing publication."
               exit 1
             fi
           else
+            tag_status="$(awk '$1 ~ /^HTTP\// { print $2; exit }' "$tag_response_file")"
+            if [ "$tag_status" != "404" ]; then
+              echo "::error::Failed to query tag $tag (HTTP ${tag_status:-unknown}): $(cat "$tag_error_file")"
+              exit 1
+            fi
+
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null
           fi
