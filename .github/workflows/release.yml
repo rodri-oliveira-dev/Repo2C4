@@ -437,21 +437,21 @@ jobs:
           )
 
           notes="$RUNNER_TEMP/release-notes.md"
-          cat > "$notes" <<EOF
-          Repo2C4 $RELEASE_TAG
-
-          Install the published .NET tools from NuGet.org:
-
-          ```bash
-          dotnet tool install --global Repo2C4.Cli --version $VERSION
-          dotnet tool install --global Repo2C4.Mcp --version $VERSION
-          dotnet tool install --global Repo2C4.Agent --version $VERSION
-          ```
-
-          The attached .nupkg files are the exact validated payload published to NuGet.org and GitHub Packages.
-          MCP Registry metadata is published separately after Repo2C4.Mcp becomes publicly consumable from NuGet.org.
-          Verify downloads with SHA256SUMS.
-          EOF
+          printf '%s\n' \
+            "Repo2C4 $RELEASE_TAG" \
+            "" \
+            "Install the published .NET tools from NuGet.org:" \
+            "" \
+            '```bash' \
+            "dotnet tool install --global Repo2C4.Cli --version $VERSION" \
+            "dotnet tool install --global Repo2C4.Mcp --version $VERSION" \
+            "dotnet tool install --global Repo2C4.Agent --version $VERSION" \
+            '```' \
+            "" \
+            "The attached .nupkg files are the exact validated payload published to NuGet.org and GitHub Packages." \
+            "MCP Registry metadata is published separately after Repo2C4.Mcp becomes publicly consumable from NuGet.org." \
+            "Verify downloads with SHA256SUMS." \
+            > "$notes"
 
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "GitHub Release $RELEASE_TAG already exists; refreshing validated assets."
