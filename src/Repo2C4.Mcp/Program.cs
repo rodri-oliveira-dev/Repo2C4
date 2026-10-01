@@ -134,7 +134,7 @@ public static class Program
     }
 
     private static string GetServerVersion() =>
-        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.1";
 
     private static void WriteHelp(TextWriter standardError)
     {

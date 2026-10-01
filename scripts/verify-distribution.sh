@@ -6,7 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 packages_dir="${1:-$repo_root/artifacts/distribution}"
-version="${2:-1.0.0}"
+version="${2:-1.0.1}"
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid SemVer package version." >&2
   exit 2

@@ -53,7 +53,7 @@ public sealed class AgentExecutionContext
     public static ActivitySource TelemetryActivitySource
     {
         get;
-    } = new(ActivitySourceName, "1.0.0");
+    } = new(ActivitySourceName, "1.0.1");
 
     private readonly AgentExecutionBudgets budgets;
     private readonly object logGate = new();

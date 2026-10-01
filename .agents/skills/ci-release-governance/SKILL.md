@@ -41,7 +41,7 @@ Não declare como existente uma automação se o arquivo correspondente não est
 6. Use permissões mínimas; não utilize `write-all`.
 7. Nunca coloque secret, token ou API key de longa duração em arquivo versionado.
 8. Para NuGet.org, preserve Trusted Publishing/OIDC quando `release.yml` usar `NuGet/login@v1`; não substitua por chave persistente sem requisito explícito e justificativa.
-9. Preserve `VersionPrefix=1.0.0` em `Directory.Build.props` como versão base enquanto essa for a baseline vigente; não duplique propriedades de versão nos `.csproj`.
+9. Preserve `VersionPrefix=1.0.1` em `Directory.Build.props` como versão base enquanto essa for a baseline vigente; não duplique propriedades de versão nos `.csproj`.
 10. Preserve a validação SemVer e a correspondência entre tag, `Version`, metadata de assembly e versão do pacote.
 11. Em release, use a tag como fonte de verdade e preserve `Version` como único override MSBuild; não reintroduza um `PackageVersion` concorrente sem necessidade comprovada.
 12. Preserve a guarda que impede a identidade placeholder da biblioteca de ser publicada.
@@ -71,7 +71,7 @@ Quando houver contexto Git e a automação precisar provar Source Link e a vers�
 ```bash
 dotnet run --file scripts/verify-package.cs -- artifacts/packages \
   --require-source-link \
-  --expected-version 1.0.0
+  --expected-version 1.0.1
 ```
 
 Para validar a versão exata de um pacote de release:
@@ -86,8 +86,8 @@ O verificador deve confirmar versão NuGet e metadata de assembly (`AssemblyVers
 
 # Versionamento
 
-- A versão base atual é `1.0.0`, declarada uma única vez em `Directory.Build.props` via `VersionPrefix`.
-- Builds locais sem override usam `1.0.0`.
+- A versão base atual é `1.0.1`, declarada uma única vez em `Directory.Build.props` via `VersionPrefix`.
+- Builds locais sem override usam `1.0.1`.
 - Releases usam tags `vMAJOR.MINOR.PATCH[-prerelease]` como fonte de verdade.
 - Em `workflow_dispatch`, a versão informada é validada antes do build e a tag correspondente só é criada depois de todas as validações locais do release passarem.
 - Em push de tag, a tag já existente deve resolver para o mesmo SHA validado pelo workflow.
