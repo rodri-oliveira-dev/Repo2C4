@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.rodri-oliveira-dev/repo2c4-mcp",
   "title": "Repo2C4 MCP",
-  "description": "Evidence-first MCP server for generating reviewable C4 architecture documentation from authorized .NET repositories.",
+  "description": "Evidence-first MCP server for reviewable C4 architecture documentation from .NET repositories.",
   "version": "1.0.0",
   "websiteUrl": "https://github.com/rodri-oliveira-dev/Repo2C4",
   "repository": {

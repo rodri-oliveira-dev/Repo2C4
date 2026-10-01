@@ -23,9 +23,9 @@ The release uses different channels for artifact hosting and product discovery:
 
 | Product | Artifact distribution | Discovery |
 | --- | --- | --- |
-| `Repo2C4.Cli` | NuGet.org + GitHub Release | GitHub/NuGet |
-| `Repo2C4.Mcp` | NuGet.org + GitHub Release | Official MCP Registry metadata in `server.json` |
-| `Repo2C4.Agent` | NuGet.org + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Cli` | NuGet.org + GitHub Packages + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Mcp` | NuGet.org + GitHub Packages + GitHub Release | Official MCP Registry metadata in `server.json` |
+| `Repo2C4.Agent` | NuGet.org + GitHub Packages + GitHub Release | GitHub/NuGet |
 
 The Agent is intentionally not published as an MCP server or platform-specific agent package. It remains a local .NET Tool and an independent MCP client.
 
@@ -47,7 +47,7 @@ NuGet ownership verification depends on the package README containing this exact
 
 The marker is packaged from `src/Repo2C4.Mcp/README.md`. The distribution smoke verifies the registry name, package/version binding, required root argument and ownership marker before a release can proceed.
 
-The Official MCP Registry stores metadata rather than the NuGet artifact, so the matching NuGet package must be public first. The protected release workflow enforces that ordering: it publishes GitHub Release/NuGet, verifies that the public `Repo2C4.Mcp` package can be installed, and only then runs the registry publication job.
+The Official MCP Registry stores metadata rather than the NuGet artifact, so the matching NuGet package must be public first. NuGet indexing is asynchronous, therefore public installation is deliberately not a gate of the immutable release. The protected release workflow validates and packs once, creates the release tag, publishes the exact payload to NuGet.org and GitHub Packages in parallel, and creates the GitHub Release only after both package registries succeed. A separate manual `Publish Repo2C4 MCP Registry metadata` workflow verifies that the released `Repo2C4.Mcp` version is publicly consumable and only then publishes the matching Registry metadata.
 
 Registry authentication uses the Official MCP Registry's GitHub Actions OIDC flow. The registry job receives only `contents: read` and `id-token: write`; it does not require a PAT or long-lived MCP Registry secret. The job downloads a pinned `mcp-publisher` release, verifies its SHA-256, validates `server.json`, checks whether that exact server/version already exists, publishes only when absent, and verifies that the version becomes readable through the registry API.
 
@@ -59,7 +59,7 @@ mcp-publisher login github
 mcp-publisher publish server.json
 ```
 
-A duplicate immutable version must not be republished. If the registry job fails after NuGet/GitHub publication, rerun the failed registry job from the same released commit; do not rebuild or change `server.json` for that version.
+A duplicate immutable package version must not be republished. If NuGet indexing has not completed yet, the registry workflow may fail without affecting the already completed release; rerun that registry workflow later for the same version. Registry-only metadata corrections in `server.json` are allowed after release when needed to satisfy Registry validation, provided the package identifier and version remain bound to the already-published immutable NuGet release.
 
 When preparing a later Repo2C4 release, update `Directory.Build.props` and both version fields in `server.json` to the same exact SemVer before running distribution/release verification.
 
@@ -128,7 +128,13 @@ MCP uses protocol messages on stdout and diagnostics on stderr; do not pipe bann
 
 ## Versioned release: verification first, publication separately authorized
 
-[Verify and optionally release Repo2C4 tools](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. It requires a SemVer input matching the version already declared in MSBuild, runs restore/format/build/test, pins and installs official LikeC4, packs the three tools and tests isolated installation/execution. A default dry-run creates **no tag, GitHub Release, NuGet publication or public artifact**. The release job is skipped by default. To publish deliberately, select `publish_release=true` **and** enter `publication_confirmation=PUBLISH`. The write-scoped job runs inside the protected `release` environment, rechecks that `main` still points at the validated commit, validates the exact four release assets, creates the versioned GitHub Release as a draft, then authenticates to NuGet.org with Trusted Publishing. `NuGet/login` exchanges the GitHub Actions OIDC token for a short-lived `NUGET_API_KEY`; no long-lived NuGet API key is stored as a repository or environment secret. The NuGet.org Trusted Publishing policy must authorize repository `rodri-oliveira-dev/Repo2C4`, workflow `release.yml` and the protected `release` environment. Only `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent` are pushed, and the GitHub Release is made public only after those pushes succeed. A final read-only consumer job installs that exact version from NuGet.org and executes all three public commands. After that succeeds, a separate OIDC-scoped job publishes the matching `Repo2C4.Mcp` metadata to the Official MCP Registry and verifies the exact version through the registry API. Failed publication or propagation is reported without printing the API key. NuGet publication is not transactional across the three package IDs: if a later push fails after an earlier package is accepted, rerun only from the same protected `main` commit and the exact validated payload. The workflow's hash verification treats an already-published package with the same SHA-256 as satisfied and rejects a same-version package with different bytes; never rebuild or replace one package of a partially published version.
+[Release](../.github/workflows/release.yml) runs **only via workflow_dispatch on trusted `main`**. The requested SemVer must already match the versions declared by the three product projects and `server.json`. Every run validates restore/format/build/test, installs the pinned official LikeC4 validator, packs `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent`, and proves clean installation/execution from the local release payload. With the default `publish_release=false`, the workflow performs validation only and creates no tag or public release.
+
+To publish deliberately, set `publish_release=true` and `publication_confirmation=PUBLISH`. After validation, the workflow rechecks that `main` still points at the validated SHA and creates the release tag. The exact uploaded artifact is then consumed by two parallel protected jobs: one authenticates to NuGet.org through Trusted Publishing/OIDC and publishes the three packages, while the other publishes the same packages to GitHub Packages using the scoped `GITHUB_TOKEN`. Both jobs verify `SHA256SUMS` before pushing. Public NuGet indexing is intentionally **not** a post-publication release gate.
+
+The GitHub Release job runs only after both package registries succeed. It attaches the three validated `.nupkg` files and `SHA256SUMS` to the already-created tag. If a downstream publication step fails after the workflow created the tag, the compensating rollback job removes only a partial GitHub Release when present and intentionally keeps the tag so retries remain bound to the validated commit. Immutable NuGet.org and GitHub Packages versions are never deleted. If a package push partially succeeds, use **Re-run failed jobs** on the same workflow run so the original validated artifact is reused; do not start a new release run for the same partially published version.
+
+Official MCP Registry publication is outside the immutable release boundary. After `Repo2C4.Mcp` becomes publicly consumable from NuGet.org, manually dispatch [Publish Repo2C4 MCP Registry metadata](../.github/workflows/publish-mcp-registry.yml) for the released version. That workflow verifies the existing release/tag, validates the current registry metadata, publishes only the MCP Registry entry, and can be retried independently without rebuilding or republishing the NuGet package.
 
 The regular [CI](../.github/workflows/ci.yml) performs the same pack/clean-install smoke on push and PR without any AI key or release write permission. [CodeQL](../.github/workflows/codeql.yml), [Dependency Review](../.github/workflows/dependency-review.yml) and security/audit checks must remain green before the Phase 5 PR is merged. The dedicated [documentation PR workflow](architecture-pr.md) is a separate manual process, not release publication.
 
