@@ -47,7 +47,7 @@ NuGet ownership verification depends on the package README containing this exact
 
 The marker is packaged from `src/Repo2C4.Mcp/README.md`. The distribution smoke verifies the registry name, package/version binding, required root argument and ownership marker before a release can proceed.
 
-The Official MCP Registry stores metadata rather than the NuGet artifact, so the matching NuGet package must be public first. The protected release workflow enforces that ordering: it publishes GitHub Release/NuGet, verifies that the public `Repo2C4.Mcp` package can be installed, and only then runs the registry publication job.
+The Official MCP Registry stores metadata rather than the NuGet artifact, so the matching NuGet package must be public first. NuGet indexing is asynchronous, therefore public installation is deliberately not a gate of the immutable release. The protected release workflow finishes after the validated NuGet packages and GitHub Release are published. A separate manual `Publish Repo2C4 MCP Registry metadata` workflow verifies that the released `Repo2C4.Mcp` version is publicly consumable and only then publishes the matching Registry metadata.
 
 Registry authentication uses the Official MCP Registry's GitHub Actions OIDC flow. The registry job receives only `contents: read` and `id-token: write`; it does not require a PAT or long-lived MCP Registry secret. The job downloads a pinned `mcp-publisher` release, verifies its SHA-256, validates `server.json`, checks whether that exact server/version already exists, publishes only when absent, and verifies that the version becomes readable through the registry API.
 
@@ -59,7 +59,7 @@ mcp-publisher login github
 mcp-publisher publish server.json
 ```
 
-A duplicate immutable version must not be republished. If the registry job fails after NuGet/GitHub publication, rerun the failed registry job from the same released commit; do not rebuild or change `server.json` for that version.
+A duplicate immutable version must not be republished. If NuGet indexing has not completed yet, the registry workflow may fail without affecting the already completed release; rerun that registry workflow later for the same version. Do not rebuild or change `server.json` for that released version.
 
 When preparing a later Repo2C4 release, update `Directory.Build.props` and both version fields in `server.json` to the same exact SemVer before running distribution/release verification.
 
