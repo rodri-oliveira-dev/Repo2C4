@@ -243,28 +243,41 @@ jobs:
             exit 1
           fi
 
-          tag_status="$(gh api --silent --include "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" 2>"$RUNNER_TEMP/tag.err" | awk '$1 ~ /^HTTP\// { print $2; exit }' || true)"
-          if [ "$tag_status" = "200" ]; then
-            tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          tag_response="$RUNNER_TEMP/tag-ref.response"
+          tag_error="$RUNNER_TEMP/tag-ref.err"
+
+          if gh api --include "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >"$tag_response" 2>"$tag_error"; then
+            tag_status="$(awk '$1 ~ /^HTTP\// { print $2; exit }' "$tag_response")"
+            if [ "$tag_status" != "200" ]; then
+              echo "::error::Unable to query tag $RELEASE_TAG (HTTP ${tag_status:-unknown})."
+              cat "$tag_error" >&2 || true
+              exit 1
+            fi
+
+            tag_json="$(awk 'body { print } /^[[:space:]\r]*$/ { body = 1 }' "$tag_response")"
             tag_type="$(jq -r '.object.type' <<<"$tag_json")"
             tag_sha="$(jq -r '.object.sha' <<<"$tag_json")"
+
             while [ "$tag_type" = "tag" ]; do
               tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_sha")"
               tag_type="$(jq -r '.object.type' <<<"$tag_object")"
               tag_sha="$(jq -r '.object.sha' <<<"$tag_object")"
             done
+
             if [ "$tag_type" != "commit" ] || [ "$tag_sha" != "$VALIDATED_SHA" ]; then
               echo "::error::Tag $RELEASE_TAG does not resolve to validated commit $VALIDATED_SHA."
               exit 1
             fi
+
             echo "Tag $RELEASE_TAG already exists on the validated commit."
             echo "tag_created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          tag_status="$(awk '$1 ~ /^HTTP\// { print $2; exit }' "$tag_response")"
           if [ "$tag_status" != "404" ]; then
             echo "::error::Unable to query tag $RELEASE_TAG (HTTP ${tag_status:-unknown})."
-            cat "$RUNNER_TEMP/tag.err" >&2 || true
+            cat "$tag_error" >&2 || true
             exit 1
           fi
 
