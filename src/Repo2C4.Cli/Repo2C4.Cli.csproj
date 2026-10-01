@@ -9,13 +9,16 @@
     <Authors>Rodrigo de Oliveira</Authors>
     <Description>Repo2C4 command-line architecture evidence and reviewable LikeC4 documentation tool.</Description>
     <PackageTags>likec4;c4;architecture;documentation;dotnet-tool</PackageTags>
+    <PackageProjectUrl>https://github.com/rodri-oliveira-dev/Repo2C4</PackageProjectUrl>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/Repo2C4</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../resource/icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Repo2C4.Core/Repo2C4.Core.csproj" />

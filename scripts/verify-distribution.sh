@@ -53,6 +53,10 @@ assert repository_root is not None
 assert repository_root.get("format") == "filepath"
 assert repository_root.get("isRequired") is True
 
+icon = pathlib.Path("resource/icon.png").read_bytes()
+assert icon.startswith(b"\x89PNG\r\n\x1a\n")
+assert len(icon) > 8
+
 mcp_readme = pathlib.Path("src/Repo2C4.Mcp/README.md").read_text(encoding="utf-8")
 assert "<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->" in mcp_readme
 PY
@@ -69,6 +73,8 @@ for product in Repo2C4.Cli Repo2C4.Mcp Repo2C4.Agent; do
   grep -Fq "<id>$product</id>" <<<"$nuspec"
   grep -Fq "<version>$version</version>" <<<"$nuspec"
   grep -Fq "<readme>README.md</readme>" <<<"$nuspec"
+  grep -Fq "<icon>icon.png</icon>" <<<"$nuspec"
+  unzip -Z1 "$archive" | grep -Fxq "icon.png"
   package_readme="$(unzip -p "$archive" README.md)"
   grep -Fq "# Repo2C4" <<<"$package_readme"
   if [[ "$product" == "Repo2C4.Mcp" ]]; then
