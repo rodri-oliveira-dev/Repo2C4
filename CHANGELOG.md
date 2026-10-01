@@ -29,6 +29,6 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 - Vendor-neutral MCP client documentation, reusable evidence-first C1/C2 prompts and a deterministic protocol-client end-to-end test that compares preview/written LikeC4 with versioned golden files without any hosted AI dependency.
 
 ### Changed
-- Added the Repo2C4 repository URL as `PackageProjectUrl` metadata for the CLI NuGet package, aligning it with the MCP and Agent packages.
+- Added consumer-facing NuGet metadata for the product packages: the Repo2C4 repository URL as CLI `PackageProjectUrl` and a shared package icon for CLI, MCP and Agent.
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.
 - Disabled inherited template release and NuGet publication until phase 5.
