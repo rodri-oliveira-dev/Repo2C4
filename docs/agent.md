@@ -64,7 +64,7 @@ Context characters: <count>
 
 Repo2C4 Agent, MCP and CLI use the same product version. Agent requires MCP; installing CLI is optional for the Agent flow and is shown here only for the broader Repo2C4 workflow.
 
-The package commands below describe the **published NuGet path** and assume version `1.0.1` is available in the configured feed:
+The package commands below describe the **published NuGet path** and assume the packages are available in the configured feed:
 
 ```bash
 dotnet tool install --global Repo2C4.Agent

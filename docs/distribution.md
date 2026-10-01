@@ -1,6 +1,6 @@
 # Repo2C4 distribution and verified release
 
-Repo2C4 v1.0.1 ships three **separate .NET 10 tool packages**: `Repo2C4.Cli` (command `repo2c4`), `Repo2C4.Mcp` (command `repo2c4-mcp`) and `Repo2C4.Agent` (command `repo2c4-agent`). The shared Core remains an internal project reference, not a separately published package. The Agent is a client of the MCP executable over stdio and does not take a project/domain dependency on Core or MCP. Package version comes from `Directory.Build.props`; the three products use the same version and distinct, non-placeholder package IDs. The tools target .NET 10, so a compatible .NET runtime/SDK must be installed. LikeC4 is an **independent, externally installed** validator and renderer, not bundled inside Repo2C4.
+Repo2C4 ships three **separate .NET 10 tool packages**: `Repo2C4.Cli` (command `repo2c4`), `Repo2C4.Mcp` (command `repo2c4-mcp`) and `Repo2C4.Agent` (command `repo2c4-agent`). The shared Core remains an internal project reference, not a separately published package. The Agent is a client of the MCP executable over stdio and does not take a project/domain dependency on Core or MCP. Package version comes from `Directory.Build.props`; the three products use the same version and distinct, non-placeholder package IDs. The tools target .NET 10, so a compatible .NET runtime/SDK must be installed. LikeC4 is an **independent, externally installed** validator and renderer, not bundled inside Repo2C4.
 
 ## Install the published tools
 

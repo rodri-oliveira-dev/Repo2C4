@@ -53,7 +53,9 @@ public sealed class AgentExecutionContext
     public static ActivitySource TelemetryActivitySource
     {
         get;
-    } = new(ActivitySourceName, "1.0.1");
+    } = new(
+        ActivitySourceName,
+        typeof(AgentExecutionContext).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");
 
     private readonly AgentExecutionBudgets budgets;
     private readonly object logGate = new();

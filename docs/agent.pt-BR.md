@@ -64,7 +64,7 @@ Context characters: <quantidade>
 
 Agent, MCP e CLI usam a mesma versão do produto. O Agent **exige o MCP**, mas a CLI é opcional para o fluxo do Agent; ela aparece aqui apenas para o fluxo mais amplo do Repo2C4.
 
-Os comandos abaixo representam o **caminho por pacotes publicados no NuGet** e pressupõem que a versão `1.0.1` esteja disponível no feed configurado:
+Os comandos abaixo representam o **caminho por pacotes publicados no NuGet** e pressupõem que os pacotes estejam disponíveis no feed configurado:
 
 ```bash
 dotnet tool install --global Repo2C4.Agent
