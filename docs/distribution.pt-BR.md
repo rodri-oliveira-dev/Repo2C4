@@ -47,7 +47,7 @@ A validação de ownership do pacote NuGet depende deste marcador exato no READM
 
 O marcador vem de `src/Repo2C4.Mcp/README.md`. O smoke de distribuição valida nome do Registry, vínculo package/version, argumento obrigatório da raiz e marcador de ownership antes da release.
 
-O Official MCP Registry armazena metadata, não o pacote NuGet, então o pacote correspondente precisa estar público primeiro. O workflow protegido de release garante essa ordem: publica GitHub Release/NuGet, verifica que o `Repo2C4.Mcp` público pode ser instalado e só então executa o job de publicação no Registry.
+O Official MCP Registry armazena metadata, não o pacote NuGet, então o pacote correspondente precisa estar público primeiro. Como a indexação do NuGet é assíncrona, a instalação pública não é usada como gate da release imutável. O workflow protegido de release termina depois de publicar os pacotes NuGet validados e a GitHub Release. Um workflow manual separado, `Publish Repo2C4 MCP Registry metadata`, verifica que a versão publicada de `Repo2C4.Mcp` já está publicamente consumível e só então publica a metadata correspondente no Registry.
 
 A autenticação usa o fluxo oficial GitHub Actions OIDC. O job recebe somente `contents: read` e `id-token: write`; não exige PAT nem secret persistente específico do MCP Registry. O workflow baixa uma versão fixada do `mcp-publisher`, confere seu SHA-256, valida `server.json`, verifica se aquela versão exata já existe, publica apenas quando ausente e confirma a leitura da versão pela API do Registry.
 
@@ -59,7 +59,7 @@ mcp-publisher login github
 mcp-publisher publish server.json
 ```
 
-Uma versão imutável duplicada não deve ser republicada. Se o job do Registry falhar depois que NuGet/GitHub já estiverem públicos, repita somente o job que falhou a partir do mesmo commit da release; não reconstrua nem altere `server.json` para aquela versão.
+Uma versão imutável duplicada não deve ser republicada. Se a indexação do NuGet ainda não tiver terminado, o workflow do Registry pode falhar sem afetar a release já concluída; execute novamente esse workflow mais tarde para a mesma versão. Não reconstrua nem altere `server.json` para essa versão publicada.
 
 Ao preparar uma release futura, atualize `Directory.Build.props` e os dois campos de versão de `server.json` para o mesmo SemVer exato antes de executar a verificação de distribuição/release.
 
