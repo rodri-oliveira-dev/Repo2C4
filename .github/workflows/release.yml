@@ -177,8 +177,22 @@ jobs:
             "SHA256SUMS"
           )
 
-          existing_tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
-          if [ -n "$existing_tag_sha" ]; then
+          tag_ref_json=""
+          if tag_ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" 2>/dev/null)"; then
+            existing_tag_type="$(jq -r '.object.type' <<<"$tag_ref_json")"
+            existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_ref_json")"
+
+            if [ "$existing_tag_type" = "tag" ]; then
+              tag_object_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing_tag_sha")"
+              existing_tag_type="$(jq -r '.object.type' <<<"$tag_object_json")"
+              existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_object_json")"
+            fi
+
+            if [ "$existing_tag_type" != "commit" ]; then
+              echo "::error::Existing tag $tag does not resolve directly to a commit; refusing publication."
+              exit 1
+            fi
+
             if [ "$existing_tag_sha" != "$GITHUB_SHA" ]; then
               echo "::error::Existing tag $tag points to a different commit; refusing publication."
               exit 1
