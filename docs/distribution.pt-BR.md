@@ -59,7 +59,7 @@ mcp-publisher login github
 mcp-publisher publish server.json
 ```
 
-Uma versão imutável duplicada não deve ser republicada. Se a indexação do NuGet ainda não tiver terminado, o workflow do Registry pode falhar sem afetar a release já concluída; execute novamente esse workflow mais tarde para a mesma versão. Não reconstrua nem altere `server.json` para essa versão publicada.
+Uma versão imutável duplicada do pacote não deve ser republicada. Se a indexação do NuGet ainda não tiver terminado, o workflow do Registry pode falhar sem afetar a release já concluída; execute novamente esse workflow mais tarde para a mesma versão. Correções apenas de metadata em `server.json` são permitidas após a release quando necessárias para atender à validação do Registry, desde que o identificador e a versão do pacote continuem vinculados à release NuGet imutável já publicada.
 
 Ao preparar uma release futura, atualize `Directory.Build.props` e os dois campos de versão de `server.json` para o mesmo SemVer exato antes de executar a verificação de distribuição/release.
 
