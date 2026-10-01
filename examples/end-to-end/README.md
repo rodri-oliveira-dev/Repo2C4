@@ -70,7 +70,7 @@ Omit `--apply` to preview changes only. Review `added`, `modified`, `unchanged` 
 
 ## Installed CLI and MCP quickstart (Phase 5)
 
-After `dotnet build Repo2C4.slnx --configuration Release` and installing the official `likec4@1.59.4` CLI, execute `bash scripts/verify-distribution.sh artifacts/distribution 1.0.1` from the Repo2C4 root to package, install and smoke-test the two version-matched tools from a NuGet feed with no external sources. No public package or cloud credential is required. See [English distribution guide](../../docs/distribution.md) or [Português](../../docs/distribution.pt-BR.md) for persistent local installation.
+After `dotnet build Repo2C4.slnx --configuration Release` and installing the official `likec4@1.59.4` CLI, execute `bash scripts/verify-distribution.sh artifacts/distribution` from the Repo2C4 root to package, install and smoke-test the two version-matched tools from a NuGet feed with no external sources. No public package or cloud credential is required. See [English distribution guide](../../docs/distribution.md) or [Português](../../docs/distribution.pt-BR.md) for persistent local installation.
 
 With the installed `repo2c4` command on PATH and while in this repository checkout, inspect the **authorized local** example and compare against the deterministic fixture:
 

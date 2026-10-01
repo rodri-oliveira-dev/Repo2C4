@@ -9,7 +9,7 @@ O servidor MCP não contém SDK de IA, credenciais de provedor nem seletor de mo
 Depois que o pacote público estiver disponível, o caminho recomendado é instalar a .NET Tool:
 
 ```bash
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
+dotnet tool install --global Repo2C4.Mcp
 repo2c4-mcp --help
 ```
 
