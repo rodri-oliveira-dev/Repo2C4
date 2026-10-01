@@ -82,10 +82,19 @@ jobs:
           echo "commit=$tag_sha" >> "$GITHUB_OUTPUT"
           echo "Released commit: $tag_sha"
 
-      - name: Checkout the exact released commit
+      - name: Checkout released package source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ steps.release.outputs.commit }}
+          path: released-source
+          persist-credentials: false
+          show-progress: false
+
+      - name: Checkout current registry metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: registry-metadata
           persist-credentials: false
           show-progress: false
 
@@ -100,15 +109,16 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          test "$(jq -r '.name' server.json)" = "io.github.rodri-oliveira-dev/repo2c4-mcp"
-          test "$(jq -r '.version' server.json)" = "$VERSION"
-          test "$(jq -r '.packages | length' server.json)" -eq 1
-          test "$(jq -r '.packages[0].registryType' server.json)" = "nuget"
-          test "$(jq -r '.packages[0].identifier' server.json)" = "Repo2C4.Mcp"
-          test "$(jq -r '.packages[0].version' server.json)" = "$VERSION"
-          test "$(jq -r '.packages[0].runtimeHint' server.json)" = "dnx"
-          test "$(jq -r '.packages[0].transport.type' server.json)" = "stdio"
-          grep -Fq '<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->' src/Repo2C4.Mcp/README.md
+          metadata="registry-metadata/server.json"
+          test "$(jq -r '.name' "$metadata")" = "io.github.rodri-oliveira-dev/repo2c4-mcp"
+          test "$(jq -r '.version' "$metadata")" = "$VERSION"
+          test "$(jq -r '.packages | length' "$metadata")" -eq 1
+          test "$(jq -r '.packages[0].registryType' "$metadata")" = "nuget"
+          test "$(jq -r '.packages[0].identifier' "$metadata")" = "Repo2C4.Mcp"
+          test "$(jq -r '.packages[0].version' "$metadata")" = "$VERSION"
+          test "$(jq -r '.packages[0].runtimeHint' "$metadata")" = "dnx"
+          test "$(jq -r '.packages[0].transport.type' "$metadata")" = "stdio"
+          grep -Fq '<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->' released-source/src/Repo2C4.Mcp/README.md
 
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
@@ -157,7 +167,8 @@ jobs:
           server_name="io.github.rodri-oliveira-dev%2Frepo2c4-mcp"
           detail_url="$registry/v0.1/servers/$server_name/versions/$VERSION"
 
-          "$publisher" validate server.json
+          metadata="registry-metadata/server.json"
+          "$publisher" validate "$metadata"
 
           status="$(curl --silent --show-error --proto '=https' --proto-redir '=https' \
             --output "$RUNNER_TEMP/registry-existing.json" \
@@ -173,7 +184,7 @@ jobs:
           fi
 
           "$publisher" login github-oidc
-          "$publisher" publish server.json
+          "$publisher" publish "$metadata"
 
           for attempt in {1..12}; do
             status="$(curl --silent --show-error --proto '=https' --proto-redir '=https' \
