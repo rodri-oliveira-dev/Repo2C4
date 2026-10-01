@@ -23,9 +23,9 @@ A release usa canais diferentes para hospedagem dos artefatos e descoberta dos p
 
 | Produto | Distribuição do artefato | Descoberta |
 | --- | --- | --- |
-| `Repo2C4.Cli` | NuGet.org + GitHub Release | GitHub/NuGet |
-| `Repo2C4.Mcp` | NuGet.org + GitHub Release | metadata no Official MCP Registry via `server.json` |
-| `Repo2C4.Agent` | NuGet.org + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Cli` | NuGet.org + GitHub Packages + GitHub Release | GitHub/NuGet |
+| `Repo2C4.Mcp` | NuGet.org + GitHub Packages + GitHub Release | metadata no Official MCP Registry via `server.json` |
+| `Repo2C4.Agent` | NuGet.org + GitHub Packages + GitHub Release | GitHub/NuGet |
 
 O Agent não é publicado artificialmente como servidor MCP nem como pacote de um marketplace específico. Ele permanece uma .NET Tool local e um cliente MCP independente.
 
@@ -47,7 +47,7 @@ A validação de ownership do pacote NuGet depende deste marcador exato no READM
 
 O marcador vem de `src/Repo2C4.Mcp/README.md`. O smoke de distribuição valida nome do Registry, vínculo package/version, argumento obrigatório da raiz e marcador de ownership antes da release.
 
-O Official MCP Registry armazena metadata, não o pacote NuGet, então o pacote correspondente precisa estar público primeiro. Como a indexação do NuGet é assíncrona, a instalação pública não é usada como gate da release imutável. O workflow protegido de release termina depois de publicar os pacotes NuGet validados e a GitHub Release. Um workflow manual separado, `Publish Repo2C4 MCP Registry metadata`, verifica que a versão publicada de `Repo2C4.Mcp` já está publicamente consumível e só então publica a metadata correspondente no Registry.
+O Official MCP Registry armazena metadata, não o pacote NuGet, então o pacote correspondente precisa estar público primeiro. Como a indexação do NuGet é assíncrona, a instalação pública não é usada como gate da release imutável. O workflow protegido de release valida e empacota uma única vez, cria a tag, publica o mesmo payload no NuGet.org e GitHub Packages em paralelo e cria a GitHub Release somente depois que ambos os registries concluírem com sucesso. Um workflow manual separado, `Publish Repo2C4 MCP Registry metadata`, verifica que a versão publicada de `Repo2C4.Mcp` já está publicamente consumível e só então publica a metadata correspondente no Registry.
 
 A autenticação usa o fluxo oficial GitHub Actions OIDC. O job recebe somente `contents: read` e `id-token: write`; não exige PAT nem secret persistente específico do MCP Registry. O workflow baixa uma versão fixada do `mcp-publisher`, confere seu SHA-256, valida `server.json`, verifica se aquela versão exata já existe, publica apenas quando ausente e confirma a leitura da versão pela API do Registry.
 
