@@ -5,8 +5,8 @@ Repo2C4 Agent is a local .NET architecture-documentation agent built with Micros
 ## Install
 
 ```bash
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
+dotnet tool install --global Repo2C4.Agent
+dotnet tool install --global Repo2C4.Mcp
 ```
 
 The Agent requires .NET 10 and the Repo2C4 MCP server. LikeC4 is installed separately for validation.

@@ -31,8 +31,8 @@ ollama pull YOUR_LOCAL_MODEL
 After the Repo2C4 packages are publicly released, install the Agent and its required MCP server:
 
 ```bash
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
+dotnet tool install --global Repo2C4.Agent
+dotnet tool install --global Repo2C4.Mcp
 npm install --global likec4@1.59.4
 
 repo2c4-agent \
@@ -67,9 +67,9 @@ Repo2C4 Agent, MCP and CLI use the same product version. Agent requires MCP; ins
 The package commands below describe the **published NuGet path** and assume version `1.0.1` is available in the configured feed:
 
 ```bash
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
-dotnet tool install --global Repo2C4.Cli --version 1.0.1
+dotnet tool install --global Repo2C4.Agent
+dotnet tool install --global Repo2C4.Mcp
+dotnet tool install --global Repo2C4.Cli
 repo2c4-agent --help
 ```
 

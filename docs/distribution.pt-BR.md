@@ -1,15 +1,15 @@
 # Distribuição e release verificável do Repo2C4
 
-O Repo2C4 versão 1.0.1 fornece três ferramentas .NET 10 separadas: `Repo2C4.Cli` (`repo2c4`), `Repo2C4.Mcp` (`repo2c4-mcp`) e `Repo2C4.Agent` (`repo2c4-agent`). O Core permanece como referência interna, sem pacote próprio. O Agent é cliente do executável MCP por stdio e não depende de Core/MCP como biblioteca de domínio. A versão compartilhada vem de `Directory.Build.props`. O LikeC4 é um validador externo, não é instalado pelo Repo2C4.
+O Repo2C4 fornece três ferramentas .NET 10 separadas: `Repo2C4.Cli` (`repo2c4`), `Repo2C4.Mcp` (`repo2c4-mcp`) e `Repo2C4.Agent` (`repo2c4-agent`). O Core permanece como referência interna, sem pacote próprio. O Agent é cliente do executável MCP por stdio e não depende de Core/MCP como biblioteca de domínio. A versão compartilhada vem de `Directory.Build.props`. O LikeC4 é um validador externo, não é instalado pelo Repo2C4.
 
 ## Instalação pública e teste local
 
-As releases publicadas disponibilizam as três ferramentas pelo NuGet.org. Instale a versão exata indicada na release:
+As releases publicadas disponibilizam as três ferramentas pelo NuGet.org. Instale a release pública atual:
 
 ```bash
-dotnet tool install --global Repo2C4.Cli --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
+dotnet tool install --global Repo2C4.Cli
+dotnet tool install --global Repo2C4.Mcp
+dotnet tool install --global Repo2C4.Agent
 repo2c4 --help
 repo2c4-mcp --help
 repo2c4-agent --help
@@ -71,12 +71,12 @@ dotnet tool restore
 dotnet restore Repo2C4.slnx --locked-mode
 dotnet build Repo2C4.slnx --configuration Release --no-restore
 npm install --global likec4@1.59.4
-bash scripts/verify-distribution.sh artifacts/distribution 1.0.1
+bash scripts/verify-distribution.sh artifacts/distribution
 ```
 
 O script cria os três pacotes de produto, confere identidade e versão, usa um feed NuGet local isolado com fontes externas desabilitadas e instala os três comandos. Ele testa `inspect → generate --apply → validate`, o protocolo MCP por stdio e o Agent empacotado contra a fixture `library-only` usando um fake compatível com Ollama em loopback mais o MCP real instalado. O fake não propõe arquitetura de propósito; o resultado esperado é `insufficient_evidence` controlado e zero escrita. Não cria tag, release, publicação NuGet nem chamada de IA. Os diretórios temporários são excluídos e os pacotes permanecem em `artifacts/distribution/`, ignorado pelo Git. No Windows, instale os pacotes com `dotnet tool install --tool-path` em diretórios separados, ajuste os caminhos e invoque `repo2c4.exe`, `repo2c4-mcp.exe` e `repo2c4-agent.exe`.
 
-Os três pacotes anexados à GitHub Release correspondente são exatamente o payload validado enviado ao NuGet.org e incluem `SHA256SUMS`. Prefira instalar a versão exata documentada na release em vez de depender de uma versão mais recente implícita.
+Os três pacotes anexados à GitHub Release correspondente são exatamente o payload validado enviado ao NuGet.org e incluem `SHA256SUMS`. Use `--version` somente quando houver necessidade explícita de fixar uma release histórica específica.
 
 ## Repositório .NET até C1/C2 e C3 seletivo
 

@@ -4,12 +4,12 @@ Repo2C4 v1.0.1 ships three **separate .NET 10 tool packages**: `Repo2C4.Cli` (co
 
 ## Install the published tools
 
-Published releases expose all three product tools through NuGet.org. Install the exact release version:
+Published releases expose all three product tools through NuGet.org. Install the current public release:
 
 ```bash
-dotnet tool install --global Repo2C4.Cli --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
+dotnet tool install --global Repo2C4.Cli
+dotnet tool install --global Repo2C4.Mcp
+dotnet tool install --global Repo2C4.Agent
 repo2c4 --help
 repo2c4-mcp --help
 repo2c4-agent --help
@@ -71,7 +71,7 @@ dotnet tool restore
 dotnet restore Repo2C4.slnx --locked-mode
 dotnet build Repo2C4.slnx --configuration Release --no-restore
 npm install --global likec4@1.59.4
-bash scripts/verify-distribution.sh artifacts/distribution 1.0.1
+bash scripts/verify-distribution.sh artifacts/distribution
 ```
 
 The script packs **CLI, MCP and Agent**, verifies version/package identity, builds an isolated local NuGet feed and installs all three commands into separate temporary tool paths using a NuGet configuration with `<clear/>` package sources. It exercises a real `inspect → generate --apply → validate` workflow, checks the MCP stdio protocol, and runs the packaged Agent against the checked-in `library-only` fixture using a controlled loopback Ollama-compatible fake plus the installed real MCP. The fake deliberately emits no proposal, so the expected Agent outcome is the controlled `insufficient_evidence` terminal reason with no write. It never pushes a package, creates a tag or invokes a cloud API. Its temporary tool directories are deleted on completion. The three packages remain in ignored `artifacts/distribution/` for optional local use.
@@ -79,15 +79,15 @@ The script packs **CLI, MCP and Agent**, verifies version/package identity, buil
 To install from previously verified package files (without using external feeds), create a NuGet.Config containing only the directory of the three local `.nupkg` files, then run:
 
 ```bash
-dotnet tool install --tool-path ./local-tools/cli Repo2C4.Cli --version 1.0.1 --configfile ./NuGet.Config
-dotnet tool install --tool-path ./local-tools/mcp Repo2C4.Mcp --version 1.0.1 --configfile ./NuGet.Config
-dotnet tool install --tool-path ./local-tools/agent Repo2C4.Agent --version 1.0.1 --configfile ./NuGet.Config
+dotnet tool install --tool-path ./local-tools/cli Repo2C4.Cli --configfile ./NuGet.Config
+dotnet tool install --tool-path ./local-tools/mcp Repo2C4.Mcp --configfile ./NuGet.Config
+dotnet tool install --tool-path ./local-tools/agent Repo2C4.Agent --configfile ./NuGet.Config
 ./local-tools/cli/repo2c4 --help
 ./local-tools/mcp/repo2c4-mcp --help
 ./local-tools/agent/repo2c4-agent --help
 ```
 
-Tool command extensions differ on Windows (`.exe`). The install script is a Linux/CI smoke test; Windows users can run the shown `dotnet tool install` commands with Windows-appropriate paths. Packages attached to the matching GitHub Release are the validated payload sent to NuGet.org and include SHA-256 checksums in `SHA256SUMS`. Prefer the exact version shown by the release notes rather than an unbounded latest install.
+Tool command extensions differ on Windows (`.exe`). The install script is a Linux/CI smoke test; Windows users can run the shown `dotnet tool install` commands with Windows-appropriate paths. Packages attached to the matching GitHub Release are the validated payload sent to NuGet.org and include SHA-256 checksums in `SHA256SUMS`. Use an explicit `--version` only when you intentionally need to pin a specific historical release.
 
 ## Local repository → evidence → reviewed architecture → LikeC4
 

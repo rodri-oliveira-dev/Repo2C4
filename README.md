@@ -65,9 +65,9 @@ The walkthrough below uses the checked-in `library-only` fixture so a new user c
 git clone https://github.com/rodri-oliveira-dev/Repo2C4.git
 cd Repo2C4
 
-dotnet tool install --global Repo2C4.Cli --version 1.0.1
-dotnet tool install --global Repo2C4.Mcp --version 1.0.1
-dotnet tool install --global Repo2C4.Agent --version 1.0.1
+dotnet tool install --global Repo2C4.Cli
+dotnet tool install --global Repo2C4.Mcp
+dotnet tool install --global Repo2C4.Agent
 npm install --global likec4@1.59.4
 ```
 
