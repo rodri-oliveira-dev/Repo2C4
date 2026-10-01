@@ -191,11 +191,11 @@ jobs:
             existing_tag_type="$(jq -r '.object.type' <<<"$tag_ref_json")"
             existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_ref_json")"
 
-            if [ "$existing_tag_type" = "tag" ]; then
+            while [ "$existing_tag_type" = "tag" ]; do
               tag_object_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing_tag_sha")"
               existing_tag_type="$(jq -r '.object.type' <<<"$tag_object_json")"
               existing_tag_sha="$(jq -r '.object.sha' <<<"$tag_object_json")"
-            fi
+            done
 
             if [ "$existing_tag_type" != "commit" ]; then
               echo "::error::Existing tag $tag does not resolve directly to a commit; refusing publication."
