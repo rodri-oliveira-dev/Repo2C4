@@ -9,7 +9,7 @@ on:
         required: true
         default: '1.0.0'
       publish_release:
-        description: 'Explicitly publish the GitHub Release and both .NET tools to NuGet.org'
+        description: 'Explicitly publish GitHub Release and all three .NET tools to NuGet.org; MCP Registry metadata follows after public verification'
         type: boolean
         required: true
         default: false
@@ -79,8 +79,10 @@ jobs:
           declared="$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)"
           test "$declared" = "$VERSION"
           test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)" = "$VERSION"
+          test "$(dotnet msbuild src/Repo2C4.Agent/Repo2C4.Agent.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)" = "$VERSION"
           test "$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Cli
           test "$(dotnet msbuild src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Mcp
+          test "$(dotnet msbuild src/Repo2C4.Agent/Repo2C4.Agent.csproj -nologo -getProperty:PackageId | tr -d '\r' | tail -n 1)" = Repo2C4.Agent
           test "$(dotnet msbuild src/Repo2C4.Core/Repo2C4.Core.csproj -nologo -getProperty:IsPackable | tr -d '\r' | tail -n 1)" = false
 
       - name: Restore, format, build and test
@@ -114,9 +116,9 @@ jobs:
           set -euo pipefail
           bash scripts/verify-distribution.sh artifacts/distribution "$VERSION"
           cd artifacts/distribution
-          sha256sum Repo2C4.Cli."$VERSION".nupkg Repo2C4.Mcp."$VERSION".nupkg > SHA256SUMS
+          sha256sum Repo2C4.Cli."$VERSION".nupkg Repo2C4.Mcp."$VERSION".nupkg Repo2C4.Agent."$VERSION".nupkg > SHA256SUMS
           sha256sum --check SHA256SUMS
-          echo "Both versioned tools are installable and runnable from a clean local feed; no publication in the dry-run job."
+          echo "All three versioned tools are installable and runnable from a clean local feed; no publication in the dry-run job."
 
       - name: Retain validated release payload only after explicit opt-in
         if: ${{ steps.inputs.outputs.publishing == 'true' }}
@@ -148,9 +150,10 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
             --name repo2c4-release-payload --dir "$RUNNER_TEMP/payload"
           cd "$RUNNER_TEMP/payload"
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 3
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 4
           test -s "Repo2C4.Cli.$VERSION.nupkg"
           test -s "Repo2C4.Mcp.$VERSION.nupkg"
+          test -s "Repo2C4.Agent.$VERSION.nupkg"
           sha256sum --check SHA256SUMS
 
       - name: Verify main has not moved and create release at validated SHA
@@ -170,6 +173,7 @@ jobs:
           expected_assets=(
             "Repo2C4.Cli.$VERSION.nupkg"
             "Repo2C4.Mcp.$VERSION.nupkg"
+            "Repo2C4.Agent.$VERSION.nupkg"
             "SHA256SUMS"
           )
 
@@ -206,12 +210,15 @@ jobs:
               '~~~bash' \
               "dotnet tool install --global Repo2C4.Cli --version $VERSION" \
               "dotnet tool install --global Repo2C4.Mcp --version $VERSION" \
+              "dotnet tool install --global Repo2C4.Agent --version $VERSION" \
               "repo2c4 --help" \
               "repo2c4-mcp --help" \
+              "repo2c4-agent --help" \
               '~~~' \
               "" \
               "The attached .nupkg files are the exact validated payload published to NuGet.org." \
-              "Verify downloads with SHA256SUMS. See docs/distribution.md for runtime requirements, MCP configuration and security guidance." \
+              "Repo2C4.Mcp registry metadata is versioned in server.json and is published to the Official MCP Registry after NuGet consumer verification." \
+              "Verify downloads with SHA256SUMS. See docs/distribution.md for runtime requirements, MCP configuration, registry publication and security guidance." \
               > "$notes_file"
             gh release create "$tag" \
               --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft \
@@ -245,7 +252,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$VERSION"
-          expected="$(printf '%s\n' "Repo2C4.Cli.$VERSION.nupkg" "Repo2C4.Mcp.$VERSION.nupkg" "SHA256SUMS" | sort)"
+          expected="$(printf '%s\n' "Repo2C4.Cli.$VERSION.nupkg" "Repo2C4.Mcp.$VERSION.nupkg" "Repo2C4.Agent.$VERSION.nupkg" "SHA256SUMS" | sort)"
           if [ -z "${NUGET_API_KEY:-}" ]; then
             echo "::error::The protected release environment must provide NUGET_API_KEY."
             exit 1
@@ -280,6 +287,7 @@ jobs:
 
           push_verified Repo2C4.Cli "$RUNNER_TEMP/payload/Repo2C4.Cli.$VERSION.nupkg"
           push_verified Repo2C4.Mcp "$RUNNER_TEMP/payload/Repo2C4.Mcp.$VERSION.nupkg"
+          push_verified Repo2C4.Agent "$RUNNER_TEMP/payload/Repo2C4.Agent.$VERSION.nupkg"
 
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
           final_json="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
@@ -335,6 +343,7 @@ jobs:
 
           install_with_retry Repo2C4.Cli "$work/cli"
           install_with_retry Repo2C4.Mcp "$work/mcp"
+          install_with_retry Repo2C4.Agent "$work/agent"
 
           "$work/cli/repo2c4" --help | grep -Fq 'Repo2C4 CLI'
           if ! "$work/mcp/repo2c4-mcp" --help >"$work/mcp.stdout" 2>"$work/mcp.stderr"; then
@@ -343,5 +352,121 @@ jobs:
           fi
           test ! -s "$work/mcp.stdout"
           grep -Fq 'stdout is reserved exclusively for MCP protocol messages' "$work/mcp.stderr"
+          "$work/agent/repo2c4-agent" --help >"$work/agent.stdout" 2>"$work/agent.stderr"
+          test ! -s "$work/agent.stdout"
+          grep -Fq 'Repo2C4 Agent host' "$work/agent.stderr"
 
-          echo "Published Repo2C4 CLI and MCP $VERSION installed and executed successfully from NuGet.org."
+          echo "Published Repo2C4 CLI, MCP and Agent $VERSION installed and executed successfully from NuGet.org."
+
+
+  publish-mcp-registry:
+    name: Publish Repo2C4 MCP to Official Registry
+    needs: post-publish
+    if: ${{ needs.post-publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout the exact released commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Verify registry metadata and NuGet availability
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test "$(jq -r '.name' server.json)" = "io.github.rodri-oliveira-dev/repo2c4-mcp"
+          test "$(jq -r '.version' server.json)" = "$VERSION"
+          test "$(jq -r '.packages | length' server.json)" -eq 1
+          test "$(jq -r '.packages[0].registryType' server.json)" = "nuget"
+          test "$(jq -r '.packages[0].identifier' server.json)" = "Repo2C4.Mcp"
+          test "$(jq -r '.packages[0].version' server.json)" = "$VERSION"
+          test "$(jq -r '.packages[0].runtimeHint' server.json)" = "dnx"
+          test "$(jq -r '.packages[0].transport.type' server.json)" = "stdio"
+          grep -Fq '<!-- mcp-name: io.github.rodri-oliveira-dev/repo2c4-mcp -->' src/Repo2C4.Mcp/README.md
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          for attempt in {1..12}; do
+            if dotnet tool install --tool-path "$work/tool" Repo2C4.Mcp --version "$VERSION" \
+              --add-source https://api.nuget.org/v3/index.json \
+              --ignore-failed-sources >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              echo "::error::Repo2C4.Mcp $VERSION is not yet consumable from NuGet.org."
+              exit 1
+            fi
+            sleep 10
+          done
+          "$work/tool/repo2c4-mcp" --help >"$work/stdout" 2>"$work/stderr"
+          test ! -s "$work/stdout"
+          grep -Fq 'stdout is reserved exclusively for MCP protocol messages' "$work/stderr"
+
+      - name: Install pinned mcp-publisher
+        shell: bash
+        env:
+          MCP_PUBLISHER_VERSION: '1.8.1'
+          MCP_PUBLISHER_SHA256: 'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/mcp-publisher.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v$MCP_PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz" \
+            --output "$archive"
+          echo "$MCP_PUBLISHER_SHA256  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" mcp-publisher
+          chmod +x "$RUNNER_TEMP/mcp-publisher"
+          "$RUNNER_TEMP/mcp-publisher" --help >/dev/null
+
+      - name: Validate and publish MCP registry metadata
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          publisher="$RUNNER_TEMP/mcp-publisher"
+          registry="https://registry.modelcontextprotocol.io"
+          server_name="io.github.rodri-oliveira-dev%2Frepo2c4-mcp"
+          detail_url="$registry/v0.1/servers/$server_name/versions/$VERSION"
+
+          "$publisher" validate server.json
+
+          status="$(curl --silent --show-error --output "$RUNNER_TEMP/registry-existing.json" \
+            --write-out '%{http_code}' "$detail_url")"
+          if [ "$status" = "200" ]; then
+            echo "Repo2C4 MCP $VERSION is already present in the Official MCP Registry."
+            exit 0
+          fi
+          if [ "$status" != "404" ]; then
+            cat "$RUNNER_TEMP/registry-existing.json" >&2 || true
+            echo "::error::Unexpected MCP Registry lookup status: $status"
+            exit 1
+          fi
+
+          "$publisher" login github-oidc
+          "$publisher" publish server.json
+
+          for attempt in {1..12}; do
+            status="$(curl --silent --show-error --output "$RUNNER_TEMP/registry-published.json" \
+              --write-out '%{http_code}' "$detail_url")"
+            if [ "$status" = "200" ]; then
+              echo "Published Repo2C4 MCP $VERSION to the Official MCP Registry."
+              exit 0
+            fi
+            sleep 5
+          done
+
+          cat "$RUNNER_TEMP/registry-published.json" >&2 || true
+          echo "::error::MCP Registry publication was not observable after publishing."
+          exit 1

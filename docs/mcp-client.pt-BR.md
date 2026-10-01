@@ -1,12 +1,19 @@
 # Usando o Repo2C4 a partir de um cliente MCP
 
-Na Fase 3, o Repo2C4 funciona como servidor MCP local por stdio. O servidor coleta evidências limitadas do repositório, recebe um `ArchitectureModel` C1/C2 proposto pelo cliente, faz preview determinístico do LikeC4, valida com a CLI oficial do LikeC4 e só grava após autorização explícita.
+O Repo2C4 MCP funciona como servidor local por stdio. O servidor coleta evidências limitadas do repositório, recebe um `ArchitectureModel` C1/C2 proposto pelo cliente, faz preview determinístico do LikeC4, valida com a CLI oficial do LikeC4 e só grava após autorização explícita.
 
 O servidor MCP não contém SDK de IA, credenciais de provedor nem seletor de modelo. Quando uma IA interpreta as evidências, o modelo é escolhido e executado pelo cliente MCP.
 
 ## Pré-requisitos
 
-Compile o Repo2C4:
+Depois que o pacote público estiver disponível, o caminho recomendado é instalar a .NET Tool:
+
+```bash
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+repo2c4-mcp --help
+```
+
+Antes de uma publicação pública, compile um checkout confiável:
 
 ```bash
 dotnet restore Repo2C4.slnx --locked-mode
@@ -24,24 +31,20 @@ Inspeção, recuperação de evidências, preview e escrita protegida não exige
 
 ## Configuração stdio genérica
 
-Clientes MCP usam arquivos e telas de configuração diferentes. Configure um servidor stdio local com o equivalente ao formato abaixo, substituindo todos os placeholders por caminhos locais absolutos:
+Clientes MCP usam arquivos e telas de configuração diferentes. Com a .NET Tool instalada, prefira o comando público:
 
 ```json
 {
   "mcpServers": {
     "repo2c4": {
-      "command": "dotnet",
-      "args": [
-        "/CAMINHO/ABSOLUTO/DO/Repo2C4.Mcp.dll",
-        "--repository-root",
-        "/CAMINHO/ABSOLUTO/DO/REPOSITORIO/AUTORIZADO"
-      ]
+      "command": "repo2c4-mcp",
+      "args": ["--repository-root", "/CAMINHO/ABSOLUTO/DO/REPOSITORIO/AUTORIZADO"]
     }
   }
 }
 ```
 
-O executável compilado normalmente está em:
+Durante desenvolvimento antes do pacote público, use `dotnet` com o DLL compilado:
 
 ```text
 src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll
@@ -65,9 +68,10 @@ Ela orienta o cliente a:
 3. separar evidência observada de hipótese arquitetural;
 4. propor C1 e C2 como `ArchitectureModel` v1;
 5. manter fronteiras/relações sem suporte como `requiresReview`;
-6. chamar primeiro `generate_likec4` em dry-run;
-7. chamar `validate_likec4`;
-8. solicitar aprovação explícita do usuário antes de qualquer `write=true`.
+6. chamar `get_evidence_report` para expor itens ainda revisáveis;
+7. chamar primeiro `generate_likec4` em dry-run, preferencialmente com o destino pretendido para obter o plano de mudanças;
+8. chamar `validate_likec4` sem destino para validar a proposta em workspace temporário;
+9. solicitar aprovação explícita do usuário antes de qualquer `write=true`.
 
 O cliente não deve interpretar `ProjectReference`, presença de pacote ou categoria `.candidate` como prova de comunicação runtime ou de fronteira de deployment.
 
@@ -104,15 +108,16 @@ O fluxo interativo esperado é:
 inspect_repository
   -> get_evidence / get_snapshot quando necessário
   -> cliente propõe ArchitectureModel C1/C2
-  -> generate_likec4 (dryRun=true)
-  -> validate_likec4
-  -> usuário revisa preview e diagnósticos
+  -> get_evidence_report
+  -> generate_likec4 (dryRun=true, destinationPath opcional para diff)
+  -> validate_likec4 (sem destinationPath, valida a proposta)
+  -> usuário revisa preview, itens requiresReview e diagnósticos
   -> usuário aprova explicitamente um destino relativo
   -> generate_likec4 (dryRun=false, write=true)
   -> validate_likec4(destinationPath=...)
 ```
 
-Pedir análise ou validação não autoriza escrita. Arquivos gerados já existentes nunca são sobrescritos pela ferramenta MCP.
+Pedir análise ou validação não autoriza escrita. O MCP pode atualizar seus próprios arquivos gerenciados somente quando o estado atual ainda corresponde ao manifesto; edição humana, arquivo gerenciado removido ou colisão não gerenciada gera conflito e não é sobrescrita.
 
 ## Limites de interpretação
 
@@ -120,4 +125,4 @@ As evidências do Repo2C4 são evidências do repositório, não observações d
 
 O servidor MCP valida o contrato v1 e algumas fronteiras de revisão, mas não decide que uma arquitetura proposta está semanticamente correta. Afirmações arquiteturais materiais continuam exigindo revisão humana.
 
-A CLI da Fase 2 continua sendo um host offline de `inspect`/`generate`/`validate` que recebe um modelo já fornecido. Um futuro modo CLI direto assistido por IA, no qual a própria CLI seleciona/chama um provedor de interpretação, não faz parte da Fase 3.
+A CLI continua disponível como outro host do Repo2C4 e possui seus próprios adaptadores opcionais de inferência. O `Repo2C4.Agent` também é um cliente MCP separado com orquestração via Microsoft Agent Framework. Nenhuma dessas capacidades move seleção de provider ou inferência para dentro do servidor MCP.

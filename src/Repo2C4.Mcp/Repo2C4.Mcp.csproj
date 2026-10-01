@@ -8,7 +8,8 @@
     <PackageId>Repo2C4.Mcp</PackageId>
     <Authors>Rodrigo de Oliveira</Authors>
     <Description>Repo2C4 local stdio Model Context Protocol server for evidence-based LikeC4 workflows.</Description>
-    <PackageTags>likec4;c4;architecture;documentation;dotnet-tool</PackageTags>
+    <PackageTags>likec4;c4;architecture;documentation;mcp;model-context-protocol;dotnet-tool</PackageTags>
+    <PackageProjectUrl>https://github.com/rodri-oliveira-dev/Repo2C4</PackageProjectUrl>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/Repo2C4</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -18,7 +19,7 @@
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Repo2C4.Core/Repo2C4.Core.csproj" />

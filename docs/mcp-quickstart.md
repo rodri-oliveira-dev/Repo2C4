@@ -6,6 +6,8 @@ Repo2C4 is a local **stdio** MCP server. The host starts `repo2c4-mcp`; Repo2C4 
 
 ## Install
 
+After the public package is available:
+
 ```bash
 dotnet tool install --global Repo2C4.Mcp --version 1.0.0
 npm install --global likec4@1.59.4
@@ -13,11 +15,15 @@ repo2c4-mcp --help
 likec4 --version
 ```
 
+LikeC4 is required for `validate_likec4`; inspection and evidence retrieval do not require an AI account or cloud credential.
+
+Before a public package release, build a trusted checkout and configure the client to run the Release DLL through `dotnet`.
+
 Authorize only one existing absolute repository root. Do not use a home directory, drive root, or a directory containing unrelated repositories. If the CLI is installed too, `repo2c4 init --repository /absolute/path` and `repo2c4 doctor --repository /absolute/path` can prepare/check the same root without starting analysis or inference.
 
 ## Connect
 
-Copy an example from [`examples/mcp-clients/`](../examples/mcp-clients/).
+Copy an example from [`examples/mcp-clients/`](../examples/mcp-clients/). The checked-in examples keep remote acquisition **disabled by default**; add `--allow-remote-acquisition` only when public remote Git inspection is intentionally required.
 
 **Portable stdio:** use [`generic.mcp.json`](../examples/mcp-clients/generic.mcp.json) with a compatible host and replace the placeholder with an absolute local path.
 
@@ -25,15 +31,32 @@ Copy an example from [`examples/mcp-clients/`](../examples/mcp-clients/).
 
 **Claude Desktop:** [`claude-desktop.json`](../examples/mcp-clients/claude-desktop.json) shows the local stdio entry. Replace the absolute-path placeholder and merge only the `repo2c4` entry into the existing local MCP configuration. Restart Claude Desktop and check the connected server/tools in its connector/developer surfaces. Claude Desktop now promotes Desktop Extensions for packaged local integrations; Repo2C4 does not ship a proprietary extension here. Web/mobile remote connectors do not replace this local-filesystem flow.
 
+## First safe call
+
+After the client connects, inspect the authorized root itself:
+
+```json
+{
+  "repositoryPath": ".",
+  "maxFiles": 1000
+}
+```
+
+`inspect_repository` returns `snapshotId`, `repositoryId`, expiry/count metadata and bounded evidence/diagnostic summaries. `repositoryId` is returned by the tool; it is **not** an input. Keep `snapshotId` for subsequent calls in the same stdio session. Snapshots expire after 30 minutes and do not survive reconnects.
+
 ## Evidence-first flow
 
-1. Call `inspect_repository` with a stable repository ID.
-2. Page through `get_evidence`; use `get_snapshot` when needed.
-3. Propose C1/C2 using only returned evidence IDs; keep unsupported claims under review.
-4. Call `generate_likec4` without write authorization first for preview/dry-run.
-5. Use `validate_likec4` against an existing generated workspace when applicable.
-6. After reviewing the preview, call `generate_likec4` with explicit write authorization and a relative destination inside the root.
-7. Validate the written workspace and inspect `get_evidence_report`.
+1. Call `inspect_repository` with `repositoryPath="."` or a safe repository-relative child directory.
+2. Page through `get_evidence`; use `get_snapshot` for file metadata/diagnostics when needed.
+3. Build or review a complete v1 `ArchitectureModel` using only the session snapshot/evidence.
+4. Call `get_evidence_report` to surface review-required assertions.
+5. Call `generate_likec4` with the default `dryRun=true`; provide the intended `destinationPath` when you want a destination-aware change plan.
+6. Call `validate_likec4` **without** `destinationPath` to validate the proposal in an isolated temporary workspace.
+7. Review generated files, changes, `requiresReview` assertions and validation diagnostics.
+8. Only after explicit local approval, call `generate_likec4` with `dryRun=false`, `write=true` and the exact repository-relative destination.
+9. Call `validate_likec4` again with the written `destinationPath`.
+
+For selective C3, pass the exact ID of an existing C2 container as `c3ContainerId` to both proposal generation and proposal validation.
 
 The host selects the AI model. Repo2C4 MCP has no cloud-provider key and does not promote hypotheses to facts.
 
@@ -53,10 +76,13 @@ Proprietary client applications are not launched by CI. CI validates the example
 | LikeC4 unavailable | Install LikeC4 separately and expose `likec4` on the MCP process PATH. |
 | Client rejects configuration | VS Code workspace format uses `servers`; portable/Claude local examples use `mcpServers`. |
 | Tools missing after edit | Restart/reload the server or client and inspect its MCP logs. |
-| Write conflict | Keep preview first. Repo2C4 blocks unmanaged collisions and changed managed files. |
+| Snapshot missing after reconnect | Run `inspect_repository` again; snapshots are session-scoped and expire after 30 minutes. |
+| `snapshot_mismatch` | Rebuild/review the model against the exact current-session snapshot. |
+| Write conflict | Preserve the human edit, run another destination-aware dry-run and review the new plan. |
+| Remote tool missing | Expected unless `--allow-remote-acquisition` was explicitly configured. |
 
 Never put API keys, tokens, private repository contents, or personal paths in these configuration files.
 
 ## Optional public remote repository
 
-Start the MCP server with `--allow-remote-acquisition` to explicitly expose `inspect_remote_repository` for a public HTTPS Git URL and optional ref. Remote acquisition is disabled by default. It acquires the repository into an isolated temporary workspace, rejects credentials/submodules/links, runs the same evidence scanner, stores only the bounded snapshot in the MCP session and deletes the workspace. The tool returns sanitized acquisition provenance (URL, requested ref and resolved commit) separately from architectural evidence. Local `inspect_repository` remains the default and does not require network access.
+Remote acquisition is intentionally absent from the default client examples. Start the MCP server with `--allow-remote-acquisition` only when needed to explicitly expose `inspect_remote_repository` for a public HTTPS Git URL and optional ref. Remote acquisition is disabled by default. It acquires the repository into an isolated temporary workspace, rejects credentials/submodules/links, runs the same evidence scanner, stores only the bounded snapshot in the MCP session and deletes the workspace. The tool returns sanitized acquisition provenance (URL, requested ref and resolved commit) separately from architectural evidence. Local `inspect_repository` remains the default and does not require network access.

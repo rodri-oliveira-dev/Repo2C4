@@ -3,10 +3,12 @@
     <Project Path="src/Repo2C4.Core/Repo2C4.Core.csproj" />
     <Project Path="src/Repo2C4.Cli/Repo2C4.Cli.csproj" />
     <Project Path="src/Repo2C4.Mcp/Repo2C4.Mcp.csproj" />
+    <Project Path="src/Repo2C4.Agent/Repo2C4.Agent.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Repo2C4.Core.Tests/Repo2C4.Core.Tests.csproj" />
     <Project Path="tests/Repo2C4.Cli.Tests/Repo2C4.Cli.Tests.csproj" />
     <Project Path="tests/Repo2C4.Mcp.Tests/Repo2C4.Mcp.Tests.csproj" />
+    <Project Path="tests/Repo2C4.Agent.Tests/Repo2C4.Agent.Tests.csproj" />
   </Folder>
 </Solution>

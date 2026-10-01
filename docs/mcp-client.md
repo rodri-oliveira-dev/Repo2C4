@@ -1,12 +1,19 @@
 # Using Repo2C4 from an MCP client
 
-Repo2C4 Phase 3 is a local stdio MCP server. The server collects bounded repository evidence, accepts a client-proposed C1/C2 `ArchitectureModel`, previews deterministic LikeC4, validates it with the official LikeC4 CLI, and writes only after explicit authorization.
+Repo2C4 MCP is a local stdio MCP server. The server collects bounded repository evidence, accepts a client-proposed C1/C2 `ArchitectureModel`, previews deterministic LikeC4, validates it with the official LikeC4 CLI, and writes only after explicit authorization.
 
 The MCP server contains no AI SDK, provider credentials or model selector. If an AI model interprets the evidence, that model is selected and executed by the MCP client.
 
 ## Prerequisites
 
-Build Repo2C4 first:
+After the public package is available, the recommended path is the .NET Tool:
+
+```bash
+dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+repo2c4-mcp --help
+```
+
+Before a public package release, build a trusted checkout:
 
 ```bash
 dotnet restore Repo2C4.slnx --locked-mode
@@ -24,24 +31,20 @@ Inspection, evidence retrieval, preview and protected writes require no cloud ac
 
 ## Generic stdio client configuration
 
-MCP clients use different settings files and UI labels. Configure a local stdio server using the equivalent of this generic shape, replacing every placeholder with an absolute local path:
+MCP clients use different settings files and UI labels. With the .NET Tool installed, prefer the public command:
 
 ```json
 {
   "mcpServers": {
     "repo2c4": {
-      "command": "dotnet",
-      "args": [
-        "/ABSOLUTE/PATH/TO/Repo2C4.Mcp.dll",
-        "--repository-root",
-        "/ABSOLUTE/PATH/TO/AUTHORIZED/REPOSITORY"
-      ]
+      "command": "repo2c4-mcp",
+      "args": ["--repository-root", "/ABSOLUTE/PATH/TO/AUTHORIZED/REPOSITORY"]
     }
   }
 }
 ```
 
-The built executable is normally:
+During development before the public package, use `dotnet` with the built DLL:
 
 ```text
 src/Repo2C4.Mcp/bin/Release/net10.0/Repo2C4.Mcp.dll
@@ -65,9 +68,10 @@ The instruction requires the client to:
 3. distinguish observed evidence from architectural hypotheses;
 4. propose C1 and C2 as v1 `ArchitectureModel` values;
 5. keep unsupported boundaries/relations as `requiresReview`;
-6. call `generate_likec4` in dry-run mode first;
-7. call `validate_likec4`;
-8. request explicit user approval before any `write=true` call.
+6. call `get_evidence_report` to surface assertions that still need review;
+7. call `generate_likec4` in dry-run mode first, preferably with the intended destination for a destination-aware change plan;
+8. call `validate_likec4` without a destination to validate the proposal in a temporary workspace;
+9. request explicit user approval before any `write=true` call.
 
 A client must not infer that `ProjectReference`, package presence or a `.candidate` category proves runtime communication or a deployment boundary.
 
@@ -104,15 +108,16 @@ A safe interactive client flow is:
 inspect_repository
   -> get_evidence / get_snapshot as needed
   -> client proposes ArchitectureModel C1/C2
-  -> generate_likec4 (dryRun=true)
-  -> validate_likec4
-  -> user reviews preview and diagnostics
+  -> get_evidence_report
+  -> generate_likec4 (dryRun=true, optional destinationPath for diff)
+  -> validate_likec4 (without destinationPath, validates the proposal)
+  -> user reviews preview, requiresReview items and diagnostics
   -> user explicitly approves a relative destination
   -> generate_likec4 (dryRun=false, write=true)
   -> validate_likec4(destinationPath=...)
 ```
 
-Writing is not implied by asking for analysis or validation. Existing generated files are never overwritten by the MCP tool.
+Writing is not implied by asking for analysis or validation. MCP can update its own managed files only while their current state still matches the manifest; human edits, removed managed files or unmanaged collisions produce a conflict and are not overwritten.
 
 ## Interpretation limits
 
@@ -120,4 +125,4 @@ Repo2C4 evidence is repository evidence, not runtime observation. A source/API/p
 
 The MCP server enforces the v1 contract and some review boundaries, but it does not decide that a proposed architecture is semantically correct. Human review remains required for material architectural claims.
 
-The existing Phase 2 CLI is an offline `inspect`/`generate`/`validate` host that consumes an already supplied model. A future direct AI-assisted CLI workflow, in which a CLI itself selects/calls an interpretation provider, is not part of Phase 3.
+The CLI remains another Repo2C4 host and has its own optional inference adapters. `Repo2C4.Agent` is also a separate MCP client that orchestrates models through Microsoft Agent Framework. None of those capabilities move provider selection or inference into the MCP server.

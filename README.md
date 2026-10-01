@@ -23,7 +23,7 @@ authorized repository
 
 The evidence layer records what Repo2C4 can observe safely from supported .NET declarations. The model layer records architectural decisions and hypotheses. **Confirmed assertions must reference evidence IDs that exist in the embedded snapshot.** Assertions marked `requiresReview` may reference supporting evidence when available, but they may also intentionally have no evidence IDs when they represent an unsupported hypothesis; in that case the contract requires a `reviewReason`. A human reviewer—or an MCP client acting under human review—decides what the evidence means.
 
-Repo2C4 does **not** contain an autonomous architecture agent. Core performs no AI calls. The MCP server contains no AI provider SDK or model selector. The CLI offers optional, explicit inference adapters for local Ollama or consent-gated OpenAI, but their output is only a review-required candidate and never architectural truth.
+Repo2C4 keeps AI orchestration outside Core and MCP. Core performs no AI calls, and the MCP server contains no AI provider SDK or model selector. The optional `repo2c4-agent` is a separate Microsoft Agent Framework client of `repo2c4-mcp`: it can orchestrate evidence-first analysis, bounded validation/correction and human-approved writes without moving model intelligence into the MCP server. The CLI also retains its simpler optional inference adapters. AI output is never architectural truth by itself.
 
 ## Current capabilities and limitations
 
@@ -36,6 +36,7 @@ Repo2C4 does **not** contain an autonomous architecture agent. Core performs no 
 - **Review-first writes:** `generate` previews by default. CLI writes require `--apply`; MCP writes require explicit `dryRun=false`, `write=true`, and an authorized relative destination. Managed-file hashes protect human edits.
 - **CLI:** `repo2c4` exposes onboarding, inspection, optional inference, generation and validation.
 - **MCP stdio server:** `repo2c4-mcp` exposes evidence, generation and validation tools inside one authorized root. Model selection, if any, belongs to the MCP client.
+- **Architecture Agent:** `repo2c4-agent` uses Microsoft Agent Framework as an independent MCP client, with explicit provider/model selection, bounded workflow/retries, sanitized observability and Agent Framework HITL before protected writes.
 - **Optional public Git acquisition:** CLI can inspect an explicitly selected public HTTPS Git ref in a bounded temporary workspace. MCP exposes remote acquisition only when the host opts in with `--allow-remote-acquisition`.
 - **Reviewable automation:** the repository includes a manually triggered workflow that can propose validated LikeC4 changes through a Pull Request without auto-merging them.
 
@@ -66,6 +67,7 @@ cd Repo2C4
 
 dotnet tool install --global Repo2C4.Cli --version 1.0.0
 dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Agent --version 1.0.0
 npm install --global likec4@1.59.4
 ```
 
@@ -127,7 +129,21 @@ repo2c4-mcp --repository-root "/absolute/path/to/Repo2C4/examples/fixtures/libra
 
 An MCP client should call `inspect_repository` first, retrieve evidence as needed, propose/review a C1 or C2 model, call `generate_likec4` in its default dry-run mode, validate, and request explicit approval before any write. Copyable configurations for VS Code, Claude Desktop and portable stdio are in the [MCP quickstart](docs/mcp-quickstart.md).
 
-The CLI fixture flow above is exercised in [CI](.github/workflows/ci.yml), including deterministic snapshot comparison, C1/C2 generation, selective C3, explicit apply, managed-conflict protection and official LikeC4 validation. The distribution smoke also installs both .NET tools and exercises the MCP protocol over stdio.
+The CLI fixture flow above is exercised in [CI](.github/workflows/ci.yml), including deterministic snapshot comparison, C1/C2 generation, selective C3, explicit apply, managed-conflict protection and official LikeC4 validation. The distribution smoke installs all three .NET tools, exercises the MCP protocol over stdio, and runs the packaged Agent against the local fixture through a controlled loopback Ollama-compatible fake.
+
+### 6. Run the Agent (optional)
+
+With Ollama running locally and an explicitly selected model:
+
+```bash
+repo2c4-agent \
+  --provider ollama \
+  --model YOUR_LOCAL_MODEL \
+  --repository-root "$(pwd)/examples/fixtures/library-only" \
+  --goal "Use only Repo2C4 MCP evidence. Produce conservative C1/C2 documentation."
+```
+
+The Agent is a client of MCP, not a replacement for it. Add `--write-destination docs/architecture` only when you want a validated proposal to reach a local human approval prompt before any write. See the [Agent guide](docs/agent.md).
 
 ## Example output: evidence → review → LikeC4
 
@@ -191,9 +207,10 @@ Repo2C4 keeps delivery hosts separate from the evidence/generation core:
 | `src/Repo2C4.Core` | Versioned evidence/model contracts, bounded inspection, evidence-backed .NET fact extraction, C1/C2 + selective-C3 policy, deterministic LikeC4 emission, managed-output planning and validation adapters. |
 | `src/Repo2C4.Cli` | User-facing CLI for onboarding, local/public-remote inspection, optional inference, preview/apply generation and validation. |
 | `src/Repo2C4.Mcp` | Local stdio MCP host with an explicit repository-root boundary; evidence and LikeC4 tools by default, optional public remote acquisition only when enabled by the host. |
-| `tests/Repo2C4.*.Tests` | Contract, security-boundary, deterministic-generation, CLI and real MCP protocol coverage. |
+| `src/Repo2C4.Agent` | Independent Microsoft Agent Framework client of Repo2C4 MCP; explicit model/provider, evidence-first orchestration, bounded workflow, observability and HITL write approval. |
+| `tests/Repo2C4.*.Tests` | Contract, security-boundary, deterministic-generation, CLI, Agent and real MCP protocol coverage. |
 
-CLI and MCP reference Core, never each other. Core does not reference the hosts. For maintainers, the detailed contracts, budgets, scanner behavior, security constraints, tests and distribution mechanics follow below.
+CLI and MCP reference Core, never each other. Agent references neither Core nor the CLI/MCP projects as domain libraries; it connects to the MCP executable over stdio. Core does not reference the hosts. For maintainers, the detailed contracts, budgets, scanner behavior, security constraints, tests and distribution mechanics follow below.
 
 ### Prerequisites and verification
 
@@ -299,6 +316,7 @@ See [MCP stdio, inspection/LikeC4 tools and access policy](docs/mcp.md) for tool
 ```bash
 dotnet run --project src/Repo2C4.Cli/Repo2C4.Cli.csproj -- --help
 dotnet run --project src/Repo2C4.Mcp/Repo2C4.Mcp.csproj -- --help
+dotnet run --project src/Repo2C4.Agent/Repo2C4.Agent.csproj -- --help
 ```
 
 CLI help is written to stdout. MCP help and diagnostics are written **only to stderr**. The MCP test suite starts the executable through a vendor-neutral JSON-RPC stdio client, performs real handshakes/tool calls, exercises pagination/security failures, reproduces both versioned C1 and C2 models, compares preview/written `.c4` files with goldens, and verifies that no non-protocol content is written to stdout.
@@ -307,7 +325,7 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 `.github/workflows/ci.yml` validates locked restore, formatting, Release build, tests, coverage, pinned LikeC4 integration, the complete offline CLI cycle (`inspect -> reviewed model -> generate -> validate`) and the full MCP protocol-client C1/C2 flow without paid AI or a proprietary client. CodeQL, Dependency Review and optional SonarQube Cloud checks remain available; [Sonar setup](docs/sonarqube-cloud.md) requires `SONAR_TOKEN`.
 
-**Distribution:** the two versioned .NET tools, `Repo2C4.Cli` and `Repo2C4.Mcp`, are clean-install tested. Public release remains manually gated; an authorized release publishes the validated packages to NuGet.org and GitHub Release, then verifies consumer installation. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
+**Distribution:** the three versioned .NET tools, `Repo2C4.Cli`, `Repo2C4.Mcp` and `Repo2C4.Agent`, are clean-install tested. Public release remains manually gated; an authorized release publishes the validated packages to NuGet.org and GitHub Release, then verifies consumer installation. `Repo2C4.Mcp` also includes versioned Official MCP Registry metadata in [`server.json`](server.json); registry publication happens only after the matching NuGet package is public. `Repo2C4.Agent` remains a local .NET Tool/MCP client rather than a marketplace-specific agent package. See the [installation, security and release guide](docs/distribution.md) or [Português](docs/distribution.pt-BR.md).
 
 
 

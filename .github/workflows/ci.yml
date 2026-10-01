@@ -210,8 +210,8 @@ jobs:
               server = data[top_key]["repo2c4"]
               assert server["command"] == "repo2c4-mcp"
               args = server["args"]
-              assert args[0] == "--repository-root" and len(args) == 3
-              assert args[2] == "--allow-remote-acquisition"
+              assert args[0] == "--repository-root" and len(args) == 2
+              assert "--allow-remote-acquisition" not in args
               assert not any(value in text.lower() for value in forbidden), f"{name}: sensitive/personal value"
               if name == "vscode.mcp.json":
                   assert server["type"] == "stdio"
@@ -247,9 +247,13 @@ jobs:
         run: dotnet build Repo2C4.slnx --configuration Release --no-restore
 
       - name: Executar testes com MTP
+        env:
+          OPENAI_API_KEY: ''
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
       - name: Coletar cobertura com Coverlet MTP
+        env:
+          OPENAI_API_KEY: ''
         run: dotnet test Repo2C4.slnx --configuration Release --no-build --coverlet --coverlet-output-format cobertura
 
       - name: Preparar artefato de cobertura
@@ -299,6 +303,8 @@ jobs:
                   "repo2c4 generate",
                   "repo2c4 validate",
                   "repo2c4-mcp --repository-root",
+                  "repo2c4-agent",
+                  "docs/agent.md",
                   "likec4 start",
                   "requiresReview",
               ],
@@ -312,6 +318,8 @@ jobs:
                   "repo2c4 generate",
                   "repo2c4 validate",
                   "repo2c4-mcp --repository-root",
+                  "repo2c4-agent",
+                  "docs/agent.pt-BR.md",
                   "likec4 start",
                   "requiresReview",
               ],
@@ -325,6 +333,7 @@ jobs:
 
       - name: Validar integração real com LikeC4
         env:
+          OPENAI_API_KEY: ''
           REPO2C4_LIKEC4_INTEGRATION: '1'
         run: dotnet test Repo2C4.slnx --configuration Release --no-build
 
@@ -412,7 +421,7 @@ jobs:
           test "$conflict_exit" -eq 5
           grep -Fq "// human edit" "$workdir/c2/model.c4"
 
-      - name: Empacotar e instalar ferramentas CLI e MCP em ambiente isolado
+      - name: Empacotar e instalar ferramentas CLI, MCP e Agent em ambiente isolado
         shell: bash
         run: |
           set -euo pipefail
