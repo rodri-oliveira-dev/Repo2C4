@@ -33,7 +33,7 @@ Requirements:
 After the Repo2C4 packages are publicly released:
 
 ```bash
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.1
 npm install --global likec4@1.59.4
 
 repo2c4-mcp --help

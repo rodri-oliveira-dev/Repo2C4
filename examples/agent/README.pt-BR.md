@@ -5,9 +5,9 @@ Este exemplo usa a fixture versionada `library-only` para demonstrar o fluxo de 
 ## 1. Instalar as ferramentas
 
 ```bash
-dotnet tool install --global Repo2C4.Agent --version 1.0.0
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
-dotnet tool install --global Repo2C4.Cli --version 1.0.0
+dotnet tool install --global Repo2C4.Agent --version 1.0.1
+dotnet tool install --global Repo2C4.Mcp --version 1.0.1
+dotnet tool install --global Repo2C4.Cli --version 1.0.1
 npm install --global likec4@1.59.4
 ```
 

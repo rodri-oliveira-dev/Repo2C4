@@ -9,7 +9,7 @@ O Repo2C4 é um servidor MCP local por **stdio**. O host inicia `repo2c4-mcp`; o
 Depois que o pacote público estiver disponível:
 
 ```bash
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp --version 1.0.1
 npm install --global likec4@1.59.4
 repo2c4-mcp --help
 likec4 --version
