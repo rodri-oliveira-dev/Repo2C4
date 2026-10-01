@@ -6,7 +6,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 packages_dir="${1:-$repo_root/artifacts/distribution}"
-version="${2:-1.0.0}"
+resolved="$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)"
+version="${2:-$resolved}"
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid SemVer package version." >&2
   exit 2
@@ -18,7 +19,6 @@ esac
 mkdir -p "$packages_dir"
 packages_dir="$(cd "$packages_dir" && pwd)"
 
-resolved="$(dotnet msbuild src/Repo2C4.Cli/Repo2C4.Cli.csproj -nologo -getProperty:Version | tr -d '\r' | tail -n 1)"
 if [[ "$resolved" != "$version" ]]; then
   echo "Package version differs from the single MSBuild Version source." >&2
   exit 2

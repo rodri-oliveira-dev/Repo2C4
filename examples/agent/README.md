@@ -5,9 +5,9 @@ This example uses the checked-in `library-only` fixture to demonstrate the Agent
 ## 1. Install the tools
 
 ```bash
-dotnet tool install --global Repo2C4.Agent --version 1.0.0
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
-dotnet tool install --global Repo2C4.Cli --version 1.0.0
+dotnet tool install --global Repo2C4.Agent
+dotnet tool install --global Repo2C4.Mcp
+dotnet tool install --global Repo2C4.Cli
 npm install --global likec4@1.59.4
 ```
 

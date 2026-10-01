@@ -9,7 +9,7 @@ It exposes bounded repository inspection, evidence retrieval, deterministic Like
 ## Install
 
 ```bash
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp
 repo2c4-mcp --help
 ```
 

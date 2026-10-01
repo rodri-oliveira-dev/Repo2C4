@@ -425,7 +425,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/verify-distribution.sh artifacts/distribution 1.0.0
+          bash scripts/verify-distribution.sh artifacts/distribution
 
       - name: Smoke test da CLI
         shell: bash

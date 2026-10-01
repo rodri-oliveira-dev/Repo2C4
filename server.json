@@ -3,7 +3,7 @@
   "name": "io.github.rodri-oliveira-dev/repo2c4-mcp",
   "title": "Repo2C4 MCP",
   "description": "Evidence-first MCP server for reviewable C4 architecture documentation from .NET repositories.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "websiteUrl": "https://github.com/rodri-oliveira-dev/Repo2C4",
   "repository": {
     "url": "https://github.com/rodri-oliveira-dev/Repo2C4",
@@ -15,7 +15,7 @@
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "Repo2C4.Mcp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"

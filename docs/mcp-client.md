@@ -9,7 +9,7 @@ The MCP server contains no AI SDK, provider credentials or model selector. If an
 After the public package is available, the recommended path is the .NET Tool:
 
 ```bash
-dotnet tool install --global Repo2C4.Mcp --version 1.0.0
+dotnet tool install --global Repo2C4.Mcp
 repo2c4-mcp --help
 ```
 
