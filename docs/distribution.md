@@ -59,7 +59,7 @@ mcp-publisher login github
 mcp-publisher publish server.json
 ```
 
-A duplicate immutable version must not be republished. If NuGet indexing has not completed yet, the registry workflow may fail without affecting the already completed release; rerun that registry workflow later for the same version. Do not rebuild or change `server.json` for that released version.
+A duplicate immutable package version must not be republished. If NuGet indexing has not completed yet, the registry workflow may fail without affecting the already completed release; rerun that registry workflow later for the same version. Registry-only metadata corrections in `server.json` are allowed after release when needed to satisfy Registry validation, provided the package identifier and version remain bound to the already-published immutable NuGet release.
 
 When preparing a later Repo2C4 release, update `Directory.Build.props` and both version fields in `server.json` to the same exact SemVer before running distribution/release verification.
 
