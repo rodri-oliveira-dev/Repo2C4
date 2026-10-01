@@ -90,7 +90,11 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Checkout current registry metadata
+      # Package code is pinned to the released tag above. Registry metadata intentionally
+      # comes from the current trusted main commit so metadata-only fixes can be published
+      # after release without rebuilding or republishing the immutable NuGet package.
+      # The workflow still requires main and validates name/version/package binding below.
+      - name: Checkout current registry metadata from main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
