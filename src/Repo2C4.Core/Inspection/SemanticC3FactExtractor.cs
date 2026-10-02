@@ -1049,9 +1049,9 @@ public static class SemanticC3FactExtractor
                 continue;
             }
 
-            if (chars[i] == ''')
+            if (chars[i] == (char)39)
             {
-                i = MaskQuoted(chars, i, ''', verbatim: false, out bool closed);
+                i = MaskQuoted(chars, i, (char)39, verbatim: false, out bool closed);
                 complete &= closed;
                 continue;
             }
@@ -1088,7 +1088,7 @@ public static class SemanticC3FactExtractor
         {
             if (chars[i] == '\n' || chars[i] == '\r')
             {
-                if (delimiter == ''')
+                if (delimiter == (char)39)
                 {
                     break;
                 }
