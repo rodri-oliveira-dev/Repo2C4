@@ -22,6 +22,33 @@ public sealed class EvidenceReportGeneratorTests
     }
 
     [Fact]
+    public void ReportListsUnmappedExternalEvidenceWithoutItsDescription()
+    {
+        ArchitectureModel model = LoadModel("acme.c2.v1.json");
+        Evidence external = new(
+            "ev_external_pending",
+            "external.http.outbound",
+            "src/Web/Program.cs",
+            7,
+            EvidenceSourceType.SourceCode,
+            "Secret-looking evidence description must not be printed.");
+        model = model with
+        {
+            Snapshot = model.Snapshot with
+            {
+                Evidence = [.. model.Snapshot.Evidence, external]
+            },
+        };
+
+        EvidenceReportResult result = EvidenceReportGenerator.Generate(model);
+
+        Assert.Equal(1, result.Summary.UnmappedExternalIntegrations);
+        Assert.Contains("external.http.outbound", result.Content, StringComparison.Ordinal);
+        Assert.Contains("src/Web/Program.cs:7", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain(external.Description, result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReportListsWarningsAndUnsupportedReviewItemsWithoutDiagnosticValues()
     {
         RepositorySnapshot snapshot = new(

@@ -69,6 +69,14 @@ For v1:
 - use a stable logical relation key when generating the relation ID;
 - never treat package names as a relation type.
 
+## External integration evidence
+
+Imported `external.*` evidence may add a root `softwareSystem` dependency only when the finding supplies a target. It never creates a child container, deployment node, owner, remote producer, or remote consumer. HTTP without a target remains only in the evidence report rather than receiving an invented endpoint.
+
+The caller explicitly selects the focal root software system; the mapper never chooses it by name or collection order. For C2, project-to-origin correlation first uses project-file provenance already referenced by one child container, then an explicit caller-supplied project mapping. If no exact C2 origin exists, a relation may use the selected focal system only as `requiresReview`. At C1, the explicitly selected focal system is the origin. Name similarity is never correlation evidence.
+
+A generated external target and relation are `confirmed` only for high-confidence evidence, an exact correlated origin that is itself confirmed, and a non-empty observed target. Medium/low confidence, a review-pending source, or focal-system fallback keeps the assertion `requiresReview` with a reason. Database, cache, and storage resource details stay in root-system names and relation descriptions rather than becoming owned infrastructure containers.
+
 A relation whose endpoint itself is a hypothesis must also remain under review.
 
 ## Metadata for external decisions
