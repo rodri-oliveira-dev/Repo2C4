@@ -161,6 +161,57 @@ public sealed class McpStdioIntegrationTests
     }
 
     [Fact]
+    public async Task RealProtocolImportsExternalEvidenceIntoOneSessionSnapshot()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        string fixtureRoot = FindExternalIntegrationFixtureRoot();
+        using Process process = StartServer(fixtureRoot);
+        await using StreamWriter input = process.StandardInput;
+        input.AutoFlush = true;
+        input.NewLine = "\n";
+        await InitializeAsync(process, input, cancellationToken);
+
+        await WriteToolCallAsync(
+            input,
+            2,
+            "inspect_repository",
+            new
+            {
+                repositoryPath = ".",
+                integrationReportPath = "inspection-v1.6.json",
+                maxFiles = 1000,
+            });
+        using JsonDocument inspectResponse = await ReadProtocolDocumentAsync(process, cancellationToken);
+        JsonElement inspect = StructuredResult(inspectResponse);
+        string snapshotId = inspect.GetProperty("snapshotId").GetString()!;
+        Assert.Contains(
+            inspect.GetProperty("evidenceCategories").EnumerateArray(),
+            item => item.GetProperty("category").GetString() == "external.messaging.consume");
+
+        await WriteToolCallAsync(
+            input,
+            3,
+            "get_evidence",
+            new
+            {
+                snapshotId,
+                category = "external.messaging.consume",
+                pageSize = 100,
+            });
+        using JsonDocument evidenceResponse = await ReadProtocolDocumentAsync(process, cancellationToken);
+        JsonElement evidence = StructuredResult(evidenceResponse);
+        JsonElement item = Assert.Single(evidence.GetProperty("items").EnumerateArray());
+        Assert.Contains("payment-approved", item.GetProperty("description").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Confidence: high", item.GetProperty("description").GetString(), StringComparison.Ordinal);
+
+        input.Close();
+        await process.WaitForExitAsync(cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Equal(string.Empty, await process.StandardOutput.ReadToEndAsync(cancellationToken));
+        Assert.Equal(0, process.ExitCode);
+    }
+
+    [Fact]
     public async Task RepositoryTextAndSecretFilesNeverBecomeToolInstructionsOrPayloadContent()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
@@ -448,5 +499,22 @@ public sealed class McpStdioIntegrationTests
         }
 
         throw new DirectoryNotFoundException("Could not locate examples/fixtures/multiproject.");
+    }
+
+    private static string FindExternalIntegrationFixtureRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "examples", "fixtures", "external-integrations-e2e");
+            if (File.Exists(Path.Combine(candidate, "inspection-v1.6.json")))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate examples/fixtures/external-integrations-e2e.");
     }
 }

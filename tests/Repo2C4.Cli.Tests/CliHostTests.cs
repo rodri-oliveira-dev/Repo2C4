@@ -84,6 +84,31 @@ public sealed class CliHostTests
     }
 
     [Fact]
+    public void InspectImportsCompleteExternalIntegrationFixtureDeterministically()
+    {
+        string repository = Path.Combine(AppContext.BaseDirectory, "ExternalIntegrationE2E");
+        using TempDirectory temp = new();
+        string first = Path.Combine(temp.Path, "first.json");
+        string second = Path.Combine(temp.Path, "second.json");
+
+        int firstExit = Run(
+            ["inspect", "--repository", repository, "--integration-report", "inspection-v1.6.json", "--output", first]);
+        int secondExit = Run(
+            ["inspect", "--repository", repository, "--integration-report", "inspection-v1.6.json", "--output", second]);
+
+        Assert.Equal(CliExitCodes.Success, firstExit);
+        Assert.Equal(CliExitCodes.Success, secondExit);
+        Assert.Equal(File.ReadAllText(first), File.ReadAllText(second));
+        RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(File.ReadAllText(first));
+        Assert.Equal(9, snapshot.Evidence.Count(item => item.Category.StartsWith("external.", StringComparison.Ordinal)));
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.messaging.publish");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.messaging.consume");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.database");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.cache");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.storage");
+    }
+
+    [Fact]
     public void InspectRejectsIncompatibleExternalReportWithoutWritingSnapshot()
     {
         using TempDirectory temp = new();

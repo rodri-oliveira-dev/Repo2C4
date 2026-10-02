@@ -52,6 +52,47 @@ public sealed class AgentEndToEndTests
     }
 
     [Fact]
+    public async Task ExternalEvidenceUsesRealMcpSnapshotAndDeterministicAgent()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using DeterministicAgentHarness harness =
+            await DeterministicAgentHarness.CreateAsync(
+                "external-integrations-e2e",
+                [true],
+                integrationReportPath: "inspection-v1.6.json",
+                cancellationToken: cancellationToken);
+        const string summary =
+            """
+            Confirmed facts
+            Serasa, LoanDb, LoanCache, publish to loan-approved and consume from payment-approved are supported by imported external evidence.
+
+            Requires review
+            IExternalScoreClient, MassTransit transport and the low-confidence AuditDb finding remain review-required and no remote producer or consumer was invented.
+
+            Diagnostics/blockers
+            External evidence came from the same bounded MCP snapshot.
+
+            Proposal
+            Review-only deterministic C1 and C2 previews were produced.
+            """;
+        using ScriptedChatClient chatClient = CreateAnalysisClient(summary, modelName: "External integrations");
+
+        ArchitectureWorkflowResult result = await harness.RunWorkflowAsync(chatClient, cancellationToken);
+
+        Assert.Equal(ArchitectureWorkflowStatus.RequiresReview, result.Status);
+        string toolResults = JsonSerializer.Serialize(
+            chatClient.Invocations
+                .SelectMany(item => item.StructuredResults));
+        Assert.Contains("external.http.outbound", toolResults, StringComparison.Ordinal);
+        Assert.Contains("external.messaging.publish", toolResults, StringComparison.Ordinal);
+        Assert.Contains("external.messaging.consume", toolResults, StringComparison.Ordinal);
+        Assert.Contains("Confidence: low", toolResults, StringComparison.Ordinal);
+        Assert.Contains("no remote producer or consumer", result.Summary, StringComparison.Ordinal);
+        Assert.Equal(2, harness.Session.InvocationState.SnapshotProposals().Count);
+        chatClient.AssertExhausted();
+    }
+
+    [Fact]
     public async Task InsufficientEvidenceStopsWithoutInventingArchitecture()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

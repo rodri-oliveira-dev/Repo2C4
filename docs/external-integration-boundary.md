@@ -1,5 +1,7 @@
 # External integration interoperability boundary
 
+[Português (Brasil)](external-integration-boundary.pt-BR.md)
+
 ## Decision
 
 Repo2C4 consumes external integration findings only through the public JSON contract emitted by DotNetRepoInspector `InspectionReport`. DotNetRepoInspector owns technical discovery; Repo2C4 owns the conservative architectural interpretation that may later produce Repo2C4 evidence and reviewed C1/C2 assertions.
@@ -34,4 +36,26 @@ The normalized result never carries raw JSON, source bodies, configuration value
 
 ## Consequences
 
-This boundary keeps detector knowledge and SDK/provider recognition in DotNetRepoInspector while allowing Repo2C4 to preserve provenance and apply its own review policy. Parser implementation, conversion into the Repo2C4 `Evidence` contract, C1/C2 mapping, and CLI/MCP/Agent exposure are deliberately deferred to the subsequent phase issues.
+This boundary keeps detector knowledge and SDK/provider recognition in DotNetRepoInspector while allowing Repo2C4 to preserve provenance and apply its own review policy. The shared Core importer and mapper are exposed by CLI, MCP, and Agent without duplicating detectors or taking a runtime dependency on DotNetRepoInspector.
+
+The canonical contract fixture comes from `rodri-oliveira-dev/DotNetRepoInspector` tag `v1.6.5`, commit `50f85ff0a314a860d3cb75c62e5515c3e9883742`, file `docs/en/schema/examples/inspection-v1.example.json`. The reproducible two-project scenario in `examples/fixtures/external-integrations-e2e` documents every consumed field and extends only the released public shape.
+
+## End-to-end usage
+
+DotNetRepoInspector discovers integrations. Repo2C4 interprets those findings as architecture evidence.
+
+```bash
+dotnet tool install --global DotNetRepoInspector --version 1.6.5
+dotnet repo-inspect /absolute/path/to/repository \
+  --discover-integrations \
+  --output /absolute/path/to/repository/artifacts/inspection.json
+
+repo2c4 inspect \
+  --repository /absolute/path/to/repository \
+  --integration-report /absolute/path/to/repository/artifacts/inspection.json \
+  --output snapshot.json
+```
+
+For MCP, call `inspect_repository` with `repositoryPath="."` and `integrationReportPath="artifacts/inspection.json"`, then retrieve `external.*` with `get_evidence`. For Agent, add `--integration-report artifacts/inspection.json`; the host injects that authorized path into the same MCP inspection and the Agent never reads the report directly.
+
+High confidence plus an exact local origin and a supported target/provider can support `confirmed`. Missing targets, framework-only messaging, medium/low confidence, or ambiguous origin remain `requiresReview`. Publish points from the local origin to the provider; consume points from the provider to the local origin. Neither direction invents the opposite remote endpoint.

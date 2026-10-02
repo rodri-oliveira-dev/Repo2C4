@@ -77,7 +77,7 @@ The normal local server exposes six tools:
 
 | Tool | Purpose | Important inputs | Write behavior |
 | --- | --- | --- | --- |
-| `inspect_repository` | Inspect one directory inside the authorized local root and create a session snapshot. | `repositoryPath` defaults to `"."`; `maxFiles` defaults to 1,000. | Read-only. |
+| `inspect_repository` | Inspect one directory inside the authorized local root and create a session snapshot. | `repositoryPath` defaults to `"."`; optional repository-relative `integrationReportPath`; `maxFiles` defaults to 1,000. | Read-only. |
 | `get_evidence` | Page through v1 evidence from a snapshot. | `snapshotId`, optional exact `category`, optional metadata `pathPrefix`, `pageSize`, opaque `cursor`. | Read-only. |
 | `get_snapshot` | Page file metadata or diagnostics without returning file bodies. | `snapshotId`, `section` = `files` or `diagnostics`, optional `pathPrefix`. | Read-only. |
 | `get_evidence_report` | Return a bounded provenance/review summary for a session-bound model. | `snapshotId`, complete `ArchitectureModel` v1. | Read-only. |

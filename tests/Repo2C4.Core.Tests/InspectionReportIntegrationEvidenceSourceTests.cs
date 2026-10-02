@@ -142,6 +142,34 @@ public sealed class InspectionReportIntegrationEvidenceSourceTests
     }
 
     [Fact]
+    public async Task MissingDiscoveryIsRejectedAndEmptyFindingsAreAccepted()
+    {
+        string report = ReportJson();
+        int discoveryStart = report.IndexOf(", \"integrationDiscovery\"", StringComparison.Ordinal);
+        ExternalIntegrationEvidenceResult missing = await ReadJsonAsync(report[..discoveryStart] + "}");
+        ExternalIntegrationEvidenceResult empty = await ReadJsonAsync(
+            report.Replace(FindingJson(1), string.Empty, StringComparison.Ordinal));
+
+        Assert.Empty(missing.Evidence);
+        Assert.Contains(missing.Diagnostics, item => item.Code == "external.discovery.incomplete");
+        Assert.True(empty.DiscoveryCompleted);
+        Assert.Empty(empty.Evidence);
+        Assert.DoesNotContain(empty.Diagnostics, item => item.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task TruncatedDiscoveryPreservesFindingsWithWarning()
+    {
+        ExternalIntegrationEvidenceResult result = await ReadJsonAsync(
+            ReportJson().Replace("\"truncated\":false", "\"truncated\":true", StringComparison.Ordinal));
+
+        Assert.True(result.Truncated);
+        Assert.Single(result.Evidence);
+        Assert.Contains(result.Diagnostics, item =>
+            item.Code == "external.discovery.truncated" && item.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
     public async Task RejectsIncompleteFindingAndMismatchedRepositoryOrCommit()
     {
         ExternalIntegrationEvidenceResult incomplete = await ReadJsonAsync(

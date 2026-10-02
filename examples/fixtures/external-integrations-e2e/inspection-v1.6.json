@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "1.6",
+  "repository": {
+    "name": "external-integrations-e2e",
+    "commitSha": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "remoteUrl": "https://github.com/example/external-integrations-e2e.git",
+    "isDirty": false
+  },
+  "dotNetSdk": {
+    "configured": { "version": "10.0.100", "rollForward": "latestFeature", "allowPrerelease": false },
+    "resolvedVersion": "10.0.100"
+  },
+  "projects": [
+    {
+      "path": "src/Api/Api.csproj",
+      "name": "Api",
+      "sdks": [{ "name": "Microsoft.NET.Sdk.Web" }],
+      "targetFrameworks": ["net10.0"],
+      "runtimeIdentifiers": [],
+      "references": [],
+      "diagnostics": []
+    },
+    {
+      "path": "src/Worker/Worker.csproj",
+      "name": "Worker",
+      "sdks": [{ "name": "Microsoft.NET.Sdk.Worker" }],
+      "targetFrameworks": ["net10.0"],
+      "runtimeIdentifiers": [],
+      "references": [],
+      "diagnostics": []
+    }
+  ],
+  "diagnostics": [],
+  "policyFindings": [],
+  "integrations": [
+    {
+      "id": "integration-0000000000000001",
+      "projectPath": "src/Api/Api.csproj",
+      "kind": "http",
+      "direction": "outbound",
+      "technology": "refit",
+      "target": "Serasa",
+      "configurationKey": "Serasa:BaseUrl",
+      "contract": "ISerasaApi",
+      "source": { "path": "src/Api/Integrations.cs", "line": 10 },
+      "confidence": "high",
+      "signals": ["http:client", "refit:contract"]
+    },
+    {
+      "id": "integration-0000000000000002",
+      "projectPath": "src/Api/Api.csproj",
+      "kind": "http",
+      "direction": "outbound",
+      "technology": "httpclient",
+      "contract": "IExternalScoreClient",
+      "source": { "path": "src/Api/Integrations.cs", "line": 20 },
+      "confidence": "medium",
+      "signals": ["http:typed-client"]
+    },
+    {
+      "id": "integration-0000000000000003",
+      "projectPath": "src/Api/Api.csproj",
+      "kind": "messaging",
+      "direction": "publish",
+      "technology": "google-pubsub",
+      "target": "loan-approved",
+      "resourceType": "topic",
+      "contract": "LoanApproved",
+      "source": { "path": "src/Api/Integrations.cs", "line": 30 },
+      "confidence": "high",
+      "signals": ["google:pubsub", "pubsub:publish"]
+    },
+    {
+      "id": "integration-0000000000000004",
+      "projectPath": "src/Worker/Worker.csproj",
+      "kind": "messaging",
+      "direction": "consume",
+      "technology": "azure-servicebus",
+      "target": "payment-approved",
+      "resourceType": "queue",
+      "contract": "PaymentApproved",
+      "source": { "path": "src/Worker/Integrations.cs", "line": 10 },
+      "confidence": "high",
+      "signals": ["azure:servicebus", "servicebus:processor"]
+    },
+    {
+      "id": "integration-0000000000000005",
+      "projectPath": "src/Worker/Worker.csproj",
+      "kind": "messaging",
+      "direction": "publish",
+      "technology": "masstransit",
+      "contract": "LoanReviewed",
+      "source": { "path": "src/Worker/Integrations.cs", "line": 20 },
+      "confidence": "medium",
+      "signals": ["messaging:masstransit"]
+    },
+    {
+      "id": "integration-0000000000000006",
+      "projectPath": "src/Api/Api.csproj",
+      "kind": "database",
+      "direction": "bidirectional",
+      "technology": "postgresql",
+      "target": "LoanDb",
+      "resourceType": "database",
+      "configurationKey": "ConnectionStrings:LoanDb",
+      "source": { "path": "src/Api/Integrations.cs", "line": 40 },
+      "confidence": "high",
+      "signals": ["database:postgresql"]
+    },
+    {
+      "id": "integration-0000000000000007",
+      "projectPath": "src/Api/Api.csproj",
+      "kind": "cache",
+      "direction": "bidirectional",
+      "technology": "redis",
+      "target": "LoanCache",
+      "resourceType": "cache",
+      "configurationKey": "Redis:Connection",
+      "source": { "path": "src/Api/Integrations.cs", "line": 50 },
+      "confidence": "high",
+      "signals": ["cache:redis"]
+    },
+    {
+      "id": "integration-0000000000000008",
+      "projectPath": "src/Worker/Worker.csproj",
+      "kind": "storage",
+      "direction": "write",
+      "technology": "gcs",
+      "target": "loan-documents",
+      "resourceType": "bucket",
+      "source": { "path": "src/Worker/Integrations.cs", "line": 30 },
+      "confidence": "high",
+      "signals": ["storage:gcs"]
+    },
+    {
+      "id": "integration-0000000000000009",
+      "projectPath": "src/Worker/Worker.csproj",
+      "kind": "database",
+      "direction": "read",
+      "technology": "postgresql",
+      "target": "AuditDb",
+      "resourceType": "database",
+      "source": { "path": "src/Worker/Integrations.cs", "line": 40 },
+      "confidence": "low",
+      "signals": ["database:package"]
+    }
+  ],
+  "integrationDiscovery": { "enabled": true, "completed": true, "truncated": false },
+  "futureAdditiveField": { "ignored": true }
+}

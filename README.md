@@ -85,7 +85,7 @@ repo2c4 inspect \
 
 The resulting snapshot is deterministic for this fixture and can be compared with [`examples/end-to-end/snapshot.v1.json`](examples/end-to-end/snapshot.v1.json).
 
-For external integrations, first generate a public `InspectionReport` schema `1.6+` with DotNetRepoInspector `v1.6.5`, save it inside the inspected repository, and add `--integration-report artifacts/inspection.json`. Repo2C4 imports normalized `external.*` evidence through that JSON boundary; it neither invokes DotNetRepoInspector nor reads its internal assemblies. See the [external integration boundary](docs/external-integration-boundary.md).
+For external integrations, first run `dotnet repo-inspect /absolute/repository --discover-integrations --output /absolute/repository/artifacts/inspection.json` with DotNetRepoInspector `v1.6.5`, then add `--integration-report /absolute/repository/artifacts/inspection.json` to `repo2c4 inspect`. Repo2C4 imports normalized `external.*` evidence through the public schema `1.6+` JSON boundary; it neither invokes DotNetRepoInspector nor reads its internal assemblies. See the [external integration boundary](docs/external-integration-boundary.md).
 
 ### 3. Review the model and preview LikeC4
 
