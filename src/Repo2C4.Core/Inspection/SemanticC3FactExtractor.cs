@@ -157,16 +157,28 @@ public static class SemanticC3FactExtractor
 
             acceptedBytes += source.SizeBytes;
             string masked = MaskSource(content!, out bool complete);
-            SourceUnit unit = ParseUnit(project, source.RelativePath, masked, cancellationToken);
-            units.Add(unit);
 
-            if (!complete || unit.HasUnbalancedTypeBody)
+            try
+            {
+                SourceUnit unit = ParseUnit(project, source.RelativePath, masked, cancellationToken);
+                units.Add(unit);
+
+                if (!complete || unit.HasUnbalancedTypeBody)
+                {
+                    diagnostics.Add(
+                        "semanticC3.partialSyntax",
+                        DiagnosticSeverity.Info,
+                        source.RelativePath,
+                        "C# source is incomplete or partially parseable; only bounded structural facts were retained.");
+                }
+            }
+            catch (RegexMatchTimeoutException)
             {
                 diagnostics.Add(
-                    "semanticC3.partialSyntax",
-                    DiagnosticSeverity.Info,
+                    "semanticC3.parseTimeout",
+                    DiagnosticSeverity.Warning,
                     source.RelativePath,
-                    "C# source is incomplete or partially parseable; only bounded structural facts were retained.");
+                    "C# structural parsing exceeded its bounded regex budget; the source file was skipped.");
             }
         }
 
@@ -181,7 +193,18 @@ public static class SemanticC3FactExtractor
                 break;
             }
 
-            AnalyzeUnit(unit, projectTypes, facts, diagnostics, cancellationToken);
+            try
+            {
+                AnalyzeUnit(unit, projectTypes, facts, diagnostics, cancellationToken);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                diagnostics.Add(
+                    "semanticC3.analysisTimeout",
+                    DiagnosticSeverity.Warning,
+                    unit.SourcePath,
+                    "C# structural analysis exceeded its bounded regex budget; remaining facts for the source file were skipped.");
+            }
         }
 
         return CreateResult(
