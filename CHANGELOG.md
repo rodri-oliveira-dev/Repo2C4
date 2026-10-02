@@ -4,6 +4,9 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### Added
+- Additive, versioned Semantic C3 contract foundation with deterministic component taxonomy, stable source-symbol identity, reviewable internal/external relations, conceptual multi-container selection, and a reproducible v1.1.0 dogfooding baseline.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added

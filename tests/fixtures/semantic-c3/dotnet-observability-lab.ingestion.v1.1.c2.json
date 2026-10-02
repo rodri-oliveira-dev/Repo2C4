@@ -1,0 +1,131 @@
+{
+  "schemaVersion": "1.0",
+  "level": "C2",
+  "snapshot": {
+    "schemaVersion": "1.0",
+    "repositoryId": "dotnet_observability_lab_ingestion_baseline",
+    "files": [
+      {
+        "relativePath": "src/Ingestion.Api/Ingestion.Api.csproj",
+        "sizeBytes": 640
+      },
+      {
+        "relativePath": "src/Ingestion.Api/Program.cs",
+        "sizeBytes": 420
+      }
+    ],
+    "evidence": [
+      {
+        "id": "ev_application_reference",
+        "category": "dotnet.project.reference",
+        "relativePath": "src/Ingestion.Api/Ingestion.Api.csproj",
+        "line": 8,
+        "sourceType": "projectFile",
+        "description": "Project declares a build-time reference to the ingestion application project."
+      },
+      {
+        "id": "ev_http_candidate",
+        "category": "dotnet.runtime.http.candidate",
+        "relativePath": "src/Ingestion.Api/Program.cs",
+        "line": 12,
+        "sourceType": "sourceCode",
+        "description": "Source contains a recognizable HTTP host or route candidate."
+      },
+      {
+        "id": "ev_ingestion_project",
+        "category": "dotnet.project",
+        "relativePath": "src/Ingestion.Api/Ingestion.Api.csproj",
+        "line": 1,
+        "sourceType": "projectFile",
+        "description": "MSBuild project manifest is present."
+      },
+      {
+        "id": "ev_postgresql_candidate",
+        "category": "dotnet.integration.postgresql.candidate",
+        "relativePath": "src/Ingestion.Api/Ingestion.Api.csproj",
+        "line": 10,
+        "sourceType": "projectFile",
+        "description": "Package evidence suggests PostgreSQL integration without proving runtime communication."
+      },
+      {
+        "id": "ev_redis_candidate",
+        "category": "dotnet.integration.redis.candidate",
+        "relativePath": "src/Ingestion.Api/Ingestion.Api.csproj",
+        "line": 11,
+        "sourceType": "projectFile",
+        "description": "Package evidence suggests Redis integration without proving runtime communication."
+      }
+    ],
+    "diagnostics": []
+  },
+  "elements": [
+    {
+      "id": "el_observability_lab",
+      "kind": "softwareSystem",
+      "name": "Observability Lab",
+      "evidenceIds": [
+        "ev_ingestion_project"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "The focal software-system boundary is a reviewable architectural decision."
+    },
+    {
+      "id": "el_ingestion_api",
+      "kind": "container",
+      "name": "Ingestion.Api",
+      "parentId": "el_observability_lab",
+      "evidenceIds": [
+        "ev_http_candidate",
+        "ev_ingestion_project"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "Executable HTTP evidence supports a container candidate; deployment boundary remains reviewable."
+    },
+    {
+      "id": "el_postgresql",
+      "kind": "container",
+      "name": "PostgreSQL",
+      "parentId": "el_observability_lab",
+      "evidenceIds": [
+        "ev_postgresql_candidate"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "Static package evidence does not prove an owned or deployed database container."
+    },
+    {
+      "id": "el_redis",
+      "kind": "container",
+      "name": "Redis",
+      "parentId": "el_observability_lab",
+      "evidenceIds": [
+        "ev_redis_candidate"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "Static package evidence does not prove an owned or deployed cache container."
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_ingestion_postgresql",
+      "sourceId": "el_ingestion_api",
+      "destinationId": "el_postgresql",
+      "description": "Reads and writes ingestion data",
+      "evidenceIds": [
+        "ev_postgresql_candidate"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "Package evidence does not independently prove runtime database communication."
+    },
+    {
+      "id": "rel_ingestion_redis",
+      "sourceId": "el_ingestion_api",
+      "destinationId": "el_redis",
+      "description": "Uses idempotency/cache state",
+      "evidenceIds": [
+        "ev_redis_candidate"
+      ],
+      "status": "requiresReview",
+      "reviewReason": "Package evidence does not independently prove runtime cache communication."
+    }
+  ]
+}
