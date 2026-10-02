@@ -30,5 +30,11 @@
     <None Include="../../examples/models/*.json"
           Link="Models/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/external-integrations/dotnetrepoinspector-v1.6.5-canonical.json"
+          Link="ExternalFixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/fixtures/external-integrations-e2e/**"
+          Link="ExternalIntegrationE2E/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

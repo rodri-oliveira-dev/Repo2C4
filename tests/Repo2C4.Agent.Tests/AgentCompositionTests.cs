@@ -31,6 +31,9 @@ public sealed class AgentCompositionTests
         Assert.NotNull(chatClient.LastOptions.Tools);
         Assert.Contains(chatClient.LastOptions.Tools!, tool => tool.Name == "marker_tool");
         Assert.NotNull(chatClient.LastMessages);
+        Assert.Contains("external.*", chatClient.LastOptions.Instructions, StringComparison.Ordinal);
+        Assert.Contains("publish/consume", chatClient.LastOptions.Instructions, StringComparison.Ordinal);
+        Assert.Contains("low-confidence", chatClient.LastOptions.Instructions, StringComparison.Ordinal);
         Assert.Contains(
             chatClient.LastMessages,
             message => message.Role == ChatRole.User &&

@@ -20,4 +20,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Repo2C4.Mcp/Repo2C4.Mcp.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../fixtures/external-integrations/dotnetrepoinspector-v1.6.5-canonical.json"
+          Link="ExternalFixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

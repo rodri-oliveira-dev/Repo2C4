@@ -12,6 +12,14 @@ repo2c4 inspect --repository PATH --output snapshot.json
 
 `inspect` inventories one explicitly selected local repository and extracts the bounded evidence supported by the Core. The output is canonical v1 JSON.
 
+To attach a previously generated DotNetRepoInspector `InspectionReport` schema `1.6+`, pass a report inside that repository. Repo2C4 reads the public JSON boundary; it does not run DotNetRepoInspector:
+
+```bash
+repo2c4 inspect --repository PATH --integration-report PATH/artifacts/inspection.json --output snapshot.json
+```
+
+The report path may be absolute or repository-relative, but must resolve to a regular, non-linked file inside the selected repository. The unchanged stdout remains the snapshot path; the imported `external.*` evidence count is written to stderr. Incompatible or unsafe reports fail without producing a snapshot.
+
 The repository ID is derived deterministically from the selected root directory name. It is a local stable label, not a globally unique repository identity.
 
 The snapshot output file must not already exist. Choose another path if it does.

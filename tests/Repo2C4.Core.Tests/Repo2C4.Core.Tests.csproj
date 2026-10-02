@@ -27,5 +27,11 @@
     <None Include="../../examples/likec4-golden/**/*.c4"
           Link="LikeC4Golden/%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/external-integrations/*.json"
+          Link="ExternalIntegrationFixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/fixtures/external-integrations-e2e/**"
+          Link="ExternalIntegrationE2E/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

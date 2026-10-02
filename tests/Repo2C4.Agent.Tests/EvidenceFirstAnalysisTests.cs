@@ -9,6 +9,22 @@ namespace Repo2C4.Agent.Tests;
 public sealed class EvidenceFirstAnalysisTests
 {
     [Fact]
+    public void PromptUsesOnlyTheHostAuthorizedIntegrationReportAndPreservesExternalSemantics()
+    {
+        AgentHostOptions options = new("ollama", "model", "Document architecture")
+        {
+            IntegrationReportPath = "artifacts/inspection.json",
+        };
+
+        string prompt = EvidenceFirstAnalysisPrompt.BuildForWorkflow(options);
+
+        Assert.Contains("integrationReportPath=\"artifacts/inspection.json\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("external.*", prompt, StringComparison.Ordinal);
+        Assert.Contains("publish/consume", prompt, StringComparison.Ordinal);
+        Assert.Contains("low-confidence", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HappyPathUsesEvidenceBeforeC1C2ProposalAndProducesSeparatedSummary()
     {
         AnalysisToolHarness harness = new();

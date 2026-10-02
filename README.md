@@ -53,7 +53,7 @@ Repo2C4 currently does **not**:
 - let the MCP server call a hosted AI provider on its own;
 - remove the need for architectural review. `validate` verifies LikeC4 syntax/workspace integrity, not whether an architectural decision is true.
 
-For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
+For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [external integration interoperability](docs/external-integration-boundary.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
 
 ## Quick Start
 
@@ -84,6 +84,8 @@ repo2c4 inspect \
 ```
 
 The resulting snapshot is deterministic for this fixture and can be compared with [`examples/end-to-end/snapshot.v1.json`](examples/end-to-end/snapshot.v1.json).
+
+For external integrations, first run `dotnet repo-inspect /absolute/repository --discover-integrations --output /absolute/repository/artifacts/inspection.json` with DotNetRepoInspector `v1.6.5`, then add `--integration-report /absolute/repository/artifacts/inspection.json` to `repo2c4 inspect`. Repo2C4 imports normalized `external.*` evidence through the public schema `1.6+` JSON boundary; it neither invokes DotNetRepoInspector nor reads its internal assemblies. See the [external integration boundary](docs/external-integration-boundary.md).
 
 ### 3. Review the model and preview LikeC4
 

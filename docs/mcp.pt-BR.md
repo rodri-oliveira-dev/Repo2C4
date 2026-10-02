@@ -77,7 +77,7 @@ O servidor local normal expõe seis tools:
 
 | Tool | Finalidade | Entradas importantes | Escrita |
 | --- | --- | --- | --- |
-| `inspect_repository` | Inspeciona um diretório dentro da raiz local autorizada e cria snapshot da sessão. | `repositoryPath` tem default `"."`; `maxFiles` tem default 1.000. | Somente leitura. |
+| `inspect_repository` | Inspeciona um diretório dentro da raiz local autorizada e cria snapshot da sessão. | `repositoryPath` tem default `"."`; `integrationReportPath` relativo é opcional; `maxFiles` tem default 1.000. | Somente leitura. |
 | `get_evidence` | Pagina evidências v1 de um snapshot. | `snapshotId`, `category` exata opcional, `pathPrefix` opcional de metadados, `pageSize`, `cursor` opaco. | Somente leitura. |
 | `get_snapshot` | Pagina metadados de arquivos ou diagnósticos sem retornar corpos de arquivos. | `snapshotId`, `section` = `files` ou `diagnostics`, `pathPrefix` opcional. | Somente leitura. |
 | `get_evidence_report` | Devolve resumo limitado de proveniência/revisão para um modelo vinculado à sessão. | `snapshotId`, `ArchitectureModel` v1 completo. | Somente leitura. |

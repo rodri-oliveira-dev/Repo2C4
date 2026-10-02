@@ -5,6 +5,9 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Reproducible external-integration end-to-end coverage based on the official DotNetRepoInspector `v1.6.5` schema `1.6` shape, spanning HTTP, database, cache, storage, messaging publish/consume, conservative review semantics, real MCP transport, deterministic Agent execution, and official LikeC4 validation.
+- Optional, security-bounded external integration report consumption across CLI `--integration-report`, MCP `inspect_repository.integrationReportPath`, and Agent host authorization, with one Core import/merge path, session-bound `external.*` evidence, controlled schema/path failures, explicit counts, confidence/direction guidance, and quickstart documentation.
+- Versioned external-integration interoperability boundary, deterministic importer, and conservative C1/C2 mapping for DotNetRepoInspector `InspectionReport` schema `1.6+`, covering HTTP, data/cache/storage, and provider-backed messaging publish/consume with normalized evidence/provenance, repository correlation, explicit confidence/review policy, pending-evidence reporting, bounded untrusted-input limits, adversarial fixtures, and no runtime or NuGet dependency between the products' cores.
 - Human-in-the-loop LikeC4 application using the Agent Framework `ApprovalRequiredAIFunction`: validated destination-specific C1/C2 previews show file/change summaries and `requiresReview` IDs, bind the local human decision to the framework approval request, recheck preview freshness/conflicts before any `write=true` MCP call and never auto-approve from repository/model content.
 - Explicit Microsoft Agent Framework Workflow orchestration for Agent analysis with typed analysis/evidence-report/preview/validation executors, a finite configurable 1-3 validation-attempt graph, sanitized correction feedback, structured terminal results and dry-run-only MCP enforcement.
 - Evidence-first Agent analysis entrypoint with explicit `--goal`, host-gated optional C3 selection, C1/C2 preview guidance, review-status rules, prompt-injection resistance and final fact/hypothesis/diagnostic summaries driven only through MCP tools.
@@ -29,6 +32,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 - Vendor-neutral MCP client documentation, reusable evidence-first C1/C2 prompts and a deterministic protocol-client end-to-end test that compares preview/written LikeC4 with versioned golden files without any hosted AI dependency.
 
 ### Changed
+- Successful external-integration imports now retain sanitized correlation/truncation diagnostics in the resulting snapshot, and unknown or nonsensical data-integration directions cannot produce confirmed relations.
 - Added consumer-facing NuGet metadata for the product packages: the Repo2C4 repository URL as CLI `PackageProjectUrl` and a shared package icon for CLI, MCP and Agent.
 - Replaced inherited single-library packaging baseline with a non-packable product scaffold.
 - Disabled inherited template release and NuGet publication until phase 5.

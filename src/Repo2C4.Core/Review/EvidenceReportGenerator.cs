@@ -7,7 +7,13 @@ public sealed record EvidenceReportSummary(
     int ConfirmedAssertions,
     int ReviewRequiredAssertions,
     int ScanWarnings,
-    int MissingOrigins);
+    int MissingOrigins)
+{
+    public int UnmappedExternalIntegrations
+    {
+        get; init;
+    }
+}
 
 public sealed record EvidenceReportResult(
     string FileName,
@@ -33,6 +39,7 @@ public static class EvidenceReportGenerator
         List<string> confirmed = [];
         List<string> review = [];
         HashSet<string> missingOrigins = new(StringComparer.Ordinal);
+        HashSet<string> referencedEvidenceIds = new(StringComparer.Ordinal);
 
         foreach (ArchitectureElement element in model.Elements.OrderBy(item => item.Id, StringComparer.Ordinal))
         {
@@ -51,6 +58,7 @@ public static class EvidenceReportGenerator
                 evidenceById,
                 inventoriedPaths,
                 missingOrigins);
+            referencedEvidenceIds.UnionWith(element.EvidenceIds);
         }
 
         foreach (ArchitectureRelation relation in model.Relations.OrderBy(item => item.Id, StringComparer.Ordinal))
@@ -70,6 +78,7 @@ public static class EvidenceReportGenerator
                 evidenceById,
                 inventoriedPaths,
                 missingOrigins);
+            referencedEvidenceIds.UnionWith(relation.EvidenceIds);
         }
 
         RepositoryDiagnostic[] warnings =
@@ -88,6 +97,14 @@ public static class EvidenceReportGenerator
         builder.AppendLine();
         AppendSection(builder, "Verified facts", confirmed, "No confirmed architectural assertions.");
         AppendSection(builder, "Hypotheses requiring review", review, "No hypotheses require review.");
+        Evidence[] unmappedExternal =
+        [
+            .. model.Snapshot.Evidence
+                .Where(item => item.Category.StartsWith("external.", StringComparison.Ordinal))
+                .Where(item => !referencedEvidenceIds.Contains(item.Id))
+                .OrderBy(item => item.Id, StringComparer.Ordinal),
+        ];
+        AppendUnmappedExternal(builder, unmappedExternal);
         AppendDiagnostics(builder, warnings);
         AppendMissingOrigins(builder, missingOrigins);
 
@@ -99,7 +116,32 @@ public static class EvidenceReportGenerator
                 confirmed.Count,
                 review.Count,
                 warnings.Length,
-                missingOrigins.Count));
+                missingOrigins.Count)
+            {
+                UnmappedExternalIntegrations = unmappedExternal.Length,
+            });
+    }
+
+    private static void AppendUnmappedExternal(StringBuilder builder, Evidence[] evidence)
+    {
+        builder.AppendLine("## External integrations pending architectural mapping");
+        builder.AppendLine();
+        if (evidence.Length == 0)
+        {
+            builder.AppendLine("No external integration evidence is pending architectural mapping.");
+        }
+        else
+        {
+            foreach (Evidence item in evidence)
+            {
+                string line = item.Line is null ? string.Empty : ":" + item.Line.Value;
+                builder.AppendLine(
+                    "- " + Code(item.Id) + " (" + PlainText(item.Category) + ") at " +
+                    Code(item.RelativePath + line) + ".");
+            }
+        }
+
+        builder.AppendLine();
     }
 
     private static void AppendSection(StringBuilder builder, string title, List<string> items, string emptyMessage)

@@ -91,6 +91,8 @@ Tool command extensions differ on Windows (`.exe`). The install script is a Linu
 
 ## Local repository → evidence → reviewed architecture → LikeC4
 
+An optional external-discovery step remains a separate tool boundary: run `dotnet repo-inspect /absolute/repository --discover-integrations --output /absolute/repository/artifacts/inspection.json` with DotNetRepoInspector `v1.6.5`, then add `--integration-report /absolute/repository/artifacts/inspection.json` to `repo2c4 inspect`. The report must remain inside the repository. Packaging does not bundle, install, or invoke DotNetRepoInspector.
+
 Inspect a local, **explicitly authorized** .NET repository into a new snapshot file:
 
 ```bash

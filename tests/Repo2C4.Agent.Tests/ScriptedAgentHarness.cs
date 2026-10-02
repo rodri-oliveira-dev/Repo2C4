@@ -198,6 +198,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         string fixtureName,
         IReadOnlyList<bool>? validationResults = null,
         string? writeDestination = null,
+        string? integrationReportPath = null,
         CancellationToken cancellationToken = default)
     {
         string repositoryRoot = FindRepositoryRoot();
@@ -225,6 +226,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             RepositoryRoot = fixture.Path,
             McpServerPath = mcpServerPath,
             WriteDestination = writeDestination,
+            IntegrationReportPath = integrationReportPath,
             MaxValidationAttempts = Math.Min(
                 Math.Max(validationResults?.Count ?? 1, 1),
                 3),

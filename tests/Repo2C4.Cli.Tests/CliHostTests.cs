@@ -59,6 +59,100 @@ public sealed class CliHostTests
     }
 
     [Fact]
+    public void InspectImportsExternalEvidenceAndKeepsOutputPathOnStdout()
+    {
+        using TempDirectory temp = new();
+        string repository = CreateIntegrationRepository(temp.Path);
+        string snapshotPath = Path.Combine(temp.Path, "snapshot.json");
+        using StringWriter output = new();
+        using StringWriter error = new();
+
+        int exitCode = Program.Run(
+            [
+                "inspect", "--repository", repository,
+                "--integration-report", Path.Combine(repository, "inspection.json"),
+                "--output", snapshotPath,
+            ],
+            output,
+            error);
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.Equal(snapshotPath + Environment.NewLine, output.ToString());
+        Assert.Contains("Imported external integration evidence: 1.", error.ToString(), StringComparison.Ordinal);
+        RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(File.ReadAllText(snapshotPath));
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.http.outbound");
+    }
+
+    [Fact]
+    public void InspectImportsCompleteExternalIntegrationFixtureDeterministically()
+    {
+        string repository = Path.Combine(AppContext.BaseDirectory, "ExternalIntegrationE2E");
+        using TempDirectory temp = new();
+        string first = Path.Combine(temp.Path, "first.json");
+        string second = Path.Combine(temp.Path, "second.json");
+
+        int firstExit = Run(
+            ["inspect", "--repository", repository, "--integration-report", "inspection-v1.6.json", "--output", first]);
+        int secondExit = Run(
+            ["inspect", "--repository", repository, "--integration-report", "inspection-v1.6.json", "--output", second]);
+
+        Assert.Equal(CliExitCodes.Success, firstExit);
+        Assert.Equal(CliExitCodes.Success, secondExit);
+        Assert.Equal(File.ReadAllText(first), File.ReadAllText(second));
+        RepositorySnapshot snapshot = ContractJson.DeserializeSnapshot(File.ReadAllText(first));
+        Assert.Equal(9, snapshot.Evidence.Count(item => item.Category.StartsWith("external.", StringComparison.Ordinal)));
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.messaging.publish");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.messaging.consume");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.database");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.cache");
+        Assert.Contains(snapshot.Evidence, item => item.Category == "external.storage");
+    }
+
+    [Fact]
+    public void InspectRejectsIncompatibleExternalReportWithoutWritingSnapshot()
+    {
+        using TempDirectory temp = new();
+        string repository = CreateIntegrationRepository(temp.Path);
+        string reportPath = Path.Combine(repository, "inspection.json");
+        File.WriteAllText(
+            reportPath,
+            File.ReadAllText(reportPath).Replace("\"1.6\"", "\"2.0\"", StringComparison.Ordinal));
+        string snapshotPath = Path.Combine(temp.Path, "snapshot.json");
+        using StringWriter output = new();
+        using StringWriter error = new();
+
+        int exitCode = Program.Run(
+            ["inspect", "--repository", repository, "--integration-report", reportPath, "--output", snapshotPath],
+            output,
+            error);
+
+        Assert.Equal(CliExitCodes.InvalidData, exitCode);
+        Assert.Contains("external.schema.incompatible", error.ToString(), StringComparison.Ordinal);
+        Assert.False(File.Exists(snapshotPath));
+    }
+
+    [Fact]
+    public void InspectRejectsExternalReportOutsideRepository()
+    {
+        using TempDirectory temp = new();
+        string repository = CreateIntegrationRepository(temp.Path);
+        string outsideReport = Path.Combine(temp.Path, "outside.json");
+        File.Copy(Path.Combine(repository, "inspection.json"), outsideReport);
+        string snapshotPath = Path.Combine(temp.Path, "snapshot.json");
+        using StringWriter output = new();
+        using StringWriter error = new();
+
+        int exitCode = Program.Run(
+            ["inspect", "--repository", repository, "--integration-report", outsideReport, "--output", snapshotPath],
+            output,
+            error);
+
+        Assert.Equal(CliExitCodes.IoError, exitCode);
+        Assert.Equal(string.Empty, output.ToString());
+        Assert.False(File.Exists(snapshotPath));
+    }
+
+    [Fact]
     public void GeneratePreviewsThenAppliesManagedFiles()
     {
         string model = Path.Combine(AppContext.BaseDirectory, "EndToEnd", "architecture.c2.v1.json");
@@ -167,6 +261,21 @@ public sealed class CliHostTests
         using StringWriter output = new();
         using StringWriter error = new();
         return Program.Run(args, output, error);
+    }
+
+    private static string CreateIntegrationRepository(string root)
+    {
+        string repository = Path.Combine(root, "repository");
+        string project = Path.Combine(repository, "src", "App");
+        Directory.CreateDirectory(project);
+        File.WriteAllText(
+            Path.Combine(project, "App.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        File.WriteAllText(Path.Combine(project, "SerasaClient.cs"), "internal sealed class SerasaClient { }");
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "ExternalFixtures", "dotnetrepoinspector-v1.6.5-canonical.json"),
+            Path.Combine(repository, "inspection.json"));
+        return repository;
     }
 
     private sealed class TempDirectory : IDisposable

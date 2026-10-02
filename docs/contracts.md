@@ -84,6 +84,8 @@ Version `1.0` is the only accepted version in the foundation phase. Unknown fiel
 
 ## v1 .NET evidence extraction categories
 
+External Integration Discovery remains a separate public boundary. `InspectionReport` schema `1.6+` findings become sanitized `external.http.outbound`, `external.messaging.publish`, `external.messaging.consume`, `external.database`, `external.cache`, `external.storage`, or `external.integration.unknown` evidence. The normalized description preserves project provenance, technology, target/resource, contract and confidence, but never configuration values, raw JSON or source bodies. See the [external integration contract and review policy](external-integration-boundary.md).
+
 `RepositoryFactExtractor.Extract(options, cancellationToken)` returns a valid v1 snapshot that retains accepted file metadata and scan diagnostics while adding factual evidence. It emits no `ArchitectureElement` or `ArchitectureRelation`.
 
 | Category | Observation and proof boundary |

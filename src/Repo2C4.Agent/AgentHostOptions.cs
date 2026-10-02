@@ -39,6 +39,12 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         init;
     }
 
+    public string? IntegrationReportPath
+    {
+        get;
+        init;
+    }
+
     public string? McpServerPath
     {
         get;
@@ -114,6 +120,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? goalOption = null;
         string? endpoint = null;
         string? repositoryRoot = null;
+        string? integrationReportPath = null;
         string? mcpServerPath = null;
         string? c3ContainerId = null;
         string? writeDestination = null;
@@ -210,6 +217,22 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     }
 
                     repositoryRoot = repositoryRootValue;
+                    break;
+
+                case "--integration-report":
+                    if (!TryReadUniqueValue(
+                            args,
+                            ref index,
+                            integrationReportPath,
+                            "--integration-report",
+                            out string? integrationReportValue,
+                            out error))
+                    {
+                        options = null;
+                        return false;
+                    }
+
+                    integrationReportPath = integrationReportValue;
                     break;
 
                 case "--mcp-server-path":
@@ -495,6 +518,18 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                 out error);
         }
 
+        string? configuredIntegrationReportPath = integrationReportPath?.Trim();
+        if (configuredIntegrationReportPath is not null
+            && !TryNormalizeRelativeDestination(
+                configuredIntegrationReportPath,
+                out configuredIntegrationReportPath))
+        {
+            return Fail(
+                "--integration-report must be a safe repository-relative file path.",
+                out options,
+                out error);
+        }
+
         if (configuredWriteDestination is not null && string.IsNullOrWhiteSpace(prompt))
         {
             return Fail(
@@ -519,6 +554,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             MaxRunDuration = TimeSpan.FromSeconds(maxDurationSeconds),
             AllowExternalAi = allowExternalAi,
             RepositoryRoot = repositoryRoot?.Trim(),
+            IntegrationReportPath = configuredIntegrationReportPath,
             McpServerPath = mcpServerPath?.Trim(),
             C3ContainerId = configuredC3ContainerId,
             MaxValidationAttempts = maxValidationAttempts,

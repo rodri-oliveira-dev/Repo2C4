@@ -86,6 +86,8 @@ Autorize explicitamente a raiz local e gere um novo snapshot:
 repo2c4 inspect --repository /caminho/absoluto/do/repositorio-dotnet --output ./snapshot.json
 ```
 
+Uma etapa externa opcional continua separada: execute `dotnet repo-inspect /repositorio --discover-integrations --output /repositorio/artifacts/inspection.json` com DotNetRepoInspector `v1.6.5` e acrescente `--integration-report /repositorio/artifacts/inspection.json` ao `repo2c4 inspect`. O report deve permanecer dentro do repositório. O pacote Repo2C4 não inclui, instala nem invoca o DotNetRepoInspector.
+
 O exemplo `examples/fixtures/library-only` possui um snapshot versionado em `examples/end-to-end/snapshot.v1.json`; os modelos C1 e C2 no mesmo diretório representam **decisões revisadas por uma pessoa**, não uma inferência automática. Se desejar, faça uma proposta opcional com Ollama local:
 
 ```bash
