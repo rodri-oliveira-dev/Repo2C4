@@ -137,7 +137,7 @@ public sealed class SemanticC3FactExtractorTests
                     "    public Type" + index + "(IDependency dependency)" + Environment.NewLine +
                     "    {" + Environment.NewLine +
                     "    }" + Environment.NewLine +
-                    "}")))
+                    "}")));
 
         SemanticC3FactSet result = Extract(fixture, new SemanticC3FactExtractionOptions(fixture.Options())
         {
