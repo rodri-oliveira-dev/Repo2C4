@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.6",
+  "repository": {
+    "name": "integration-sample",
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "dotNetSdk": {},
+  "projects": [
+    {
+      "path": "src/App/App.csproj",
+      "sdks": [],
+      "targetFrameworks": [],
+      "runtimeIdentifiers": [],
+      "references": [],
+      "diagnostics": []
+    }
+  ],
+  "diagnostics": [],
+  "integrations": [
+    {
+      "id": "integration-0000000000000001",
+      "projectPath": "src/App/App.csproj",
+      "kind": "http",
+      "direction": "outbound",
+      "technology": "refit",
+      "target": "Serasa",
+      "configurationKey": "Serasa:BaseUrl",
+      "contract": "ISerasaApi",
+      "source": { "path": "src/App/Integrations.cs", "line": 10 },
+      "confidence": "high",
+      "signals": ["refit:contract", "http:client"]
+    },
+    {
+      "id": "integration-0000000000000002",
+      "projectPath": "src/App/App.csproj",
+      "kind": "messaging",
+      "direction": "publish",
+      "technology": "google-pubsub",
+      "target": "loan-approved",
+      "resourceType": "topic",
+      "contract": "LoanApproved",
+      "source": { "path": "src/App/Integrations.cs", "line": 20 },
+      "confidence": "high",
+      "signals": ["pubsub:publisher"]
+    },
+    {
+      "id": "integration-0000000000000003",
+      "projectPath": "src/App/App.csproj",
+      "kind": "messaging",
+      "direction": "consume",
+      "technology": "azure-servicebus",
+      "target": "payment-approved",
+      "resourceType": "queue",
+      "contract": "PaymentApproved",
+      "source": { "path": "src/App/Integrations.cs", "line": 30 },
+      "confidence": "high",
+      "signals": ["servicebus:processor"]
+    },
+    {
+      "id": "integration-0000000000000004",
+      "projectPath": "src/App/App.csproj",
+      "kind": "database",
+      "direction": "read",
+      "technology": "postgresql",
+      "target": "LoanDb",
+      "configurationKey": "ConnectionStrings:LoanDb",
+      "source": { "path": "src/App/Integrations.cs", "line": 40 },
+      "confidence": "high",
+      "signals": ["npgsql:datasource"]
+    },
+    {
+      "id": "integration-0000000000000005",
+      "projectPath": "src/App/App.csproj",
+      "kind": "cache",
+      "direction": "read",
+      "technology": "redis",
+      "source": { "path": "src/App/Integrations.cs", "line": 50 },
+      "confidence": "low",
+      "signals": ["redis:package"]
+    },
+    {
+      "id": "integration-0000000000000006",
+      "projectPath": "src/App/App.csproj",
+      "kind": "storage",
+      "direction": "write",
+      "technology": "amazon-s3",
+      "target": "documents",
+      "resourceType": "bucket",
+      "source": { "path": "src/App/Integrations.cs", "line": 60 },
+      "confidence": "medium",
+      "signals": ["s3:client"]
+    }
+  ],
+  "integrationDiscovery": { "enabled": true, "completed": true, "truncated": false },
+  "futureAdditiveField": { "ignored": true }
+}

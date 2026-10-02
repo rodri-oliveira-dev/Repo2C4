@@ -5,7 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
-- Versioned external-integration interoperability boundary for DotNetRepoInspector `InspectionReport` schema `1.6+`, with normalized provenance contracts, explicit confidence/review policy, bounded untrusted-input limits, and no runtime or NuGet dependency between the products' cores.
+- Versioned external-integration interoperability boundary and deterministic importer for DotNetRepoInspector `InspectionReport` schema `1.6+`, with normalized evidence/provenance, repository correlation, explicit confidence/review policy, bounded untrusted-input limits, adversarial fixtures, and no runtime or NuGet dependency between the products' cores.
 - Human-in-the-loop LikeC4 application using the Agent Framework `ApprovalRequiredAIFunction`: validated destination-specific C1/C2 previews show file/change summaries and `requiresReview` IDs, bind the local human decision to the framework approval request, recheck preview freshness/conflicts before any `write=true` MCP call and never auto-approve from repository/model content.
 - Explicit Microsoft Agent Framework Workflow orchestration for Agent analysis with typed analysis/evidence-report/preview/validation executors, a finite configurable 1-3 validation-attempt graph, sanitized correction feedback, structured terminal results and dry-run-only MCP enforcement.
 - Evidence-first Agent analysis entrypoint with explicit `--goal`, host-gated optional C3 selection, C1/C2 preview guidance, review-status rules, prompt-injection resistance and final fact/hypothesis/diagnostic summaries driven only through MCP tools.

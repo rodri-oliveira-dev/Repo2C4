@@ -20,6 +20,8 @@ For each accepted integration finding, the internal boundary preserves:
 
 Paths must use `/`, be relative to the inspected repository, and contain no traversal. Absolute, drive-qualified, backslash, empty-segment, or control-character paths are rejected. Unknown additive JSON fields are not retained. Findings and signals are canonicalized with ordinal ordering by the importer so source enumeration order cannot affect output.
 
+Correlation requires every finding's project and source paths to exist in the local `RepositorySnapshot`, and the project must also occur in the report's project inventory. Callers that know the authoritative repository name or commit supply them through `ExternalIntegrationImportContext`; a missing or different supplied identity rejects the report. When neither value is available, successful path reconciliation is accepted with an explicit `external.correlation.pathOnly` diagnostic rather than silently claiming commit-level correlation.
+
 ## Confidence and architectural review
 
 Imported evidence remains an observation; it is not itself a confirmed C4 assertion. A later mapping may mark an assertion `confirmed` only when high-confidence evidence establishes the repository origin, integration kind and direction, and enough target or provider identity for the represented endpoint. Medium or low confidence, an unknown kind/direction, or incomplete endpoint identity remains `requiresReview` with an explicit reason. Queue, topic, exchange, stream, subscription, message, or handler names describe the known relation and never prove a remote producer, consumer, owner, deployment, or container.

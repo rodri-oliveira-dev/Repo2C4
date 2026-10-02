@@ -45,6 +45,8 @@ public enum ExternalIntegrationConfidence
 /// <summary>Repository-relative provenance imported from one normalized integration finding.</summary>
 public sealed record ExternalIntegrationEvidence(
     string Id,
+    string Category,
+    string Description,
     string? OriginalFindingId,
     string ProjectPath,
     ExternalIntegrationKind Kind,
@@ -57,7 +59,11 @@ public sealed record ExternalIntegrationEvidence(
     string SourcePath,
     int SourceLine,
     ExternalIntegrationConfidence Confidence,
-    ImmutableArray<string> Signals);
+    ImmutableArray<string> Signals)
+{
+    public Evidence ToRepositoryEvidence() =>
+        new(Id, Category, SourcePath, SourceLine, EvidenceSourceType.SourceCode, Description);
+}
 
 /// <summary>A controlled import diagnostic that never contains report or source bodies.</summary>
 public sealed record ExternalIntegrationDiagnostic(
@@ -69,10 +75,30 @@ public sealed record ExternalIntegrationDiagnostic(
 /// <summary>Bounded normalized output; no raw JSON or secret-bearing configuration values are retained.</summary>
 public sealed record ExternalIntegrationEvidenceResult(
     string ReportSchemaVersion,
+    string? RepositoryName,
+    string? CommitSha,
     bool DiscoveryCompleted,
     bool Truncated,
     ImmutableArray<ExternalIntegrationEvidence> Evidence,
-    ImmutableArray<ExternalIntegrationDiagnostic> Diagnostics);
+    ImmutableArray<ExternalIntegrationDiagnostic> Diagnostics)
+{
+    public ImmutableArray<Evidence> RepositoryEvidence =>
+        [.. Evidence.Select(item => item.ToRepositoryEvidence())];
+}
+
+/// <summary>Local snapshot and optional authoritative identity used to reject unrelated or stale reports.</summary>
+public sealed record ExternalIntegrationImportContext(RepositorySnapshot Snapshot)
+{
+    public string? ExpectedRepositoryName
+    {
+        get; init;
+    }
+
+    public string? ExpectedCommitSha
+    {
+        get; init;
+    }
+}
 
 /// <summary>Hard limits applied while reading an untrusted InspectionReport JSON stream.</summary>
 public sealed record ExternalIntegrationEvidenceReadOptions
@@ -102,6 +128,7 @@ public interface IExternalIntegrationEvidenceSource
 {
     ValueTask<ExternalIntegrationEvidenceResult> ReadAsync(
         Stream report,
+        ExternalIntegrationImportContext context,
         ExternalIntegrationEvidenceReadOptions? options = null,
         CancellationToken cancellationToken = default);
 }

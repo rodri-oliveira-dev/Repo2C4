@@ -25,6 +25,8 @@ public sealed class ExternalIntegrationContractTests
     {
         ExternalIntegrationEvidence evidence = new(
             "ev_external_http",
+            "external.http.outbound",
+            "Project calls Serasa via HTTP using refit.",
             "integration-6e7ab864fd3b45dc",
             "src/App/App.csproj",
             ExternalIntegrationKind.Http,
@@ -44,5 +46,6 @@ public sealed class ExternalIntegrationContractTests
         Assert.Equal(42, evidence.SourceLine);
         Assert.Equal("Serasa:BaseUrl", evidence.ConfigurationKey);
         Assert.Equal(["http:client", "refit:contract"], evidence.Signals);
+        Assert.Equal("external.http.outbound", evidence.ToRepositoryEvidence().Category);
     }
 }
