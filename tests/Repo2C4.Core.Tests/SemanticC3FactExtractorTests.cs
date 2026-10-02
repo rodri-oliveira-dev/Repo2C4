@@ -131,14 +131,13 @@ public sealed class SemanticC3FactExtractorTests
             "Many.cs",
             string.Join(
                 Environment.NewLine,
-                Enumerable.Range(0, 200).Select(index => $"""
-                    public sealed class Type{{index}}
-                    {
-                        public Type{{index}}(IDependency dependency)
-                        {
-                        }
-                    }
-                    """)));
+                Enumerable.Range(0, 200).Select(index =>
+                    "public sealed class Type" + index + Environment.NewLine +
+                    "{" + Environment.NewLine +
+                    "    public Type" + index + "(IDependency dependency)" + Environment.NewLine +
+                    "    {" + Environment.NewLine +
+                    "    }" + Environment.NewLine +
+                    "}")))
 
         SemanticC3FactSet result = Extract(fixture, new SemanticC3FactExtractionOptions(fixture.Options())
         {
