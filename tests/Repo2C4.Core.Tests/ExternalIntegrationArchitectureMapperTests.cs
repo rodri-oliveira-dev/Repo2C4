@@ -202,6 +202,26 @@ public sealed class ExternalIntegrationArchitectureMapperTests
         Assert.NotNull(relation.ReviewReason);
     }
 
+    [Theory]
+    [InlineData(ExternalIntegrationKind.Database, ExternalIntegrationDirection.Unknown)]
+    [InlineData(ExternalIntegrationKind.Cache, ExternalIntegrationDirection.Publish)]
+    [InlineData(ExternalIntegrationKind.Storage, ExternalIntegrationDirection.Consume)]
+    public void UnknownOrNonsensicalDataDirectionsRequireReview(
+        ExternalIntegrationKind kind,
+        ExternalIntegrationDirection direction)
+    {
+        ArchitectureModel model = ModelWithContainers(("el_api", "src/Api/Api.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Data.cs", 10, kind,
+                direction, "postgresql", "ExternalData", confidence: ExternalIntegrationConfidence.High));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+
+        ArchitectureRelation relation = Assert.Single(mapped.Relations);
+        Assert.Equal(ReviewStatus.RequiresReview, relation.Status);
+        Assert.Contains("direction", relation.ReviewReason, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void SharedTargetCreatesOneExternalSystemAndOneRelationPerCorrelatedProject()
     {

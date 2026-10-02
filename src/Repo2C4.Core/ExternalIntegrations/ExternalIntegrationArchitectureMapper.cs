@@ -182,7 +182,8 @@ public static class ExternalIntegrationArchitectureMapper
         bool confirmed = origin.Exact &&
             origin.Element!.Status == ReviewStatus.Confirmed &&
             externalElement.Status == ReviewStatus.Confirmed &&
-            evidence.Confidence == ExternalIntegrationConfidence.High;
+            evidence.Confidence == ExternalIntegrationConfidence.High &&
+            HasConfirmableDirection(evidence);
         string? reviewReason = confirmed ? null : RelationReviewReason(origin, externalElement, evidence);
 
         if (!relations.TryGetValue(relationId, out ArchitectureRelation? existing))
@@ -234,6 +235,11 @@ public static class ExternalIntegrationArchitectureMapper
         if (origin.Element!.Status == ReviewStatus.RequiresReview)
         {
             return "The correlated source element still requires architectural review.";
+        }
+
+        if (!HasConfirmableDirection(evidence))
+        {
+            return "The external integration direction is not supported for confirmed architectural mapping.";
         }
 
         if (externalElement.Status == ReviewStatus.RequiresReview || evidence.Confidence != ExternalIntegrationConfidence.High)
@@ -314,6 +320,17 @@ public static class ExternalIntegrationArchitectureMapper
             evidence.Direction is ExternalIntegrationDirection.Publish or ExternalIntegrationDirection.Consume &&
             MessagingProviderName(evidence.Technology) is not null,
         ExternalIntegrationKind.Database or ExternalIntegrationKind.Cache or ExternalIntegrationKind.Storage => true,
+        _ => false,
+    };
+
+    private static bool HasConfirmableDirection(ExternalIntegrationEvidence evidence) => evidence.Kind switch
+    {
+        ExternalIntegrationKind.Http => evidence.Direction == ExternalIntegrationDirection.Outbound,
+        ExternalIntegrationKind.Messaging =>
+            evidence.Direction is ExternalIntegrationDirection.Publish or ExternalIntegrationDirection.Consume,
+        ExternalIntegrationKind.Database or ExternalIntegrationKind.Cache or ExternalIntegrationKind.Storage =>
+            evidence.Direction is ExternalIntegrationDirection.Read or ExternalIntegrationDirection.Write or
+                ExternalIntegrationDirection.Bidirectional,
         _ => false,
     };
 

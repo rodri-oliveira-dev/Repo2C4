@@ -45,6 +45,35 @@ public sealed class McpArchitectureToolsTests
     }
 
     [Fact]
+    public async Task SuccessfulExternalImportPreservesDiagnosticsInTheSessionSnapshot()
+    {
+        using TemporaryDirectory root = new();
+        string repository = CreateIntegrationRepository(root.Path);
+        string reportPath = Path.Combine(repository, "inspection.json");
+        File.WriteAllText(
+            reportPath,
+            File.ReadAllText(reportPath).Replace(
+                "\"truncated\": false",
+                "\"truncated\": true",
+                StringComparison.Ordinal));
+        using McpSnapshotStore store = new();
+        McpArchitectureTools tools = new(root.Path, store);
+
+        McpInspectRepositoryResult result = await tools.InspectRepository(
+            Path.GetRelativePath(root.Path, repository),
+            "inspection.json",
+            cancellationToken: TestContext.Current.CancellationToken);
+        McpSnapshotPageResult diagnostics = tools.GetSnapshot(
+            result.SnapshotId,
+            section: "diagnostics",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(result.DiagnosticCount, diagnostics.TotalMatched);
+        Assert.Contains(diagnostics.Diagnostics, item => item.Code == "external.discovery.truncated");
+        Assert.Contains(diagnostics.Diagnostics, item => item.Code == "external.correlation.pathOnly");
+    }
+
+    [Fact]
     public async Task InspectionRejectsExternalReportOutsideSelectedRepository()
     {
         using TemporaryDirectory root = new();

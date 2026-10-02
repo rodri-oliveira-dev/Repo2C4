@@ -122,6 +122,23 @@ public static class ExternalIntegrationSnapshotImporter
         RepositorySnapshot merged = ExternalIntegrationEvidenceMerger.Merge(
             snapshot,
             imported.RepositoryEvidence);
+        merged = merged with
+        {
+            Diagnostics =
+            [
+                .. merged.Diagnostics
+                    .Concat(imported.Diagnostics.Select(item => new RepositoryDiagnostic(
+                        item.Code,
+                        item.Severity,
+                        null,
+                        item.Message)))
+                    .Distinct()
+                    .OrderBy(item => item.Code, StringComparer.Ordinal)
+                    .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
+                    .ThenBy(item => item.Message, StringComparer.Ordinal),
+            ],
+        };
+        _ = ContractJson.SerializeSnapshot(merged);
         return new ExternalIntegrationSnapshotImportResult(
             merged,
             imported.Evidence.Length,
