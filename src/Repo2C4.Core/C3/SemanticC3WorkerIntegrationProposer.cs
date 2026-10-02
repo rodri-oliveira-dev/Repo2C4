@@ -1108,9 +1108,17 @@ public static class SemanticC3WorkerIntegrationProposer
 
         public HashSet<string> SourcePaths { get; } = new(StringComparer.Ordinal);
 
-        public bool DirectBoundary { get; set; }
+        public bool DirectBoundary
+        {
+            get;
+            set;
+        }
 
-        public bool RegisteredBoundary { get; set; }
+        public bool RegisteredBoundary
+        {
+            get;
+            set;
+        }
     }
 
     private sealed record WorkerCandidate(
