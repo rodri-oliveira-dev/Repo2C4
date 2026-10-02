@@ -32,6 +32,11 @@ public static class SemanticC3FactExtractor
         @"(?<return>[A-Za-z_][A-Za-z0-9_?.<>\[\],]{0,255})\s+" +
         @"(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})\s*\((?<params>[^()\r\n]*)\)\s*(?<tail>=>|\{|;)");
 
+    private static readonly Regex ConstructorRegex = CreateRegex(
+        @"(?m)^[ \t]*(?<attrs>(?:[ \t]*\[[^\]\r\n]+\][ \t]*\r?\n)*)" +
+        @"[ \t]*(?:(?:public|private|protected|internal|static|extern|unsafe)\s+)*" +
+        @"(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})\s*\((?<params>[^()\r\n]*)\)\s*(?<tail>=>|\{|;)");
+
     private static readonly Regex DiRegistrationRegex = CreateRegex(
         @"\bAdd(?<lifetime>Scoped|Singleton|Transient)\s*<\s*" +
         @"(?<service>[A-Za-z_][A-Za-z0-9_.<>?,]{0,255})\s*" +
@@ -560,16 +565,11 @@ public static class SemanticC3FactExtractor
                 absolute));
         }
 
-        Regex constructorRegex = CreateRegex(
-            @"(?m)^[ \t]*(?<attrs>(?:[ \t]*\[[^\]\r\n]+\][ \t]*\r?\n)*)" +
-            @"[ \t]*(?:(?:public|private|protected|internal|static|extern|unsafe)\s+)*" +
-            Regex.Escape(type.Name) +
-            @"\s*\((?<params>[^()\r\n]*)\)\s*(?<tail>=>|\{|;)");
-
-        foreach (Match match in constructorRegex.Matches(body))
+        foreach (Match match in ConstructorRegex.Matches(body))
         {
             int absolute = type.BodyStart + match.Index;
-            if (braceDepth[absolute] != type.BodyDepth)
+            if (braceDepth[absolute] != type.BodyDepth ||
+                !string.Equals(match.Groups["name"].Value, type.Name, StringComparison.Ordinal))
             {
                 continue;
             }
