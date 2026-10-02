@@ -128,6 +128,7 @@ public static class SemanticC3WorkerIntegrationProposer
             WorkerAccumulator accumulator = GetWorker(workers, fact.SourceSymbol);
             accumulator.DirectBoundary = true;
             accumulator.EvidenceIds.Add(fact.Id);
+            accumulator.SourcePaths.Add(fact.SourcePath);
             if (typeFacts.TryGetValue(fact.SourceSymbol.Id, out SemanticC3Fact? typeFact))
             {
                 accumulator.EvidenceIds.Add(typeFact.Id);
@@ -154,6 +155,8 @@ public static class SemanticC3WorkerIntegrationProposer
             accumulator.RegisteredBoundary = true;
             accumulator.EvidenceIds.Add(typeFact.Id);
             accumulator.EvidenceIds.Add(registration.Id);
+            accumulator.SourcePaths.Add(typeFact.SourcePath);
+            accumulator.SourcePaths.Add(registration.SourcePath);
         }
 
         return
@@ -182,6 +185,7 @@ public static class SemanticC3WorkerIntegrationProposer
                     return new WorkerCandidate(
                         component,
                         worker.SourceSymbol,
+                        [.. worker.SourcePaths.OrderBy(path => path, StringComparer.Ordinal)],
                         worker.DirectBoundary,
                         worker.RegisteredBoundary);
                 })
@@ -306,6 +310,7 @@ public static class SemanticC3WorkerIntegrationProposer
         {
             PersistenceAccumulator candidate = GetPersistence(candidates, fact.SourceSymbol, PersistenceKind.DbContext);
             candidate.EvidenceIds.Add(fact.Id);
+            candidate.SourcePaths.Add(fact.SourcePath);
             if (typeFacts.TryGetValue(fact.SourceSymbol.Id, out SemanticC3Fact? typeFact))
             {
                 candidate.EvidenceIds.Add(typeFact.Id);
@@ -363,6 +368,9 @@ public static class SemanticC3WorkerIntegrationProposer
             candidate.EvidenceIds.Add(repository.Id);
             candidate.EvidenceIds.Add(registration.Fact.Id);
             candidate.EvidenceIds.Add(injection.Id);
+            candidate.SourcePaths.Add(repository.SourcePath);
+            candidate.SourcePaths.Add(registration.Fact.SourcePath);
+            candidate.SourcePaths.Add(injection.SourcePath);
             if (typeFacts.TryGetValue(repository.SourceSymbol.Id, out SemanticC3Fact? typeFact))
             {
                 candidate.EvidenceIds.Add(typeFact.Id);
@@ -394,6 +402,8 @@ public static class SemanticC3WorkerIntegrationProposer
                 PersistenceKind.Repository);
             candidate.EvidenceIds.Add(repository.Id);
             candidate.EvidenceIds.Add(invocation.Id);
+            candidate.SourcePaths.Add(repository.SourcePath);
+            candidate.SourcePaths.Add(invocation.SourcePath);
             if (typeFacts.TryGetValue(repository.SourceSymbol.Id, out SemanticC3Fact? typeFact))
             {
                 candidate.EvidenceIds.Add(typeFact.Id);
@@ -430,7 +440,11 @@ public static class SemanticC3WorkerIntegrationProposer
                         ReviewStatus.RequiresReview,
                         reason);
 
-                    return new PersistenceCandidate(component, candidate.SourceSymbol, candidate.Kind);
+                    return new PersistenceCandidate(
+                        component,
+                        candidate.SourceSymbol,
+                        [.. candidate.SourcePaths.OrderBy(path => path, StringComparer.Ordinal)],
+                        candidate.Kind);
                 })
                 .OrderBy(candidate => candidate.Component.Id, StringComparer.Ordinal),
         ];
@@ -527,10 +541,7 @@ public static class SemanticC3WorkerIntegrationProposer
                 WorkerCandidate[] exactWorkers =
                 [
                     .. workers.Where(worker =>
-                        string.Equals(
-                            WorkerSourcePath(worker, baseModel, evidence.ProjectPath),
-                            evidence.SourcePath,
-                            StringComparison.Ordinal)),
+                        worker.SourcePaths.Contains(evidence.SourcePath, StringComparer.Ordinal)),
                 ];
                 if (exactWorkers.Length == 1)
                 {
@@ -574,10 +585,7 @@ public static class SemanticC3WorkerIntegrationProposer
         PersistenceCandidate[] samePath =
         [
             .. persistence.Where(candidate =>
-                string.Equals(
-                    SourcePathFor(candidate.Component, candidate.SourceSymbol, evidence.ProjectPath),
-                    evidence.SourcePath,
-                    StringComparison.Ordinal)),
+                candidate.SourcePaths.Contains(evidence.SourcePath, StringComparer.Ordinal)),
         ];
         if (samePath.Length == 1)
         {
@@ -590,27 +598,6 @@ public static class SemanticC3WorkerIntegrationProposer
                 candidate.SourceSymbol.ProjectPath == evidence.ProjectPath),
         ];
         return sameProject.Length == 1 ? sameProject[0] : null;
-    }
-
-    private static string? WorkerSourcePath(
-        WorkerCandidate worker,
-        ArchitectureModel baseModel,
-        string projectPath)
-    {
-        _ = baseModel;
-        _ = projectPath;
-        return null;
-    }
-
-    private static string? SourcePathFor(
-        SemanticC3ComponentCandidate component,
-        SemanticC3SourceSymbolIdentity symbol,
-        string projectPath)
-    {
-        _ = component;
-        _ = symbol;
-        _ = projectPath;
-        return null;
     }
 
     private static SemanticC3Fact? MatchMessagingSignal(
@@ -1119,6 +1106,8 @@ public static class SemanticC3WorkerIntegrationProposer
 
         public HashSet<string> EvidenceIds { get; } = new(StringComparer.Ordinal);
 
+        public HashSet<string> SourcePaths { get; } = new(StringComparer.Ordinal);
+
         public bool DirectBoundary { get; set; }
 
         public bool RegisteredBoundary { get; set; }
@@ -1127,6 +1116,7 @@ public static class SemanticC3WorkerIntegrationProposer
     private sealed record WorkerCandidate(
         SemanticC3ComponentCandidate Component,
         SemanticC3SourceSymbolIdentity SourceSymbol,
+        ImmutableArray<string> SourcePaths,
         bool DirectBoundary,
         bool RegisteredBoundary);
 
@@ -1164,11 +1154,14 @@ public static class SemanticC3WorkerIntegrationProposer
         public PersistenceKind Kind { get; } = kind;
 
         public HashSet<string> EvidenceIds { get; } = new(StringComparer.Ordinal);
+
+        public HashSet<string> SourcePaths { get; } = new(StringComparer.Ordinal);
     }
 
     private sealed record PersistenceCandidate(
         SemanticC3ComponentCandidate Component,
         SemanticC3SourceSymbolIdentity SourceSymbol,
+        ImmutableArray<string> SourcePaths,
         PersistenceKind Kind);
 
     private sealed record DiRegistration(
