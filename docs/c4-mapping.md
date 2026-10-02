@@ -153,6 +153,25 @@ The asynchronous Semantic C3 pass combines local .NET structure with the normali
 - Low/medium confidence and all newly proposed C3 boundaries remain explicit `requiresReview` assertions. Resource, contract and provider detail remain provenance/relation metadata rather than extra C4 components.
 - General component-to-component collaboration (worker → publisher, worker → application processing, application → persistence, and similar internal flow) is intentionally deferred to the dedicated internal-relation policy.
 
+## Semantic C3 internal-relation confidence policy
+
+Semantic C3 relations are composed only after component discovery. The relation builder is deterministic and bounded by explicit `MaxComponents` and `MaxRelations` limits.
+
+| Structural evidence | Relation status |
+| --- | --- |
+| DI/handler wiring **and** direct symbol invocation between supported component responsibilities | `confirmed` |
+| DI/handler wiring without direct invocation | `requiresReview` |
+| direct invocation without DI/handler wiring | `requiresReview` |
+| interface implementation only, type/name similarity only, or `ProjectReference` only | no runtime relation |
+| existing exact C1/C2 external relation already `confirmed` with matching provenance | component → existing external element may be `confirmed` |
+| external C1/C2 relation still under review | component → existing external element remains `requiresReview` |
+
+Supported internal responsibility flows are intentionally narrow: HTTP endpoint → application service, application service → persistence/integration adapter, background worker → messaging publisher, and messaging consumer → application service. Other static references do not become architecture merely because they exist in the source graph.
+
+Relations are merged by semantic source/destination/kind/description and evidence is unioned deterministically. Self-loops without explicit architectural semantics, missing endpoints and component-to-component edges that cross container boundaries are omitted. Reciprocal weak references do not manufacture cycles; a cycle is retained only when independently strong supported relations justify both directions.
+
+The Semantic C3 evidence report lists each candidate/relation, its evidence locations and signal categories, missing strong signals, review reason and graph-budget/omission diagnostics without reproducing source bodies or configuration values.
+
 ## Out of scope
 
 The C1/C2 mapping policy itself does not implement LikeC4 emission, CLI/MCP/Agent orchestration, AI calls, runtime tracing or automatic PR generation. The additive Semantic C3 policies above only define conservative component proposals; generation/orchestration is handled by later phases.

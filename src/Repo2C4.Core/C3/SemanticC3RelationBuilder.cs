@@ -465,6 +465,31 @@ public static class SemanticC3RelationBuilder
                     "An existing Semantic C3 external relation was omitted because its C1/C2 element does not exist."));
                 continue;
             }
+            else
+            {
+                ArchitectureRelation[] backingRelations =
+                [
+                    .. baseModel.Relations.Where(item =>
+                        (item.SourceId == source.ContainerId &&
+                         item.DestinationId == relation.DestinationId) ||
+                        (item.DestinationId == source.ContainerId &&
+                         item.SourceId == relation.DestinationId))
+                    .Where(item =>
+                        item.EvidenceIds.Intersect(
+                            relation.EvidenceIds,
+                            StringComparer.Ordinal).Any()),
+                ];
+
+                if (backingRelations.Any(item => item.Status == ReviewStatus.Confirmed))
+                {
+                    yield return relation with
+                    {
+                        Status = ReviewStatus.Confirmed,
+                        ReviewReason = null,
+                    };
+                    continue;
+                }
+            }
 
             yield return relation;
         }

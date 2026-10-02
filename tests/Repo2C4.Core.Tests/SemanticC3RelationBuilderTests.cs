@@ -283,6 +283,41 @@ public sealed class SemanticC3RelationBuilderTests
     }
 
     [Fact]
+    public void ExistingReviewExternalRelationIsPromotedWhenConfirmedC1C2EvidenceMatches()
+    {
+        ArchitectureModel model = BaseModelWithExternal();
+        SemanticC3ComponentCandidate adapter = Component(
+            "T:Sample.SerasaClient",
+            SemanticC3ComponentCategory.IntegrationAdapter,
+            "Serasa integration adapter");
+
+        SemanticC3RelationCandidate existing = new(
+            StableIds.ForRelation(adapter.Id, "el_serasa", "legacy-c3-external"),
+            adapter.Id,
+            "el_serasa",
+            SemanticC3RelationTargetKind.ArchitectureElement,
+            "Calls Serasa via HTTP",
+            ["ev_external"],
+            ReviewStatus.RequiresReview,
+            "C3 association pending review.");
+
+        SemanticC3Proposal proposal = new(
+            SemanticC3ContractSchema.Version,
+            [ContainerId],
+            [adapter],
+            [existing]);
+
+        SemanticC3RelationCandidate relation = Assert.Single(
+            SemanticC3RelationBuilder.Build(
+                model,
+                proposal,
+                FactSet()).Proposal.Relations);
+
+        Assert.Equal(ReviewStatus.Confirmed, relation.Status);
+        Assert.Null(relation.ReviewReason);
+    }
+
+    [Fact]
     public void HandlerDelegateCanSupplyEndpointOwnershipButStillNeedsInvocationForConfirmation()
     {
         SemanticC3ComponentCandidate endpoint = Component(
@@ -490,6 +525,43 @@ public sealed class SemanticC3RelationBuilderTests
         Assert.Single(first.Proposal.Relations);
         Assert.Contains(first.Diagnostics, diagnostic =>
             diagnostic.Code == "semanticC3.relationBudget");
+        Assert.Equal(
+            SemanticC3ContractJson.Serialize(first.Proposal),
+            SemanticC3ContractJson.Serialize(repeated.Proposal));
+    }
+
+    [Fact]
+    public void ComponentBudgetTruncatesDeterministically()
+    {
+        SemanticC3ComponentCandidate endpoint = Component(
+            "T:Sample.OrdersController",
+            SemanticC3ComponentCategory.HttpEndpoint,
+            "Orders HTTP endpoint");
+        SemanticC3ComponentCandidate application = Component(
+            "T:Sample.OrderService",
+            SemanticC3ComponentCategory.ApplicationService,
+            "Order application service");
+
+        SemanticC3RelationBuildOptions options = new()
+        {
+            MaxComponents = 1,
+            MaxRelations = 10,
+        };
+
+        SemanticC3RelationBuildResult first = SemanticC3RelationBuilder.Build(
+            BaseModel(),
+            Proposal(endpoint, application),
+            FactSet(),
+            options);
+        SemanticC3RelationBuildResult repeated = SemanticC3RelationBuilder.Build(
+            BaseModel(),
+            Proposal(endpoint, application),
+            FactSet(),
+            options);
+
+        Assert.Single(first.Proposal.Components);
+        Assert.Contains(first.Diagnostics, diagnostic =>
+            diagnostic.Code == "semanticC3.componentBudget");
         Assert.Equal(
             SemanticC3ContractJson.Serialize(first.Proposal),
             SemanticC3ContractJson.Serialize(repeated.Proposal));
