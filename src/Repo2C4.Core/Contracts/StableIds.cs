@@ -78,6 +78,47 @@ public static class StableIds
         return Hash("cmp", containerId, category.ToString(), stableLogicalKey);
     }
 
+    public static string ForSemanticC3Fact(
+        string projectPath,
+        string sourcePath,
+        string sourceSymbolId,
+        SemanticC3FactKind kind,
+        string category,
+        string relatedSymbolId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceSymbolId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        ArgumentNullException.ThrowIfNull(relatedSymbolId);
+
+        if (!ContractValidator.IsNormalizedRelativePath(projectPath))
+        {
+            throw new ArgumentException(
+                "Semantic C3 fact project path must be repository-relative.",
+                nameof(projectPath));
+        }
+
+        if (!ContractValidator.IsNormalizedRelativePath(sourcePath))
+        {
+            throw new ArgumentException(
+                "Semantic C3 fact source path must be repository-relative.",
+                nameof(sourcePath));
+        }
+
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        return Hash(
+            "fact",
+            projectPath,
+            sourcePath,
+            sourceSymbolId,
+            kind.ToString(),
+            category,
+            relatedSymbolId);
+    }
+
     private static string Hash(string prefix, params string[] parts)
     {
         // Length-prefix fields so ["ab", "c"] cannot alias ["a", "bc"].

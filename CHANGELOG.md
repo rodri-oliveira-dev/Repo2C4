@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Bounded, cancellation-aware C# structural fact extraction for Semantic C3, covering symbols, DI/wiring, Minimal API/controllers, hosted services, DbContext, messaging role signals and conservative intra-project collaboration facts without build/code execution or source/literal propagation.
 - Additive, versioned Semantic C3 contract foundation with deterministic component taxonomy, stable source-symbol identity, reviewable internal/external relations, conceptual multi-container selection, and a reproducible v1.1.0 dogfooding baseline.
 
 ## [1.1.0] - 2026-10-02
