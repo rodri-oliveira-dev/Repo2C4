@@ -137,6 +137,22 @@ Semantic C3 remains additive to the stable C1/C2 model. For HTTP/application pro
 
 Component IDs derive from stable source-symbol identity and category, and evidence references use Semantic C3 fact IDs. This keeps route aggregation and naming deterministic across repeated analysis while preserving the facts that motivated each proposal.
 
+## Semantic C3 worker/messaging/persistence policy
+
+The asynchronous Semantic C3 pass combines local .NET structure with the normalized Integration Evidence boundary instead of treating package/framework names as architecture.
+
+- A concrete `BackgroundService` / `IHostedService` symbol is one worker candidate. `AddHostedService<T>` evidence is merged into the same symbol-derived candidate instead of creating a second component. Registration-only boundaries remain `requiresReview`.
+- The worker host and its internal processing responsibility stay aggregated when the evidence exposes only one hosted-service boundary. They are split only when later evidence supports a distinct internal responsibility; class or method names alone do not justify that split.
+- A messaging adapter requires both a concrete local publisher/consumer-shaped symbol and supported Integration Evidence for the same project/direction. The imported evidence supplies publish vs consume, provider/technology, resource and contract metadata.
+- A messaging component is stable per local source symbol, direction/category and provider. Multiple findings for the same adapter merge provenance; different providers or distinct local adapter symbols remain distinct.
+- Framework-only `masstransit` / `nservicebus`, unknown transports, missing targets, or unmatched local role evidence do not create a broker adapter or remote peer.
+- `DbContext` inheritance is a strong local persistence-boundary signal and may produce a reviewable persistence candidate without modeling entities or `DbSet` values.
+- A repository-shaped implementation is only promoted when its use is structurally observable from a worker/messaging boundary through DI registration plus constructor injection, or through direct local symbol collaboration. A type merely named `Repository` is insufficient.
+- Database/cache package or Integration Evidence without a semantically linked local persistence responsibility does not fabricate a persistence component. Cache evidence is not reclassified as database persistence.
+- External Semantic C3 relations are attached only when the same evidence ID already participates in an existing C1/C2 external relation involving the selected container. The C3 pass reuses that existing architecture element; it never invents the other endpoint.
+- Low/medium confidence and all newly proposed C3 boundaries remain explicit `requiresReview` assertions. Resource, contract and provider detail remain provenance/relation metadata rather than extra C4 components.
+- General component-to-component collaboration (worker → publisher, worker → application processing, application → persistence, and similar internal flow) is intentionally deferred to the dedicated internal-relation policy.
+
 ## Out of scope
 
-This policy does not implement LikeC4 emission, LikeC4 validation, CLI commands, MCP transport, AI calls, C3, external services or automatic PR generation.
+The C1/C2 mapping policy itself does not implement LikeC4 emission, CLI/MCP/Agent orchestration, AI calls, runtime tracing or automatic PR generation. The additive Semantic C3 policies above only define conservative component proposals; generation/orchestration is handled by later phases.
