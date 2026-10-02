@@ -15,5 +15,6 @@ public sealed class CoreDependencyTests
 
         Assert.DoesNotContain("Repo2C4.Cli", dependencies);
         Assert.DoesNotContain("Repo2C4.Mcp", dependencies);
+        Assert.DoesNotContain(dependencies, dependency => dependency.StartsWith("DotNetRepoInspector", StringComparison.Ordinal));
     }
 }

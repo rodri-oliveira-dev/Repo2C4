@@ -53,7 +53,7 @@ Repo2C4 currently does **not**:
 - let the MCP server call a hosted AI provider on its own;
 - remove the need for architectural review. `validate` verifies LikeC4 syntax/workspace integrity, not whether an architectural decision is true.
 
-For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
+For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [external integration interoperability](docs/external-integration-boundary.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
 
 ## Quick Start
 
