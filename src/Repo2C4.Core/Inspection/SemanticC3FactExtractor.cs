@@ -15,6 +15,7 @@ public static class SemanticC3FactExtractor
     private const int MaxIdentifierLength = 128;
     private const int MaxAttributesPerSymbol = 32;
     private const int MaxBaseTypesPerType = 32;
+    private const int MaxEndpointCallLength = 4_096;
 
     private static readonly Regex NamespaceRegex = CreateRegex(
         @"\bnamespace\s+(?<name>[A-Za-z_][A-Za-z0-9_]{0,127}(?:\.[A-Za-z_][A-Za-z0-9_]{0,127})*)\s*(?:;|\{)");
@@ -54,6 +55,9 @@ public static class SemanticC3FactExtractor
 
     private static readonly Regex AttributeNameRegex = CreateRegex(
         @"\b(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})(?:Attribute)?\b");
+
+    private static readonly Regex EndpointHandlerRegex = CreateRegex(
+        @"^(?<type>[A-Za-z_][A-Za-z0-9_.]{0,255})\.(?<method>[A-Za-z_][A-Za-z0-9_]{0,127})$");
 
     public static SemanticC3FactSet Extract(
         SemanticC3FactExtractionOptions options,
@@ -337,6 +341,19 @@ public static class SemanticC3FactExtractor
                         : "Declares method " + method.Name + ".",
                     null));
 
+                for (int parameterIndex = 0; parameterIndex < method.Parameters.Length; parameterIndex++)
+                {
+                    ParameterDeclaration parameter = method.Parameters[parameterIndex];
+                    facts.AddObservation(Fact(
+                        unit,
+                        method.Line,
+                        methodSymbol,
+                        SemanticC3FactKind.MethodParameter,
+                        "semantic.symbol.parameter",
+                        "Method declares parameter type " + parameter.Type + ".",
+                        "T:" + parameter.Type + ":" + parameterIndex));
+                }
+
                 foreach (string attribute in method.Attributes.Take(MaxAttributesPerSymbol))
                 {
                     facts.AddObservation(Fact(
@@ -428,6 +445,8 @@ public static class SemanticC3FactExtractor
                 "semantic.host.minimalApi",
                 "Source invokes ASP.NET Core " + api + " route mapping.",
                 "route:" + api + ":" + routeOrdinal));
+
+            AnalyzeEndpointDetails(unit, match, source, facts);
             routeOrdinal++;
         }
 
@@ -472,6 +491,162 @@ public static class SemanticC3FactExtractor
                 "HOST:" + hostedType + ":" + hostedOrdinal));
             hostedOrdinal++;
         }
+    }
+
+    private static void AnalyzeEndpointDetails(
+        SourceUnit unit,
+        Match routeMatch,
+        SemanticC3SourceSymbolIdentity source,
+        FactAccumulator facts)
+    {
+        int openParenthesis = routeMatch.Index + routeMatch.Length - 1;
+        int closeParenthesis = FindMatchingParenthesisBounded(unit.MaskedSource, openParenthesis);
+        if (closeParenthesis < 0)
+        {
+            return;
+        }
+
+        string arguments = unit.MaskedSource[(openParenthesis + 1)..closeParenthesis];
+        int lambdaArrow = arguments.IndexOf("=>", StringComparison.Ordinal);
+        if (lambdaArrow >= 0)
+        {
+            int parameterClose = arguments.LastIndexOf(')', lambdaArrow);
+            if (parameterClose < 0)
+            {
+                return;
+            }
+
+            int parameterOpen = FindMatchingOpenParenthesis(arguments, parameterClose);
+            if (parameterOpen < 0)
+            {
+                return;
+            }
+
+            ParameterDeclaration[] parameters = ParseParameters(
+                arguments[(parameterOpen + 1)..parameterClose]);
+
+            for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
+            {
+                ParameterDeclaration parameter = parameters[parameterIndex];
+                facts.AddRelation(Fact(
+                    unit,
+                    unit.LineAt(routeMatch.Index),
+                    source,
+                    SemanticC3FactKind.EndpointDependency,
+                    "semantic.wiring.endpointDependency",
+                    "HTTP endpoint lambda depends on parameter type " + parameter.Type + ".",
+                    "T:" + parameter.Type + ":" + parameterIndex));
+            }
+
+            return;
+        }
+
+        string? handlerArgument = LastTopLevelArgument(arguments);
+        if (handlerArgument is null)
+        {
+            return;
+        }
+
+        Match handler = EndpointHandlerRegex.Match(handlerArgument);
+        if (!handler.Success)
+        {
+            return;
+        }
+
+        string typeName = handler.Groups["type"].Value;
+        string methodName = handler.Groups["method"].Value;
+        facts.AddRelation(Fact(
+            unit,
+            unit.LineAt(routeMatch.Index),
+            source,
+            SemanticC3FactKind.EndpointHandler,
+            "semantic.host.endpointHandler",
+            "HTTP endpoint maps to explicit handler " + typeName + "." + methodName + ".",
+            "M:" + typeName + "." + methodName));
+    }
+
+    private static int FindMatchingParenthesisBounded(string source, int openParenthesis)
+    {
+        int depth = 0;
+        int limit = Math.Min(source.Length, openParenthesis + MaxEndpointCallLength);
+
+        for (int index = openParenthesis; index < limit; index++)
+        {
+            if (source[index] == '(')
+            {
+                depth++;
+            }
+            else if (source[index] == ')' && --depth == 0)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindMatchingOpenParenthesis(string value, int closeParenthesis)
+    {
+        int depth = 0;
+        for (int index = closeParenthesis; index >= 0; index--)
+        {
+            if (value[index] == ')')
+            {
+                depth++;
+            }
+            else if (value[index] == '(' && --depth == 0)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string? LastTopLevelArgument(string value)
+    {
+        int start = 0;
+        int round = 0;
+        int square = 0;
+        int curly = 0;
+        int angle = 0;
+
+        for (int index = 0; index < value.Length; index++)
+        {
+            switch (value[index])
+            {
+                case '(':
+                    round++;
+                    break;
+                case ')':
+                    round = Math.Max(0, round - 1);
+                    break;
+                case '[':
+                    square++;
+                    break;
+                case ']':
+                    square = Math.Max(0, square - 1);
+                    break;
+                case '{':
+                    curly++;
+                    break;
+                case '}':
+                    curly = Math.Max(0, curly - 1);
+                    break;
+                case '<':
+                    angle++;
+                    break;
+                case '>':
+                    angle = Math.Max(0, angle - 1);
+                    break;
+                case ',' when round == 0 && square == 0 && curly == 0 && angle == 0:
+                    start = index + 1;
+                    break;
+            }
+        }
+
+        string candidate = value[start..].Trim();
+        return candidate.Length == 0 ? null : candidate;
     }
 
     private static SourceUnit ParseUnit(

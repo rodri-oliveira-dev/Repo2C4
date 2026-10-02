@@ -99,6 +99,56 @@ public sealed class SemanticC3FactExtractorTests
     }
 
     [Fact]
+    public void ExtractsMinimalApiLambdaDependenciesAndExplicitHandlers()
+    {
+        using Fixture fixture = new();
+        fixture.Add("App.csproj", "<Project />");
+        fixture.Add("Program.cs", """
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Services.AddScoped<IOrderService, OrderService>();
+            var app = builder.Build();
+
+            app.MapPost("/inline", (IOrderService service) => Results.Ok());
+            app.MapGet("/explicit", OrderEndpoints.Handle);
+            """);
+        fixture.Add("Endpoints.cs", """
+            public static class OrderEndpoints
+            {
+                public static object Handle(IOrderService service) => new();
+            }
+
+            public interface IOrderService
+            {
+                void Execute();
+            }
+
+            public sealed class OrderService : IOrderService
+            {
+                public void Execute() { }
+            }
+            """);
+
+        SemanticC3FactSet result = Extract(fixture);
+
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.EndpointDependency &&
+            fact.RelatedSymbolId != null &&
+            fact.RelatedSymbolId.StartsWith("T:IOrderService:", StringComparison.Ordinal));
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.EndpointHandler &&
+            fact.RelatedSymbolId == "M:OrderEndpoints.Handle");
+
+        SemanticC3Fact handler = Assert.Single(result.Facts.Where(fact =>
+            fact.Kind == SemanticC3FactKind.MethodDeclaration &&
+            fact.SourceSymbol.SymbolId.StartsWith("M:OrderEndpoints.Handle(", StringComparison.Ordinal)));
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.MethodParameter &&
+            fact.SourceSymbol.Id == handler.SourceSymbol.Id &&
+            fact.RelatedSymbolId != null &&
+            fact.RelatedSymbolId.StartsWith("T:IOrderService:", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void OutputIsDeterministicAndStableAcrossRepeatedExtraction()
     {
         using Fixture fixture = new();
