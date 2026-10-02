@@ -77,6 +77,8 @@ The caller explicitly selects the focal root software system; the mapper never c
 
 A generated external target and relation are `confirmed` only for high-confidence evidence, an exact correlated origin that is itself confirmed, and a non-empty observed target. Medium/low confidence, a review-pending source, or focal-system fallback keeps the assertion `requiresReview` with a reason. Database, cache, and storage resource details stay in root-system names and relation descriptions rather than becoming owned infrastructure containers.
 
+Messaging creates a root logical provider only when `technology` identifies a supported broker/provider. Publish is emitted from the local correlated origin to that provider; consume is emitted from the provider to the local correlated consumer, while the wording remains `Consumes ... from ...`. Queue, topic, exchange, subscription, stream, and contract are relation details, never child containers or inferred remote services. Framework-only `masstransit`/`nservicebus`, custom `unknown` technology, and findings without a target stay as pending evidence because they do not prove a transport or resource identity.
+
 A relation whose endpoint itself is a hypothesis must also remain under review.
 
 ## Metadata for external decisions

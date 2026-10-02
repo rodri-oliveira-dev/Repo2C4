@@ -50,21 +50,27 @@ public static class ExternalIntegrationArchitectureMapper
                 continue;
             }
 
-            string destinationId = DestinationId(evidence);
-            ArchitectureElement destination = CreateOrMergeDestination(elements, destinationId, evidence);
-            elements[destinationId] = destination;
+            string externalElementId = DestinationId(evidence);
+            ArchitectureElement externalElement = CreateOrMergeDestination(elements, externalElementId, evidence);
+            elements[externalElementId] = externalElement;
 
             string description = RelationDescription(evidence);
+            bool consumes = evidence.Kind == ExternalIntegrationKind.Messaging &&
+                evidence.Direction == ExternalIntegrationDirection.Consume;
+            string sourceId = consumes ? externalElementId : origin.Element.Id;
+            string destinationId = consumes ? origin.Element.Id : externalElementId;
             string relationId = StableIds.ForRelation(
-                origin.Element.Id,
+                sourceId,
                 destinationId,
                 "external:" + evidence.Kind.ToString() + ":" + evidence.Direction.ToString() + ":" +
-                evidence.Technology + ":" + evidence.ResourceType + ":" + evidence.Target);
+                evidence.Technology + ":" + evidence.ResourceType + ":" + evidence.Target + ":" + evidence.Contract);
             ArchitectureRelation relation = CreateOrMergeRelation(
                 relations,
                 relationId,
+                sourceId,
+                destinationId,
                 origin,
-                destination,
+                externalElement,
                 evidence,
                 description);
             relations[relationId] = relation;
@@ -153,7 +159,7 @@ public static class ExternalIntegrationArchitectureMapper
             return new ArchitectureElement(
                 destinationId,
                 ArchitectureElementKind.SoftwareSystem,
-                evidence.Target!,
+                DestinationName(evidence),
                 null,
                 [evidence.Id],
                 confirmed ? ReviewStatus.Confirmed : ReviewStatus.RequiresReview,
@@ -161,7 +167,7 @@ public static class ExternalIntegrationArchitectureMapper
         }
 
         if (existing.Kind != ArchitectureElementKind.SoftwareSystem || existing.ParentId is not null ||
-            !string.Equals(existing.Name, evidence.Target, StringComparison.Ordinal))
+            !string.Equals(existing.Name, DestinationName(evidence), StringComparison.Ordinal))
         {
             throw new InvalidOperationException("A generated external target ID conflicts with an existing architecture element.");
         }
@@ -186,31 +192,33 @@ public static class ExternalIntegrationArchitectureMapper
     private static ArchitectureRelation CreateOrMergeRelation(
         Dictionary<string, ArchitectureRelation> relations,
         string relationId,
+        string sourceId,
+        string destinationId,
         OriginResolution origin,
-        ArchitectureElement destination,
+        ArchitectureElement externalElement,
         ExternalIntegrationEvidence evidence,
         string description)
     {
         bool confirmed = origin.Exact &&
             origin.Element!.Status == ReviewStatus.Confirmed &&
-            destination.Status == ReviewStatus.Confirmed &&
+            externalElement.Status == ReviewStatus.Confirmed &&
             evidence.Confidence == ExternalIntegrationConfidence.High;
-        string? reviewReason = confirmed ? null : RelationReviewReason(origin, destination, evidence);
+        string? reviewReason = confirmed ? null : RelationReviewReason(origin, externalElement, evidence);
 
         if (!relations.TryGetValue(relationId, out ArchitectureRelation? existing))
         {
             return new ArchitectureRelation(
                 relationId,
-                origin.Element!.Id,
-                destination.Id,
+                sourceId,
+                destinationId,
                 description,
                 [evidence.Id],
                 confirmed ? ReviewStatus.Confirmed : ReviewStatus.RequiresReview,
                 reviewReason);
         }
 
-        if (!string.Equals(existing.SourceId, origin.Element!.Id, StringComparison.Ordinal) ||
-            !string.Equals(existing.DestinationId, destination.Id, StringComparison.Ordinal) ||
+        if (!string.Equals(existing.SourceId, sourceId, StringComparison.Ordinal) ||
+            !string.Equals(existing.DestinationId, destinationId, StringComparison.Ordinal) ||
             !string.Equals(existing.Description, description, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("A generated external relation ID conflicts with an existing architecture relation.");
@@ -235,7 +243,7 @@ public static class ExternalIntegrationArchitectureMapper
 
     private static string RelationReviewReason(
         OriginResolution origin,
-        ArchitectureElement destination,
+        ArchitectureElement externalElement,
         ExternalIntegrationEvidence evidence)
     {
         if (!origin.Exact)
@@ -248,7 +256,7 @@ public static class ExternalIntegrationArchitectureMapper
             return "The correlated source element still requires architectural review.";
         }
 
-        if (destination.Status == ReviewStatus.RequiresReview || evidence.Confidence != ExternalIntegrationConfidence.High)
+        if (externalElement.Status == ReviewStatus.RequiresReview || evidence.Confidence != ExternalIntegrationConfidence.High)
         {
             return ConfidenceReviewReason(evidence);
         }
@@ -263,8 +271,15 @@ public static class ExternalIntegrationArchitectureMapper
     private static string DestinationId(ExternalIntegrationEvidence evidence) =>
         StableIds.ForElement(
             ArchitectureElementKind.SoftwareSystem,
-            "external:" + evidence.Kind.ToString() + ":" + evidence.Technology + ":" +
-            evidence.ResourceType + ":" + evidence.Target);
+            evidence.Kind == ExternalIntegrationKind.Messaging
+                ? "external:messaging:" + evidence.Technology
+                : "external:" + evidence.Kind.ToString() + ":" + evidence.Technology + ":" +
+                    evidence.ResourceType + ":" + evidence.Target);
+
+    private static string DestinationName(ExternalIntegrationEvidence evidence) =>
+        evidence.Kind == ExternalIntegrationKind.Messaging
+            ? MessagingProviderName(evidence.Technology)!
+            : evidence.Target!;
 
     private static string RelationDescription(ExternalIntegrationEvidence evidence)
     {
@@ -273,6 +288,10 @@ public static class ExternalIntegrationArchitectureMapper
         {
             (ExternalIntegrationKind.Http, ExternalIntegrationDirection.Outbound) =>
                 "Calls " + evidence.Target + " via HTTP (" + technology + ")",
+            (ExternalIntegrationKind.Messaging, ExternalIntegrationDirection.Publish) =>
+                "Publishes" + ContractPhrase(evidence.Contract) + " to " + ResourcePhrase(evidence),
+            (ExternalIntegrationKind.Messaging, ExternalIntegrationDirection.Consume) =>
+                "Consumes" + ContractPhrase(evidence.Contract) + " from " + ResourcePhrase(evidence),
             (ExternalIntegrationKind.Database, _) =>
                 "Uses " + technology + " database " + evidence.Target,
             (ExternalIntegrationKind.Cache, _) =>
@@ -290,6 +309,11 @@ public static class ExternalIntegrationArchitectureMapper
     private static string TechnologyAndResource(string technology, ExternalIntegrationEvidence evidence) =>
         evidence.ResourceType is null ? technology + " storage" : technology + " " + evidence.ResourceType;
 
+    private static string ContractPhrase(string? contract) => contract is null ? string.Empty : " " + contract;
+
+    private static string ResourcePhrase(ExternalIntegrationEvidence evidence) =>
+        evidence.ResourceType is null ? evidence.Target! : evidence.ResourceType + " " + evidence.Target;
+
     private static string TechnologyName(string technology) => technology.ToLowerInvariant() switch
     {
         "amazon-s3" => "Amazon S3",
@@ -306,8 +330,26 @@ public static class ExternalIntegrationArchitectureMapper
     private static bool IsSupported(ExternalIntegrationEvidence evidence) => evidence.Kind switch
     {
         ExternalIntegrationKind.Http => evidence.Direction == ExternalIntegrationDirection.Outbound,
+        ExternalIntegrationKind.Messaging =>
+            evidence.Direction is ExternalIntegrationDirection.Publish or ExternalIntegrationDirection.Consume &&
+            MessagingProviderName(evidence.Technology) is not null,
         ExternalIntegrationKind.Database or ExternalIntegrationKind.Cache or ExternalIntegrationKind.Storage => true,
         _ => false,
+    };
+
+    private static string? MessagingProviderName(string technology) => technology.ToLowerInvariant() switch
+    {
+        "aws-eventbridge" => "Amazon EventBridge",
+        "aws-kinesis" => "Amazon Kinesis",
+        "aws-sns" => "Amazon SNS",
+        "aws-sqs" => "Amazon SQS",
+        "azure-eventgrid" => "Azure Event Grid",
+        "azure-eventhubs" => "Azure Event Hubs",
+        "azure-servicebus" => "Azure Service Bus",
+        "google-pubsub" => "Google Pub/Sub",
+        "kafka" => "Kafka",
+        "rabbitmq" => "RabbitMQ",
+        _ => null,
     };
 
     private static ImmutableArray<string> AddId(ImmutableArray<string> ids, string id) =>

@@ -223,6 +223,124 @@ public sealed class ExternalIntegrationArchitectureMapperTests
     }
 
     [Fact]
+    public void MessagingPublishAndConsumePreserveProviderResourceContractAndDirection()
+    {
+        ArchitectureModel model = ModelWithContainers(
+            ("el_api", "src/Api/Api.csproj"),
+            ("el_worker", "src/Worker/Worker.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 10, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "google-pubsub", "loan-approved", "topic",
+                ExternalIntegrationConfidence.High, "LoanApproved"),
+            Finding("src/Worker/Worker.csproj", "src/Worker/Clients.cs", 20, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Consume, "azure-servicebus", "payment-approved", "queue",
+                ExternalIntegrationConfidence.High, "PaymentApprovedConsumer"));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+
+        ArchitectureElement pubsub = Assert.Single(mapped.Elements, item => item.Name == "Google Pub/Sub");
+        ArchitectureElement serviceBus = Assert.Single(mapped.Elements, item => item.Name == "Azure Service Bus");
+        Assert.Contains(mapped.Relations, item =>
+            item.SourceId == "el_api" && item.DestinationId == pubsub.Id &&
+            item.Description == "Publishes LoanApproved to topic loan-approved");
+        Assert.Contains(mapped.Relations, item =>
+            item.SourceId == serviceBus.Id && item.DestinationId == "el_worker" &&
+            item.Description == "Consumes PaymentApprovedConsumer from queue payment-approved");
+        Assert.DoesNotContain(mapped.Elements, item => item.Name is "LoanApproved" or "PaymentApprovedConsumer");
+    }
+
+    [Fact]
+    public void MessagingProviderCatalogDoesNotTurnResourcesIntoContainers()
+    {
+        ArchitectureModel model = ModelWithContainers(("el_api", "src/Api/Api.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 10, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "aws-sqs", "orders", "queue", contract: "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 20, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "rabbitmq", "orders.exchange", "exchange", contract: "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 30, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Consume, "rabbitmq", "orders.queue", "queue", contract: "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 40, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "kafka", "orders", "topic", contract: "OrderCreated"));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+
+        Assert.Contains(mapped.Elements, item => item.Name == "Amazon SQS");
+        Assert.Contains(mapped.Elements, item => item.Name == "RabbitMQ");
+        Assert.Contains(mapped.Elements, item => item.Name == "Kafka");
+        Assert.DoesNotContain(mapped.Elements, item => item.Kind == ArchitectureElementKind.Container && item.Id != "el_api");
+        Assert.Contains(mapped.Relations, item => item.Description == "Publishes OrderCreated to queue orders");
+        Assert.Contains(mapped.Relations, item => item.Description == "Publishes OrderCreated to exchange orders.exchange");
+        Assert.Contains(mapped.Relations, item => item.Description == "Consumes OrderCreated from queue orders.queue");
+        Assert.Contains(mapped.Relations, item => item.Description == "Publishes OrderCreated to topic orders");
+    }
+
+    [Fact]
+    public void FrameworkOnlyAndUnknownMessagingRemainPendingEvidence()
+    {
+        ArchitectureModel model = ModelWithContainers(("el_api", "src/Api/Api.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 10, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "masstransit", "orders", "queue", contract: "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 20, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Consume, "nservicebus", "orders", "queue", contract: "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 30, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "unknown", "custom-orders", contract: "OrderCreated"));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+        EvidenceReportResult report = EvidenceReportGenerator.Generate(mapped);
+
+        Assert.Equal(model.Elements.Length, mapped.Elements.Length);
+        Assert.Empty(mapped.Relations);
+        Assert.Equal(3, report.Summary.UnmappedExternalIntegrations);
+        Assert.DoesNotContain(mapped.Elements, item => item.Name is "RabbitMQ" or "Azure Service Bus");
+    }
+
+    [Fact]
+    public void MessagingResourcesAndSharedUseAreDeduplicatedDeterministically()
+    {
+        ArchitectureModel model = ModelWithContainers(
+            ("el_api", "src/Api/Api.csproj"),
+            ("el_worker", "src/Worker/Worker.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 10, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "google-pubsub", "loan-approved", "topic", contract: "LoanApproved"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 20, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "google-pubsub", "loan-rejected", "topic", contract: "LoanRejected"),
+            Finding("src/Worker/Worker.csproj", "src/Worker/Clients.cs", 30, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Consume, "google-pubsub", "loan-approved", "topic", contract: "LoanApproved"));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+
+        ArchitectureElement provider = Assert.Single(mapped.Elements, item => item.Name == "Google Pub/Sub");
+        Assert.Equal(3, provider.EvidenceIds.Length);
+        Assert.Equal(3, mapped.Relations.Length);
+        Assert.Contains(mapped.Relations, item => item.SourceId == provider.Id && item.DestinationId == "el_worker");
+        Assert.Equal(2, mapped.Relations.Count(item => item.SourceId == "el_api" && item.DestinationId == provider.Id));
+    }
+
+    [Fact]
+    public void LowConfidenceMessagingRequiresReviewAndMissingTargetIsNotMapped()
+    {
+        ArchitectureModel model = ModelWithContainers(("el_api", "src/Api/Api.csproj"));
+        ExternalIntegrationEvidenceResult imported = Result(
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 10, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "aws-sqs", "orders", "queue",
+                ExternalIntegrationConfidence.Low, "OrderCreated"),
+            Finding("src/Api/Api.csproj", "src/Api/Clients.cs", 20, ExternalIntegrationKind.Messaging,
+                ExternalIntegrationDirection.Publish, "google-pubsub", null, "topic",
+                ExternalIntegrationConfidence.High, "OrderCreated"));
+
+        ArchitectureModel mapped = ExternalIntegrationArchitectureMapper.Map(model, imported, "el_system");
+        EvidenceReportResult report = EvidenceReportGenerator.Generate(mapped);
+
+        ArchitectureRelation relation = Assert.Single(mapped.Relations);
+        Assert.Equal(ReviewStatus.RequiresReview, relation.Status);
+        Assert.Contains("low confidence", relation.ReviewReason, StringComparison.Ordinal);
+        Assert.Equal(1, report.Summary.UnmappedExternalIntegrations);
+    }
+
+    [Fact]
     public void MappingAndLikeC4EmissionAreIndependentOfFindingOrder()
     {
         ArchitectureModel model = ModelWithContainers(("el_api", "src/Api/Api.csproj"));
@@ -296,7 +414,8 @@ public sealed class ExternalIntegrationArchitectureMapperTests
         string technology,
         string? target,
         string? resourceType = null,
-        ExternalIntegrationConfidence confidence = ExternalIntegrationConfidence.High)
+        ExternalIntegrationConfidence confidence = ExternalIntegrationConfidence.High,
+        string? contract = null)
     {
         string category = kind switch
         {
@@ -324,7 +443,7 @@ public sealed class ExternalIntegrationArchitectureMapperTests
             target,
             resourceType,
             null,
-            null,
+            contract,
             sourcePath,
             line,
             confidence,
