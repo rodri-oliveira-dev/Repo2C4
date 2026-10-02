@@ -285,7 +285,8 @@ public sealed class InspectionReportIntegrationEvidenceSource : IExternalIntegra
 
         ImmutableArray<string> canonicalSignals = [.. signals.Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal)];
         string category = Category(kind, direction);
-        string description = Description(kind, direction, technology!, target, resourceType, contract);
+        string description = Description(
+            projectPath!, kind, direction, technology!, target, resourceType, contract, confidence);
         if (description.Length > options.MaxTextLength)
         {
             diagnostics.Add(Diagnostic("external.finding.description", path, "The normalized evidence description exceeds the configured text limit."));
@@ -487,26 +488,29 @@ public sealed class InspectionReportIntegrationEvidenceSource : IExternalIntegra
     };
 
     private static string Description(
+        string projectPath,
         ExternalIntegrationKind kind,
         ExternalIntegrationDirection direction,
         string technology,
         string? target,
         string? resourceType,
-        string? contract)
+        string? contract,
+        ExternalIntegrationConfidence confidence)
     {
         string endpoint = target ?? "an unidentified external target";
         string resource = resourceType is null ? endpoint : resourceType + " " + endpoint;
         string message = contract ?? "a message";
-        return (kind, direction) switch
+        string description = (kind, direction) switch
         {
             (ExternalIntegrationKind.Http, ExternalIntegrationDirection.Outbound) =>
-                "Project calls " + endpoint + " via HTTP using " + technology + ".",
+                "Project " + projectPath + " calls " + endpoint + " via HTTP using " + technology + ".",
             (ExternalIntegrationKind.Messaging, ExternalIntegrationDirection.Publish) =>
-                "Project publishes " + message + " to " + resource + " using " + technology + ".",
+                "Project " + projectPath + " publishes " + message + " to " + resource + " using " + technology + ".",
             (ExternalIntegrationKind.Messaging, ExternalIntegrationDirection.Consume) =>
-                "Project consumes " + message + " from " + resource + " using " + technology + ".",
-            _ => "Project uses " + resource + " for " + kind.ToString().ToLowerInvariant() + " via " + technology + ".",
+                "Project " + projectPath + " consumes " + message + " from " + resource + " using " + technology + ".",
+            _ => "Project " + projectPath + " uses " + resource + " for " + kind.ToString().ToLowerInvariant() + " via " + technology + ".",
         };
+        return description + " Confidence: " + confidence.ToString().ToLowerInvariant() + ".";
     }
 
     private static async Task<byte[]?> ReadBoundedAsync(Stream stream, long maxBytes, CancellationToken cancellationToken)

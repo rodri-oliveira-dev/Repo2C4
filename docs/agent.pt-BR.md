@@ -42,6 +42,8 @@ repo2c4-agent \
   --goal "Documente a arquitetura C1 e C2 atual de forma conservadora."
 ```
 
+Se o DotNetRepoInspector `v1.6.5` já produziu um `InspectionReport` schema `1.6+` dentro do repositório, autorize explicitamente o caminho relativo com `--integration-report artifacts/inspection.json`. O Agent não abre o report: a política do host encaminha somente esse caminho ao `inspect_repository`, e o Agent consome o snapshot da sessão por `get_evidence`. Direção e confidence de `external.*` são preservadas; evidência ambígua ou de baixa confidence não vira arquitetura confirmada automaticamente.
+
 Essa primeira execução é **somente análise**: sem `--write-destination`, o Agent não cria arquivos `.c4` gerenciados. Ele imprime no terminal o status do workflow, run ID, contadores, diagnósticos e o resumo produzido pelo modelo.
 
 Uma análise bem-sucedida normalmente termina com campos como:

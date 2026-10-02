@@ -48,13 +48,15 @@ public sealed class AgentMcpTests
     }
 
     [Fact]
-    public async Task SafeInspectionForcesAuthorizedRepositoryRoot()
+    public async Task SafeInspectionForcesAuthorizedRepositoryRootAndReport()
     {
         string? observedPath = null;
+        string? observedReport = null;
         AIFunction inspect = AIFunctionFactory.Create(
-            (string repositoryPath) =>
+            (string repositoryPath, string? integrationReportPath) =>
             {
                 observedPath = repositoryPath;
+                observedReport = integrationReportPath;
                 return JsonSerializer.SerializeToElement(new
                 {
                     structuredContent = new
@@ -66,13 +68,21 @@ public sealed class AgentMcpTests
             "inspect_repository");
 
         AIFunction safeInspect = Assert.IsAssignableFrom<AIFunction>(
-            AgentMcpToolPolicy.CreateSafeTools([inspect], null).Single());
+            AgentMcpToolPolicy.CreateSafeTools(
+                [inspect],
+                null,
+                authorizedIntegrationReportPath: "artifacts/inspection.json").Single());
 
         _ = await safeInspect.InvokeAsync(
-            new AIFunctionArguments { ["repositoryPath"] = "src/only-this-subtree" },
+            new AIFunctionArguments
+            {
+                ["repositoryPath"] = "src/only-this-subtree",
+                ["integrationReportPath"] = "secrets.json",
+            },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(".", observedPath);
+        Assert.Equal("artifacts/inspection.json", observedReport);
     }
 
     [Fact]

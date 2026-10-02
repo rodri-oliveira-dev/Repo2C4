@@ -31,7 +31,9 @@ public static class ExternalIntegrationArchitectureMapper
         _ = ContractJson.SerializeModel(model);
         ArchitectureElement focalSystem = ValidateOptions(model, focalSystemId, options);
 
-        RepositorySnapshot snapshot = MergeEvidence(model.Snapshot, externalEvidence.RepositoryEvidence);
+        RepositorySnapshot snapshot = ExternalIntegrationEvidenceMerger.Merge(
+            model.Snapshot,
+            externalEvidence.RepositoryEvidence);
         Dictionary<string, Evidence> originalEvidenceById = model.Snapshot.Evidence
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
         Dictionary<string, ArchitectureElement> elements = model.Elements
@@ -85,28 +87,6 @@ public static class ExternalIntegrationArchitectureMapper
 
         _ = ContractJson.SerializeModel(result);
         return result;
-    }
-
-    private static RepositorySnapshot MergeEvidence(
-        RepositorySnapshot snapshot,
-        ImmutableArray<Evidence> importedEvidence)
-    {
-        Dictionary<string, Evidence> evidence = snapshot.Evidence
-            .ToDictionary(item => item.Id, StringComparer.Ordinal);
-        foreach (Evidence imported in importedEvidence)
-        {
-            if (evidence.TryGetValue(imported.Id, out Evidence? existing) && existing != imported)
-            {
-                throw new InvalidOperationException("Imported external evidence conflicts with an existing evidence ID.");
-            }
-
-            evidence[imported.Id] = imported;
-        }
-
-        return snapshot with
-        {
-            Evidence = [.. evidence.Values.OrderBy(item => item.Id, StringComparer.Ordinal)]
-        };
     }
 
     private static OriginResolution ResolveOrigin(

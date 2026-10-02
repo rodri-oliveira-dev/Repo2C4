@@ -44,6 +44,7 @@ public static class EvidenceFirstAnalysisPrompt
         AgentHostOptions options,
         string attemptContext)
     {
+        string inspectionCall = InspectionCall(options);
         string c3Policy = options.C3ContainerId is null
             ? "C3 is not authorized for this run. Do not send c3ContainerId to any tool."
             : "C3 is authorized only for the explicitly selected container ID "
@@ -61,13 +62,19 @@ public static class EvidenceFirstAnalysisPrompt
             + """
               
               Proposal-stage contract:
-              1. Start with inspect_repository using repositoryPath="." and query get_evidence/get_snapshot as needed.
+              """
+            + "1. Start with "
+            + inspectionCall
+            + " and query get_evidence/get_snapshot as needed."
+            + Environment.NewLine
+            + """
               2. Retrieve enough unfiltered pages to reproduce the exact MCP snapshot before constructing a model.
               3. Submit C1 and C2 independently through generate_likec4. This is the only way to hand ArchitectureModel values to the host; never depend on Repo2C4.Core types.
               4. The host forces every generate_likec4 call to dryRun=true, write=false and destinationPath=null.
               5. Do not call get_evidence_report or validate_likec4 in this stage; the Agent Framework workflow executes those stages explicitly after your proposal.
-              6. confirmed requires directly supporting cited evidence. Candidate/package/ProjectReference/executable/manifest signals do not prove runtime communication, deployment, ownership or system boundaries.
-              7. Prefer omission over invention. Useful uncertainty stays requiresReview with a concrete reviewReason.
+              6. Query external.* evidence categories when present. Preserve technology, resource, contract, confidence and publish/consume direction; imported low-confidence evidence is never automatically confirmed.
+              7. confirmed requires directly supporting cited evidence. Candidate/package/ProjectReference/executable/manifest signals do not prove runtime communication, deployment, ownership or system boundaries.
+              8. Prefer omission over invention. Useful uncertainty stays requiresReview with a concrete reviewReason.
               """
             + Environment.NewLine
             + c3Policy
@@ -85,6 +92,7 @@ public static class EvidenceFirstAnalysisPrompt
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Goal);
 
+        string inspectionCall = InspectionCall(options);
         string c3Policy = options.C3ContainerId is null
             ? "C3 is not authorized for this run. Do not send c3ContainerId to any tool."
             : "C3 is authorized only for the explicitly selected container ID "
@@ -100,13 +108,19 @@ public static class EvidenceFirstAnalysisPrompt
             + """
               
               Execution contract:
-              1. Start with inspect_repository using repositoryPath=".".
+              """
+            + "1. Start with "
+            + inspectionCall
+            + "."
+            + Environment.NewLine
+            + """
               2. Decide which evidence categories/pages are useful for interpretation. Use get_evidence and get_snapshot as needed. Before constructing an ArchitectureModel, retrieve enough unfiltered snapshot/evidence pages to reproduce the exact MCP snapshot; never fabricate or alter snapshot facts.
               3. Propose C1 and C2 independently through the generate_likec4 tool. The complete ArchitectureModel must be supplied only as that MCP tool argument; do not depend on Repo2C4.Core types.
-              4. Use confirmed only when the cited evidence directly supports the architectural assertion. Candidate evidence, package presence, ProjectReference, source naming, Docker/compose presence and executable-project signals do not by themselves prove runtime communication, deployment, ownership or system boundaries.
-              5. When evidence is insufficient, prefer omission. If a useful hypothesis is included, mark it requiresReview and provide a concrete reviewReason. Never invent actors, external systems, protocols, runtime calls or deployment boundaries to complete a diagram.
-              6. Call get_evidence_report for the proposals used in your final answer. LikeC4 generation is preview-only. Do not request writes or destinations.
-              7. Do not start an autonomous validation/correction loop in this stage.
+              4. Query external.* evidence categories when present. Preserve technology, resource, contract, confidence and publish/consume direction; imported low-confidence evidence is never automatically confirmed.
+              5. Use confirmed only when the cited evidence directly supports the architectural assertion. Candidate evidence, package presence, ProjectReference, source naming, Docker/compose presence and executable-project signals do not by themselves prove runtime communication, deployment, ownership or system boundaries.
+              6. When evidence is insufficient, prefer omission. If a useful hypothesis is included, mark it requiresReview and provide a concrete reviewReason. Never invent actors, external systems, protocols, runtime calls or deployment boundaries to complete a diagram.
+              7. Call get_evidence_report for the proposals used in your final answer. LikeC4 generation is preview-only. Do not request writes or destinations.
+              8. Do not start an autonomous validation/correction loop in this stage.
               """
             + Environment.NewLine
             + c3Policy
@@ -124,4 +138,10 @@ public static class EvidenceFirstAnalysisPrompt
               In Proposal, identify the C1/C2 previews produced and whether C3 was omitted, unavailable or previewed for the authorized selected container.
               """;
     }
+
+    private static string InspectionCall(AgentHostOptions options) =>
+        options.IntegrationReportPath is null
+            ? "inspect_repository using repositoryPath=\".\""
+            : "inspect_repository using repositoryPath=\".\" and integrationReportPath=" +
+                JsonSerializer.Serialize(options.IntegrationReportPath);
 }

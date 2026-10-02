@@ -5,6 +5,7 @@ using System.Text;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.ExternalIntegrations;
 using Repo2C4.Core.Inspection;
 
 namespace Repo2C4.Mcp;
@@ -30,6 +31,7 @@ internal sealed class McpArchitectureTools
             "inspect_repository",
             "Inspect one repository directory within the authorized local root and return a bounded evidence summary. " +
             "The tool returns metadata and static v1 evidence only, never source-file contents. " +
+            "integrationReportPath optionally imports a DotNetRepoInspector InspectionReport schema 1.6+ file relative to the selected repository. " +
             $"repositoryPath is relative to the authorized root; maxFiles must be 1..{McpLimits.MaxFilesPerInspection}. " +
             $"Snapshots expire after {McpLimits.SnapshotLifetime.TotalMinutes:0} minutes and are scoped to this stdio session. " +
             "Errors are controlled codes such as repository_path_invalid, tool_timeout and response_limit_exceeded."));
@@ -51,9 +53,11 @@ internal sealed class McpArchitectureTools
     }
 
     [Description("Inspect an authorized local repository and create a session-scoped evidence snapshot.")]
-    public McpInspectRepositoryResult InspectRepository(
+    public async Task<McpInspectRepositoryResult> InspectRepository(
         [Description("Repository directory relative to the authorized MCP root. Use '.' for the authorized root.")]
         string repositoryPath = ".",
+        [Description("Optional InspectionReport JSON file relative to the selected repository. Absolute and traversing paths are rejected.")]
+        string? integrationReportPath = null,
         [Description("Maximum inventoried files for this call. Valid range: 1 to 1000.")]
         int maxFiles = McpLimits.MaxFilesPerInspection,
         CancellationToken cancellationToken = default)
@@ -76,6 +80,16 @@ internal sealed class McpArchitectureTools
                 MaxFiles = maxFiles,
             };
             RepositorySnapshot snapshot = RepositoryFactExtractor.Extract(options, linked.Token);
+            if (!string.IsNullOrWhiteSpace(integrationReportPath))
+            {
+                ExternalIntegrationSnapshotImportResult imported = await ImportExternalEvidenceAsync(
+                    repositoryRoot,
+                    integrationReportPath,
+                    snapshot,
+                    linked.Token).ConfigureAwait(false);
+                snapshot = imported.Snapshot;
+            }
+
             McpSnapshotStore.SnapshotEntry entry = _snapshotStore.Store(snapshot);
 
             McpEvidenceCategoryCount[] categories =
@@ -304,6 +318,72 @@ internal sealed class McpArchitectureTools
         }
 
         return repositoryRoot;
+    }
+
+    private static async Task<ExternalIntegrationSnapshotImportResult> ImportExternalEvidenceAsync(
+        string repositoryRoot,
+        string integrationReportPath,
+        RepositorySnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string reportPath = RepositoryAccessPolicy.ResolveExistingPath(
+                repositoryRoot,
+                integrationReportPath,
+                cancellationToken);
+            if (!File.Exists(reportPath))
+            {
+                throw new McpException("integration_report_invalid: requested report file does not exist.");
+            }
+
+            FileStream report = new(
+                reportPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 81_920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var configuredReport = report.ConfigureAwait(false);
+            ExternalIntegrationSnapshotImportResult imported =
+                await ExternalIntegrationSnapshotImporter.ImportAsync(
+                    snapshot,
+                    report,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (!imported.Succeeded)
+            {
+                string codes = string.Join(
+                    ",",
+                    imported.Diagnostics
+                        .Where(item => item.Severity == DiagnosticSeverity.Error)
+                        .Select(item => item.Code)
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(item => item, StringComparer.Ordinal));
+                throw new McpException("integration_report_invalid: " + codes);
+            }
+
+            return imported;
+        }
+        catch (McpException)
+        {
+            throw;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw new McpException("integration_report_unauthorized: report path is not authorized.");
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw new McpException("integration_report_invalid: requested report file does not exist.");
+        }
+        catch (IOException)
+        {
+            throw new McpException("integration_report_unavailable: report could not be read safely.");
+        }
+        catch (ArgumentException)
+        {
+            throw new McpException("integration_report_invalid: report path is invalid.");
+        }
     }
 
     private static void ValidatePageSize(int pageSize)

@@ -5,6 +5,7 @@ using Repo2C4.Cli.Inference;
 using Repo2C4.Core.Acquisition;
 using Repo2C4.Core.C3;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.ExternalIntegrations;
 using Repo2C4.Core.Generation;
 using Repo2C4.Core.Inspection;
 using Repo2C4.Core.LikeC4;
@@ -286,7 +287,7 @@ internal static class CliApplication
     {
         if (!TryParseOptions(
             args,
-            ["--repository", "--remote-url", "--remote-ref", "--output"],
+            ["--repository", "--remote-url", "--remote-ref", "--output", "--integration-report"],
             [],
             out Dictionary<string, string> values,
             out _,
@@ -308,6 +309,12 @@ internal static class CliApplication
         if (!remote && values.ContainsKey("--remote-ref"))
         {
             standardError.WriteLine("--remote-ref requires --remote-url.");
+            return CliExitCodes.UsageError;
+        }
+
+        if (remote && values.ContainsKey("--integration-report"))
+        {
+            standardError.WriteLine("--integration-report is supported only with --repository.");
             return CliExitCodes.UsageError;
         }
 
@@ -339,6 +346,41 @@ internal static class CliApplication
                 }
 
                 RepositorySnapshot snapshot = InspectRepository(fullRepository, cancellationToken);
+                if (values.TryGetValue("--integration-report", out string? integrationReport))
+                {
+                    string reportPath = ResolveRepositoryFile(fullRepository, integrationReport, cancellationToken);
+                    FileStream report = new(
+                        reportPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        bufferSize: 81_920,
+                        FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    await using var configuredReport = report.ConfigureAwait(false);
+                    ExternalIntegrationSnapshotImportResult imported =
+                        await ExternalIntegrationSnapshotImporter.ImportAsync(
+                            snapshot,
+                            report,
+                            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    if (!imported.Succeeded)
+                    {
+                        string codes = string.Join(
+                            ",",
+                            imported.Diagnostics
+                                .Where(item => item.Severity == DiagnosticSeverity.Error)
+                                .Select(item => item.Code)
+                                .Distinct(StringComparer.Ordinal)
+                                .OrderBy(item => item, StringComparer.Ordinal));
+                        standardError.WriteLine("integration_report_invalid: " + codes);
+                        return CliExitCodes.InvalidData;
+                    }
+
+                    snapshot = imported.Snapshot;
+                    standardError.WriteLine(
+                        "Imported external integration evidence: " +
+                        imported.ImportedEvidenceCount.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
+                }
+
                 await WriteSnapshotAsync(fullOutput, snapshot, cancellationToken).ConfigureAwait(false);
             }
             else
@@ -409,6 +451,42 @@ internal static class CliApplication
     {
         RepositoryScanOptions options = new(repositoryRoot, repositoryId);
         return RepositoryFactExtractor.Extract(options, cancellationToken);
+    }
+
+    private static string ResolveRepositoryFile(
+        string repositoryRoot,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(repositoryRoot));
+        string candidate = Path.GetFullPath(
+            Path.IsPathFullyQualified(path) ? path : Path.Combine(root, path));
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        string rootPrefix = Path.EndsInDirectorySeparator(root)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        if (!candidate.StartsWith(rootPrefix, comparison) || !File.Exists(candidate))
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        string current = root;
+        foreach (string segment in Path.GetRelativePath(root, candidate).Split(
+                     Path.DirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            current = Path.Combine(current, segment);
+            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
+            {
+                throw new UnauthorizedAccessException();
+            }
+        }
+
+        return candidate;
     }
 
     private static async Task WriteSnapshotAsync(
@@ -694,7 +772,7 @@ internal static class CliApplication
                 output.WriteLine("Proposes a review-required model from sanitized metadata; never generates C4 files.");
                 return CliExitCodes.Success;
             case "inspect":
-                output.WriteLine("Usage: repo2c4 inspect (--repository PATH | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
+                output.WriteLine("Usage: repo2c4 inspect (--repository PATH [--integration-report FILE] | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
                 output.WriteLine("Collects bounded evidence only. Remote HTTPS acquisition uses an isolated temporary workspace and writes separate acquisition provenance.");
                 return CliExitCodes.Success;
             case "generate":
@@ -718,7 +796,7 @@ internal static class CliApplication
         output.WriteLine("Commands:");
         output.WriteLine("  init     [--repository PATH] [--non-interactive] [--force]");
         output.WriteLine("  doctor   [--repository PATH]");
-        output.WriteLine("  inspect  (--repository PATH | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
+        output.WriteLine("  inspect  (--repository PATH [--integration-report FILE] | --remote-url HTTPS_URL [--remote-ref REF]) --output snapshot.json");
         output.WriteLine("  infer    --snapshot snapshot.json --provider ollama|openai --model-id IDENTIFIER --output candidate.json [--allow-external-ai]");
         output.WriteLine("  generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
         output.WriteLine("  validate --output DIR");

@@ -23,8 +23,33 @@ public sealed class AgentHostTests
         Assert.Equal(0, exitCode);
         Assert.Equal(string.Empty, output.ToString());
         Assert.Contains("--repository-root", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("--integration-report", error.ToString(), StringComparison.Ordinal);
         Assert.Contains("--mcp-server-path", error.ToString(), StringComparison.Ordinal);
         Assert.Contains("--allow-external-ai", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IntegrationReportMustBeRepositoryRelative()
+    {
+        bool valid = AgentHostOptions.TryParse(
+            [
+                "--provider", "ollama",
+                "--model", "model",
+                "--integration-report", "artifacts/inspection.json",
+            ],
+            out AgentHostOptions? options,
+            out string? error);
+
+        Assert.True(valid, error);
+        Assert.Equal("artifacts/inspection.json", options!.IntegrationReportPath);
+
+        valid = AgentHostOptions.TryParse(
+            ["--provider", "ollama", "--model", "model", "--integration-report", "../inspection.json"],
+            out _,
+            out error);
+
+        Assert.False(valid);
+        Assert.Contains("repository-relative", error, StringComparison.Ordinal);
     }
 
     [Theory]

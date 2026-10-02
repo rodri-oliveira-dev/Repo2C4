@@ -38,11 +38,14 @@ After the client connects, inspect the authorized root itself:
 ```json
 {
   "repositoryPath": ".",
+  "integrationReportPath": "artifacts/inspection.json",
   "maxFiles": 1000
 }
 ```
 
-`inspect_repository` returns `snapshotId`, `repositoryId`, expiry/count metadata and bounded evidence/diagnostic summaries. `repositoryId` is returned by the tool; it is **not** an input. Keep `snapshotId` for subsequent calls in the same stdio session. Snapshots expire after 30 minutes and do not survive reconnects.
+`integrationReportPath` is optional. When present, it must be relative to the selected repository and identify a DotNetRepoInspector `InspectionReport` schema `1.6+` file. Repo2C4 never starts DotNetRepoInspector and never exposes the report as a generic file reader. Omit the field to preserve the original inspection behavior.
+
+`inspect_repository` returns `snapshotId`, `repositoryId`, expiry/count metadata and bounded evidence/diagnostic summaries. Imported facts use `external.*` category counts and belong to that same session snapshot. `repositoryId` is returned by the tool; it is **not** an input. Keep `snapshotId` for subsequent calls in the same stdio session. Snapshots expire after 30 minutes and do not survive reconnects.
 
 ## Evidence-first flow
 
@@ -73,6 +76,7 @@ Proprietary client applications are not launched by CI. CI validates the example
 | Server/command not found | Check `dotnet tool list --global`, the client process PATH, and `repo2c4-mcp --help`. |
 | Invalid repository path | The root must be an existing absolute directory and not a symlink/junction/reparse-point root. |
 | Access outside root rejected | Intentional. Keep the smallest required root; never broaden it to bypass policy. |
+| Integration report rejected | Keep it inside the selected repository, use a relative non-linked path, and generate compatible schema `1.6+` JSON. |
 | LikeC4 unavailable | Install LikeC4 separately and expose `likec4` on the MCP process PATH. |
 | Client rejects configuration | VS Code workspace format uses `servers`; portable/Claude local examples use `mcpServers`. |
 | Tools missing after edit | Restart/reload the server or client and inspect its MCP logs. |

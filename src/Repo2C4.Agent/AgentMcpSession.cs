@@ -288,7 +288,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
             IReadOnlyList<AITool> safeTools = AgentMcpToolPolicy.CreateSafeTools(
                 discovered,
                 options.C3ContainerId,
-                invocationState);
+                invocationState,
+                options.IntegrationReportPath);
             McpClientTool generateLikeC4 = discovered.Single(
                 tool => string.Equals(
                     tool.Name,
@@ -458,7 +459,8 @@ public static class AgentMcpToolPolicy
     public static IReadOnlyList<AITool> CreateSafeTools(
         IEnumerable<AITool> discovered,
         string? authorizedC3ContainerId,
-        AgentMcpInvocationState? invocationState = null)
+        AgentMcpInvocationState? invocationState = null,
+        string? authorizedIntegrationReportPath = null)
     {
         ArgumentNullException.ThrowIfNull(discovered);
 
@@ -478,7 +480,9 @@ public static class AgentMcpToolPolicy
             AIFunction safeFunction =
                 tool.Name switch
                 {
-                    "inspect_repository" => new AuthorizedRootInspectionMcpFunction(function),
+                    "inspect_repository" => new AuthorizedRootInspectionMcpFunction(
+                        function,
+                        authorizedIntegrationReportPath),
                     "generate_likec4" => new PreviewOnlyMcpFunction(
                         function,
                         authorizedC3ContainerId,
@@ -500,7 +504,9 @@ public static class AgentMcpToolPolicy
         return tools;
     }
 
-    private sealed class AuthorizedRootInspectionMcpFunction(AIFunction inner)
+    private sealed class AuthorizedRootInspectionMcpFunction(
+        AIFunction inner,
+        string? authorizedIntegrationReportPath)
         : DelegatingAIFunction(inner)
     {
         public override string Description =>
@@ -515,13 +521,18 @@ public static class AgentMcpToolPolicy
             AIFunctionArguments safeArguments = [];
             foreach ((string key, object? value) in arguments)
             {
-                if (key != "repositoryPath")
+                if (key is not "repositoryPath" and not "integrationReportPath")
                 {
                     safeArguments[key] = value;
                 }
             }
 
             safeArguments["repositoryPath"] = ".";
+            if (authorizedIntegrationReportPath is not null)
+            {
+                safeArguments["integrationReportPath"] = authorizedIntegrationReportPath;
+            }
+
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }
     }

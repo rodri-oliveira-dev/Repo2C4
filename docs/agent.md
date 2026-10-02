@@ -42,6 +42,19 @@ repo2c4-agent \
   --goal "Document the current C1 and C2 architecture conservatively."
 ```
 
+If DotNetRepoInspector `v1.6.5` has already produced an `InspectionReport` schema `1.6+` inside the repository, authorize that relative path explicitly:
+
+```bash
+repo2c4-agent \
+  --provider ollama \
+  --model YOUR_LOCAL_MODEL \
+  --repository-root "/absolute/path/to/repository" \
+  --integration-report "artifacts/inspection.json" \
+  --goal "Document C1 and C2 including external integrations."
+```
+
+The Agent does not open the report. Its host policy passes only this authorized path to `inspect_repository`, then the Agent reads the resulting session snapshot through `get_evidence`. It preserves `external.*` direction and confidence, and does not promote low-confidence or ambiguous evidence to confirmed architecture.
+
 This first command is **analysis-only**: without `--write-destination`, the Agent does not create managed `.c4` files. It prints the workflow status, run ID, counters, diagnostics and the model-produced summary to the terminal.
 
 A typical successful analysis ends with fields similar to:

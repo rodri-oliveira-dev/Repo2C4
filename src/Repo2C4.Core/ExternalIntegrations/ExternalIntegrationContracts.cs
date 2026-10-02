@@ -86,6 +86,79 @@ public sealed record ExternalIntegrationEvidenceResult(
         [.. Evidence.Select(item => item.ToRepositoryEvidence())];
 }
 
+/// <summary>The validated snapshot produced by importing normalized external integration evidence.</summary>
+public sealed record ExternalIntegrationSnapshotImportResult(
+    RepositorySnapshot Snapshot,
+    int ImportedEvidenceCount,
+    ImmutableArray<ExternalIntegrationDiagnostic> Diagnostics)
+{
+    public bool Succeeded => Diagnostics.All(item => item.Severity != DiagnosticSeverity.Error);
+}
+
+/// <summary>Imports one bounded report and merges only normalized evidence into a repository snapshot.</summary>
+public static class ExternalIntegrationSnapshotImporter
+{
+    public static async ValueTask<ExternalIntegrationSnapshotImportResult> ImportAsync(
+        RepositorySnapshot snapshot,
+        Stream report,
+        ExternalIntegrationEvidenceReadOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(report);
+
+        InspectionReportIntegrationEvidenceSource source = new();
+        ExternalIntegrationEvidenceResult imported = await source.ReadAsync(
+            report,
+            new ExternalIntegrationImportContext(snapshot),
+            options,
+            cancellationToken).ConfigureAwait(false);
+
+        if (imported.Diagnostics.Any(item => item.Severity == DiagnosticSeverity.Error))
+        {
+            return new ExternalIntegrationSnapshotImportResult(snapshot, 0, imported.Diagnostics);
+        }
+
+        RepositorySnapshot merged = ExternalIntegrationEvidenceMerger.Merge(
+            snapshot,
+            imported.RepositoryEvidence);
+        return new ExternalIntegrationSnapshotImportResult(
+            merged,
+            imported.Evidence.Length,
+            imported.Diagnostics);
+    }
+}
+
+/// <summary>Deterministically merges normalized external evidence without replacing local facts.</summary>
+public static class ExternalIntegrationEvidenceMerger
+{
+    public static RepositorySnapshot Merge(
+        RepositorySnapshot snapshot,
+        ImmutableArray<Evidence> importedEvidence)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        Dictionary<string, Evidence> evidence = snapshot.Evidence
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        foreach (Evidence imported in importedEvidence)
+        {
+            if (evidence.TryGetValue(imported.Id, out Evidence? existing) && existing != imported)
+            {
+                throw new InvalidOperationException("Imported external evidence conflicts with an existing evidence ID.");
+            }
+
+            evidence[imported.Id] = imported;
+        }
+
+        RepositorySnapshot result = snapshot with
+        {
+            Evidence = [.. evidence.Values.OrderBy(item => item.Id, StringComparer.Ordinal)],
+        };
+        _ = ContractJson.SerializeSnapshot(result);
+        return result;
+    }
+}
+
 /// <summary>Local snapshot and optional authoritative identity used to reject unrelated or stale reports.</summary>
 public sealed record ExternalIntegrationImportContext(RepositorySnapshot Snapshot)
 {

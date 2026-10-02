@@ -38,9 +38,14 @@ Depois que o cliente conectar, inspecione a própria raiz autorizada:
 ```json
 {
   "repositoryPath": ".",
+  "integrationReportPath": "artifacts/inspection.json",
   "maxFiles": 1000
 }
 ```
+
+`integrationReportPath` é opcional. Quando presente, deve ser relativo ao repositório selecionado e apontar para um `InspectionReport` DotNetRepoInspector schema `1.6+`. O Repo2C4 não inicia o DotNetRepoInspector nem oferece leitura genérica do arquivo. Omitir o campo preserva o comportamento original.
+
+As evidências importadas usam categorias `external.*`, entram no mesmo snapshot de sessão e aparecem nas contagens por categoria.
 
 `inspect_repository` devolve `snapshotId`, `repositoryId`, metadados de expiração/contagem e resumos limitados de evidências/diagnósticos. `repositoryId` é retornado pela tool; ele **não** é uma entrada. Guarde `snapshotId` para as chamadas seguintes da mesma sessão stdio. Snapshots expiram após 30 minutos e não sobrevivem a reconexões.
 

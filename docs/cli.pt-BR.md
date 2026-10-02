@@ -10,6 +10,14 @@ Os comandos offline `inspect`, `generate` e `validate` não chamam IA, abrem pul
 repo2c4 inspect --repository PATH --output snapshot.json
 ```
 
+Para anexar um `InspectionReport` schema `1.6+` previamente gerado pelo DotNetRepoInspector, informe um arquivo dentro do repositório. O Repo2C4 lê somente o boundary JSON público; ele não executa o DotNetRepoInspector:
+
+```bash
+repo2c4 inspect --repository PATH --integration-report PATH/artifacts/inspection.json --output snapshot.json
+```
+
+O caminho pode ser absoluto ou relativo ao repositório, mas deve resolver para um arquivo regular, sem links, dentro da raiz selecionada. O stdout continua contendo somente o caminho do snapshot; a contagem de evidências `external.*` importadas vai para stderr. Reports incompatíveis ou inseguros falham sem produzir snapshot.
+
 `inspect` inventaria um repositório local explicitamente selecionado e extrai apenas as evidências limitadas suportadas pelo Core. A saída é JSON v1 canônico.
 
 O identificador do repositório é derivado de forma determinística do nome do diretório raiz selecionado. Ele é um rótulo local estável, não uma identidade globalmente única.
