@@ -724,11 +724,6 @@ public sealed class SemanticC3RelationBuilderTests
             Snapshot = model.Snapshot with
             {
                 Evidence = [.. model.Snapshot.Evidence, externalEvidence],
-                Files =
-                [
-                    .. model.Snapshot.Files,
-                    new RepositoryFile("src/App/Adapters.cs", 1, null),
-                ],
             },
             Elements = [.. model.Elements, external],
             Relations = [relation],

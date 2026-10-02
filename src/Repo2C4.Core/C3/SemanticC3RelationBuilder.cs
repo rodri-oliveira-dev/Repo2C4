@@ -200,8 +200,7 @@ public static class SemanticC3RelationBuilder
         SemanticC3Proposal result = new(
             SemanticC3ContractSchema.Version,
             [
-                .. components
-                    .Select(component => component.ContainerId)
+                .. proposal.SelectedContainerIds
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(id => id, StringComparer.Ordinal),
             ],
@@ -989,19 +988,32 @@ public static class SemanticC3RelationBuilder
         private readonly SemanticC3ComponentCandidate[] _components = components;
 
         public SemanticC3ComponentCandidate? FindExact(
-            SemanticC3SourceSymbolIdentity sourceSymbol) =>
-            _components.SingleOrDefault(component =>
-                component.SourceSymbol?.Id == sourceSymbol.Id);
+            SemanticC3SourceSymbolIdentity sourceSymbol)
+        {
+            SemanticC3ComponentCandidate[] matches =
+            [
+                .. _components.Where(component =>
+                    component.SourceSymbol?.Id == sourceSymbol.Id),
+            ];
+            return matches.Length == 1 ? matches[0] : null;
+        }
 
         public SemanticC3ComponentCandidate? FindByMethodOwner(
             SemanticC3SourceSymbolIdentity methodSymbol)
         {
             string? declaringType = DeclaringTypeId(methodSymbol.SymbolId);
-            return declaringType is null
-                ? FindExact(methodSymbol)
-                : _components.SingleOrDefault(component =>
+            if (declaringType is null)
+            {
+                return FindExact(methodSymbol);
+            }
+
+            SemanticC3ComponentCandidate[] matches =
+            [
+                .. _components.Where(component =>
                     component.SourceSymbol?.ProjectPath == methodSymbol.ProjectPath &&
-                    component.SourceSymbol.SymbolId == declaringType);
+                    component.SourceSymbol.SymbolId == declaringType),
+            ];
+            return matches.Length == 1 ? matches[0] : null;
         }
 
         public SemanticC3ComponentCandidate? FindByTypeName(string typeName)
