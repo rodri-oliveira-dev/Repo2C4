@@ -66,6 +66,9 @@ public sealed class SemanticC3FactExtractorTests
 
             public sealed class OrdersDbContext : DbContext { }
 
+            public interface IOrderRepository { }
+            public sealed class OrderRepository : IOrderRepository { }
+
             public interface IEventPublisher { }
             public sealed class RabbitPublisher : IEventPublisher { }
 
@@ -85,6 +88,8 @@ public sealed class SemanticC3FactExtractorTests
         Assert.Contains(result.Facts, fact => fact.Category == "semantic.host.backgroundService");
         Assert.Contains(result.Facts, fact => fact.Category == "semantic.wiring.hostedServiceRegistration");
         Assert.Contains(result.Facts, fact => fact.Category == "semantic.persistence.dbContext");
+        Assert.Contains(result.Facts, fact => fact.Category == "semantic.persistence.repositoryImplementation"
+            && fact.SourceSymbol.SymbolId.EndsWith(".OrderRepository", StringComparison.Ordinal));
         Assert.Contains(result.Facts, fact => fact.Category == "semantic.messaging.abstraction");
         Assert.Contains(result.Facts, fact => fact.Category == "semantic.collaboration.staticInvocation"
             && fact.RelatedSymbolId!.Contains("Helper.Process", StringComparison.Ordinal));

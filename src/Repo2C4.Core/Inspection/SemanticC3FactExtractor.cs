@@ -312,6 +312,18 @@ public static class SemanticC3FactExtractor
                     "dbContext"));
             }
 
+            if (!type.IsInterface && IsRepositoryImplementationSignal(type))
+            {
+                facts.AddObservation(Fact(
+                    unit,
+                    type.Line,
+                    typeSymbol,
+                    SemanticC3FactKind.PersistenceCandidate,
+                    "semantic.persistence.repositoryImplementation",
+                    "Concrete type implements or declares a repository-shaped persistence abstraction.",
+                    "repository"));
+            }
+
             if (IsMessagingAbstraction(type))
             {
                 facts.AddObservation(Fact(
@@ -1065,6 +1077,18 @@ public static class SemanticC3FactExtractor
         type.Attributes.Contains("ApiController", StringComparer.Ordinal) ||
         type.BaseTypes.Any(item =>
             SimpleTypeName(item) is "Controller" or "ControllerBase");
+
+    private static bool IsRepositoryImplementationSignal(TypeDeclaration type)
+    {
+        if (type.Name.EndsWith("Repository", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return type.BaseTypes
+            .Select(SimpleTypeName)
+            .Any(item => item.EndsWith("Repository", StringComparison.Ordinal));
+    }
 
     private static bool IsMessagingAbstraction(TypeDeclaration type)
     {
