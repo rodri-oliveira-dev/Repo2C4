@@ -123,6 +123,20 @@ The Phase 2 fixtures under `examples/models/` are intentionally review-oriented:
 
 All fixture evidence IDs resolve inside the embedded v1 snapshot. Tests deserialize them through `ContractJson`, validate the contract, and assert the negative rules above.
 
+## Semantic C3 HTTP/application policy
+
+Semantic C3 remains additive to the stable C1/C2 model. For HTTP/application proposals:
+
+- controller routes are aggregated by the declaring controller type, so multiple actions do not become arbitrary one-route components;
+- Minimal API routes are aggregated by their enclosing semantic symbol (for example a top-level host or a route-mapping extension method);
+- explicit endpoint handlers, typed endpoint dependencies, controller injection, DI registration and direct static symbol collaboration are structural signals that may support an `applicationService` candidate;
+- a class name such as `Service`, `Handler` or `UseCase` is never sufficient by itself;
+- a DI-registered type that is merely co-located with a Minimal API host may be proposed only as `requiresReview`, with the missing endpoint-level usage called out explicitly;
+- worker, messaging and persistence responsibilities are excluded from this HTTP/application pass and are classified separately;
+- internal C3 relations are not created by this step; relation construction has its own provenance/confidence policy.
+
+Component IDs derive from stable source-symbol identity and category, and evidence references use Semantic C3 fact IDs. This keeps route aggregation and naming deterministic across repeated analysis while preserving the facts that motivated each proposal.
+
 ## Out of scope
 
 This policy does not implement LikeC4 emission, LikeC4 validation, CLI commands, MCP transport, AI calls, C3, external services or automatic PR generation.
