@@ -1641,7 +1641,7 @@ public static class SemanticC3FactExtractor
         new(
             pattern,
             RegexOptions.CultureInvariant | RegexOptions.NonBacktracking | RegexOptions.Compiled,
-            TimeSpan.FromMilliseconds(100));
+            TimeSpan.FromMilliseconds(500));
 
     private sealed record TypeHeaderInfo(
         ParameterDeclaration[] PrimaryParameters,
