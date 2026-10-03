@@ -25,8 +25,8 @@ public static class SemanticC3FactExtractor
         @"[ \t]*(?:(?:public|internal|private|protected|abstract|sealed|static|partial|readonly|ref)\s+)*" +
         @"(?<kind>class|interface|struct|record(?:\s+class|\s+struct)?)\s+" +
         @"(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})(?:\s*<[^>{;\r\n]+>)?" +
-        @"(?:\s*\((?<primaryParams>[^(){};]{0,1024})\))?" +
-        @"(?:\s*:\s*(?<bases>[^\{\r\n]+))?");
+        @"(?:[ \t]*\([^()\r\n]{0,1024}\))?" +
+        @"(?:[ \t]*:[ \t]*(?<bases>[^\{\r\n]+))?");
 
     private static readonly Regex MethodRegex = CreateRegex(
         @"(?m)^[ \t]*(?<attrs>(?:[ \t]*\[[^\]\r\n]+\][ \t]*\r?\n)*)" +
@@ -662,6 +662,123 @@ public static class SemanticC3FactExtractor
         return candidate.Length == 0 ? null : candidate;
     }
 
+    private static TypeHeaderInfo ParseTypeHeader(
+        string source,
+        int start,
+        int openBrace)
+    {
+        int hardEnd = openBrace >= 0 ? openBrace : source.Length;
+        int end = Math.Min(hardEnd, start + 2_048);
+        int index = start;
+
+        while (index < end && char.IsWhiteSpace(source[index]))
+        {
+            index++;
+        }
+
+        if (index < end && source[index] == '<')
+        {
+            int angleDepth = 0;
+            for (; index < end; index++)
+            {
+                if (source[index] == '<')
+                {
+                    angleDepth++;
+                }
+                else if (source[index] == '>' && --angleDepth == 0)
+                {
+                    index++;
+                    break;
+                }
+            }
+        }
+
+        while (index < end && char.IsWhiteSpace(source[index]))
+        {
+            index++;
+        }
+
+        ParameterDeclaration[] primaryParameters = [];
+        if (index < end && source[index] == '(')
+        {
+            int close = FindMatchingCloseParenthesis(source, index);
+            if (close > index &&
+                close < end &&
+                close - index <= 1_025)
+            {
+                primaryParameters = ParseParameters(
+                    source[(index + 1)..close]);
+                index = close + 1;
+            }
+        }
+
+        while (index < end && char.IsWhiteSpace(source[index]))
+        {
+            index++;
+        }
+
+        string[] bases = [];
+        if (index < end && source[index] == ':')
+        {
+            int baseStart = ++index;
+            int roundDepth = 0;
+            int angleDepth = 0;
+            for (; index < end; index++)
+            {
+                char current = source[index];
+                if (current == '(')
+                {
+                    roundDepth++;
+                }
+                else if (current == ')')
+                {
+                    roundDepth = Math.Max(0, roundDepth - 1);
+                }
+                else if (current == '<')
+                {
+                    angleDepth++;
+                }
+                else if (current == '>')
+                {
+                    angleDepth = Math.Max(0, angleDepth - 1);
+                }
+
+                if (roundDepth == 0 &&
+                    angleDepth == 0 &&
+                    StartsWithWord(source, index, "where"))
+                {
+                    break;
+                }
+            }
+
+            bases = SplitTypeList(source[baseStart..index]);
+        }
+
+        return new TypeHeaderInfo(primaryParameters, bases);
+    }
+
+    private static bool StartsWithWord(
+        string source,
+        int index,
+        string word)
+    {
+        if (index < 0 ||
+            index + word.Length > source.Length ||
+            !source.AsSpan(index, word.Length).SequenceEqual(word))
+        {
+            return false;
+        }
+
+        bool leftBoundary =
+            index == 0 ||
+            !char.IsLetterOrDigit(source[index - 1]) && source[index - 1] != '_';
+        int right = index + word.Length;
+        bool rightBoundary =
+            right >= source.Length ||
+            !char.IsLetterOrDigit(source[right]) && source[right] != '_';
+        return leftBoundary && rightBoundary;
+    }
+
     private static SourceUnit ParseUnit(
         string projectPath,
         string sourcePath,
@@ -681,10 +798,16 @@ public static class SemanticC3FactExtractor
             string name = match.Groups["name"].Value;
             string ns = NamespaceAt(namespaces, match.Index);
             string qualified = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-            string[] bases = SplitTypeList(match.Groups["bases"].Value);
             string[] attributes = ExtractAttributes(match.Groups["attrs"].Value);
 
             int openBrace = masked.IndexOf('{', match.Index + match.Length);
+            TypeHeaderInfo header = ParseTypeHeader(
+                masked,
+                match.Groups["name"].Index + match.Groups["name"].Length,
+                openBrace);
+            string[] bases = header.Bases.Length > 0
+                ? header.Bases
+                : SplitTypeList(match.Groups["bases"].Value);
             int bodyStart = -1;
             int bodyEnd = -1;
             int bodyDepth = -1;
@@ -713,18 +836,16 @@ public static class SemanticC3FactExtractor
                 []);
 
             List<MethodDeclaration> methods = [];
-            if (match.Groups["primaryParams"].Success &&
+            if (header.PrimaryParameters.Length > 0 &&
                 !type.IsInterface)
             {
-                ParameterDeclaration[] primaryParameters =
-                    ParseParameters(match.Groups["primaryParams"].Value);
                 methods.Add(new MethodDeclaration(
                     type.Name,
-                    MethodSymbolId(type, "#ctor", primaryParameters, isConstructor: true),
+                    MethodSymbolId(type, "#ctor", header.PrimaryParameters, isConstructor: true),
                     true,
                     type.Line,
                     [],
-                    primaryParameters,
+                    header.PrimaryParameters,
                     -1,
                     -1,
                     match.Index));
@@ -1521,6 +1642,10 @@ public static class SemanticC3FactExtractor
             pattern,
             RegexOptions.CultureInvariant | RegexOptions.NonBacktracking | RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(100));
+
+    private sealed record TypeHeaderInfo(
+        ParameterDeclaration[] PrimaryParameters,
+        string[] Bases);
 
     private sealed record ParameterDeclaration(string Type, string Name);
 
