@@ -75,6 +75,11 @@ public static class ArchitectureC3Validator
         HashSet<string> evidenceIds = model.BaseModel.Snapshot.Evidence
             .Select(item => item.Id)
             .ToHashSet(StringComparer.Ordinal);
+        if (model.BaseModel.Snapshot.SemanticC3Facts is not null)
+        {
+            evidenceIds.UnionWith(
+                model.BaseModel.Snapshot.SemanticC3Facts.Facts.Select(fact => fact.Id));
+        }
 
         HashSet<string> componentIds = new(StringComparer.Ordinal);
         for (int i = 0; i < model.Components.Length; i++)

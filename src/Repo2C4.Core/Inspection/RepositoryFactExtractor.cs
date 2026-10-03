@@ -118,16 +118,26 @@ public static class RepositoryFactExtractor
                 "Evidence budget reached; some evidence or remaining files were omitted."));
         }
 
+        SemanticC3FactSet semanticFacts = SemanticC3FactExtractor.Extract(
+            new SemanticC3FactExtractionOptions(options)
+            {
+                Timeout = TimeSpan.FromSeconds(10),
+            },
+            cancellationToken);
+
         RepositorySnapshot result = snapshot with
         {
             Evidence = [.. evidence.Items.OrderBy(item => item.Id, StringComparer.Ordinal)],
             Diagnostics =
             [
                 .. diagnostics
+                    .Concat(semanticFacts.Diagnostics)
+                    .Distinct()
                     .OrderBy(item => item.Code, StringComparer.Ordinal)
                     .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
                     .ThenBy(item => item.Message, StringComparer.Ordinal),
             ],
+            SemanticC3Facts = semanticFacts,
         };
         ImmutableArray<ContractError> errors = ContractValidator.ValidateSnapshot(result);
         if (!errors.IsEmpty)

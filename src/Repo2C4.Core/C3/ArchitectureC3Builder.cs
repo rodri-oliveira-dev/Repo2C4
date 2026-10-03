@@ -1,12 +1,17 @@
 using System.Collections.Immutable;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.ExternalIntegrations;
 
 namespace Repo2C4.Core.C3;
+
+public sealed record ArchitectureC3BuildResult(
+    ArchitectureC3Workspace Workspace,
+    SemanticC3RelationBuildResult? SemanticResult);
 
 /// <summary>Builds bounded, evidence-first C3 proposals for explicitly selected C2 containers.</summary>
 public static class ArchitectureC3Builder
 {
-    private static readonly (string Prefix, string Name, string Responsibility)[] Categories =
+    private static readonly (string Prefix, string Name, string Responsibility)[] LegacyCategories =
     [
         ("dotnet.runtime.http.", "HTTP interface", "Receives HTTP traffic and exposes application entry points."),
         ("dotnet.integration.", "Integration adapter", "Connects the selected container to an external technology or service."),
@@ -56,6 +61,11 @@ public static class ArchitectureC3Builder
 
     public static ArchitectureC3Workspace BuildMany(
         ArchitectureModel baseModel,
+        IEnumerable<string> selectedContainerIds) =>
+        BuildManyDetailed(baseModel, selectedContainerIds).Workspace;
+
+    public static ArchitectureC3BuildResult BuildManyDetailed(
+        ArchitectureModel baseModel,
         IEnumerable<string> selectedContainerIds)
     {
         ArgumentNullException.ThrowIfNull(baseModel);
@@ -71,10 +81,12 @@ public static class ArchitectureC3Builder
         string[] requested = [.. selectedContainerIds];
         if (requested.Length == 0)
         {
-            return new ArchitectureC3Workspace(
-                ContractSchema.Version,
-                baseModel,
-                []);
+            return new ArchitectureC3BuildResult(
+                new ArchitectureC3Workspace(
+                    ContractSchema.Version,
+                    baseModel,
+                    []),
+                null);
         }
 
         if (baseModel.Level != ArchitectureLevel.C2)
@@ -136,17 +148,28 @@ public static class ArchitectureC3Builder
                 .OrderBy(id => id, StringComparer.Ordinal),
         ];
 
-        ArchitectureC3Selection[] selections =
-        [
-            .. canonicalIds.Select(id =>
+        List<ArchitectureC3Selection> selections = [];
+        List<SemanticC3RelationBuildResult> semanticResults = [];
+        foreach (string id in canonicalIds)
+        {
+            if (baseModel.Snapshot.SemanticC3Facts is null)
             {
-                ArchitectureC3Model model = BuildSingle(baseModel, elements[id]);
-                return new ArchitectureC3Selection(
-                    model.SelectedContainerId,
-                    model.Components,
-                    model.Relations);
-            }),
-        ];
+                ArchitectureC3Model legacy = BuildLegacySingle(baseModel, elements[id]);
+                selections.Add(new ArchitectureC3Selection(
+                    legacy.SelectedContainerId,
+                    legacy.Components,
+                    legacy.Relations));
+                continue;
+            }
+
+            SemanticC3RelationBuildResult semantic = BuildSemanticSingle(
+                baseModel,
+                id,
+                baseModel.Snapshot.SemanticC3Facts,
+                baseModel.Snapshot.ExternalIntegrationEvidence);
+            semanticResults.Add(semantic);
+            selections.Add(ToSelection(id, semantic.Proposal));
+        }
 
         ArchitectureC3Workspace workspace = new(
             ContractSchema.Version,
@@ -160,10 +183,182 @@ public static class ArchitectureC3Builder
             throw new ContractValidationException(errors);
         }
 
-        return workspace;
+        SemanticC3RelationBuildResult? combined = semanticResults.Count == 0
+            ? null
+            : CombineSemanticResults(canonicalIds, semanticResults);
+
+        return new ArchitectureC3BuildResult(workspace, combined);
     }
 
-    private static ArchitectureC3Model BuildSingle(
+    private static SemanticC3RelationBuildResult BuildSemanticSingle(
+        ArchitectureModel baseModel,
+        string selectedContainerId,
+        SemanticC3FactSet factSet,
+        ExternalIntegrationEvidenceResult? externalEvidence)
+    {
+        ExternalIntegrationEvidenceResult integrations = externalEvidence ??
+            new ExternalIntegrationEvidenceResult(
+                ExternalIntegrationReportSchema.MinimumVersion,
+                null,
+                null,
+                false,
+                false,
+                [],
+                []);
+
+        SemanticC3Proposal http = SemanticC3HttpApplicationProposer.Propose(
+            baseModel,
+            selectedContainerId,
+            factSet);
+        SemanticC3Proposal workers = SemanticC3WorkerIntegrationProposer.Propose(
+            baseModel,
+            selectedContainerId,
+            factSet,
+            integrations);
+        SemanticC3Proposal adapters = SemanticC3IntegrationProposer.Propose(
+            baseModel,
+            selectedContainerId,
+            factSet,
+            integrations);
+
+        SemanticC3Proposal seed = MergeSemanticProposals(
+            selectedContainerId,
+            http,
+            workers,
+            adapters);
+
+        return SemanticC3RelationBuilder.Build(
+            baseModel,
+            seed,
+            factSet,
+            new SemanticC3RelationBuildOptions
+            {
+                MaxComponents = ArchitectureC3Validator.MaxComponents,
+                MaxRelations = ArchitectureC3Validator.MaxRelations,
+            });
+    }
+
+    private static SemanticC3Proposal MergeSemanticProposals(
+        string selectedContainerId,
+        params SemanticC3Proposal[] proposals)
+    {
+        SemanticC3ComponentCandidate[] components =
+        [
+            .. proposals
+                .SelectMany(proposal => proposal.Components)
+                .GroupBy(component => component.Id, StringComparer.Ordinal)
+                .Select(group =>
+                {
+                    SemanticC3ComponentCandidate first = group.First();
+                    return first with
+                    {
+                        EvidenceIds =
+                        [
+                            .. group.SelectMany(component => component.EvidenceIds)
+                                .Distinct(StringComparer.Ordinal)
+                                .OrderBy(id => id, StringComparer.Ordinal),
+                        ],
+                    };
+                })
+                .OrderBy(component => component.Id, StringComparer.Ordinal),
+        ];
+
+        SemanticC3RelationCandidate[] relations =
+        [
+            .. proposals
+                .SelectMany(proposal => proposal.Relations)
+                .GroupBy(relation => relation.Id, StringComparer.Ordinal)
+                .Select(group =>
+                {
+                    SemanticC3RelationCandidate first = group.First();
+                    return first with
+                    {
+                        EvidenceIds =
+                        [
+                            .. group.SelectMany(relation => relation.EvidenceIds)
+                                .Distinct(StringComparer.Ordinal)
+                                .OrderBy(id => id, StringComparer.Ordinal),
+                        ],
+                    };
+                })
+                .OrderBy(relation => relation.Id, StringComparer.Ordinal),
+        ];
+
+        return new SemanticC3Proposal(
+            SemanticC3ContractSchema.Version,
+            [selectedContainerId],
+            components,
+            relations);
+    }
+
+    private static ArchitectureC3Selection ToSelection(
+        string selectedContainerId,
+        SemanticC3Proposal proposal)
+    {
+        ArchitectureComponent[] components =
+        [
+            .. proposal.Components
+                .Select(component => new ArchitectureComponent(
+                    component.Id,
+                    component.ContainerId,
+                    component.Name,
+                    component.Responsibility,
+                    component.EvidenceIds,
+                    component.Status,
+                    component.ReviewReason))
+                .OrderBy(component => component.Id, StringComparer.Ordinal),
+        ];
+
+        ArchitectureComponentRelation[] relations =
+        [
+            .. proposal.Relations
+                .Select(relation => new ArchitectureComponentRelation(
+                    relation.Id,
+                    relation.SourceComponentId,
+                    relation.DestinationId,
+                    relation.Description,
+                    relation.EvidenceIds,
+                    relation.Status,
+                    relation.ReviewReason))
+                .OrderBy(relation => relation.Id, StringComparer.Ordinal),
+        ];
+
+        return new ArchitectureC3Selection(
+            selectedContainerId,
+            [.. components],
+            [.. relations]);
+    }
+
+    private static SemanticC3RelationBuildResult CombineSemanticResults(
+        string[] selectedContainerIds,
+        List<SemanticC3RelationBuildResult> results)
+    {
+        SemanticC3Proposal proposal = new(
+            SemanticC3ContractSchema.Version,
+            [.. selectedContainerIds],
+            [
+                .. results
+                    .SelectMany(result => result.Proposal.Components)
+                    .OrderBy(component => component.Id, StringComparer.Ordinal),
+            ],
+            [
+                .. results
+                    .SelectMany(result => result.Proposal.Relations)
+                    .OrderBy(relation => relation.Id, StringComparer.Ordinal),
+            ]);
+
+        return new SemanticC3RelationBuildResult(
+            proposal,
+            [
+                .. results
+                    .SelectMany(result => result.Diagnostics)
+                    .Distinct()
+                    .OrderBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                    .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal),
+            ]);
+    }
+
+    private static ArchitectureC3Model BuildLegacySingle(
         ArchitectureModel baseModel,
         ArchitectureElement selected)
     {
@@ -186,7 +381,7 @@ public static class ArchitectureC3Builder
         ];
 
         List<ArchitectureComponent> components = [];
-        foreach ((string prefix, string name, string responsibility) in Categories)
+        foreach ((string prefix, string name, string responsibility) in LegacyCategories)
         {
             Evidence[] matching =
             [

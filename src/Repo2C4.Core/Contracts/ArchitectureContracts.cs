@@ -72,7 +72,28 @@ public sealed record RepositorySnapshot(
     string RepositoryId,
     ImmutableArray<RepositoryFile> Files,
     ImmutableArray<Evidence> Evidence,
-    ImmutableArray<RepositoryDiagnostic> Diagnostics);
+    ImmutableArray<RepositoryDiagnostic> Diagnostics)
+{
+    /// <summary>
+    /// Optional additive Semantic C3 structural facts captured during repository inspection.
+    /// Facts contain bounded metadata only and never source bodies or arbitrary literals.
+    /// </summary>
+    public SemanticC3FactSet? SemanticC3Facts
+    {
+        get;
+        init;
+    }
+
+    /// <summary>
+    /// Optional normalized external integration findings imported from a compatible inspection report.
+    /// The persisted form is sanitized and bounded by the external-integration contract.
+    /// </summary>
+    public Repo2C4.Core.ExternalIntegrations.ExternalIntegrationEvidenceResult? ExternalIntegrationEvidence
+    {
+        get;
+        init;
+    }
+}
 
 /// <summary>Containment is represented by ParentId and validated against the model's element set.</summary>
 public sealed record ArchitectureElement(
