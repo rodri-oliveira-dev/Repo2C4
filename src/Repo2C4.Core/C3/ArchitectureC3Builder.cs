@@ -293,8 +293,8 @@ public static class ArchitectureC3Builder
         return new SemanticC3Proposal(
             SemanticC3ContractSchema.Version,
             [selectedContainerId],
-            components,
-            relations);
+            [.. components],
+            [.. relations]);
     }
 
     private static ArchitectureC3Selection ToSelection(
