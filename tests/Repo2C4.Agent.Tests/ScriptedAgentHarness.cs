@@ -172,6 +172,8 @@ internal sealed class DeterministicApprovalPrompt(
 
 internal sealed class DeterministicAgentHarness : IAsyncDisposable
 {
+    private static readonly string[] MultiC3Selection = ["el_beta", "el_alpha"];
+
     private readonly TempRepositoryFixture fixture;
     private readonly IAgentMcpSession session;
 
@@ -642,7 +644,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
                         ["write"] = false,
                         ["destinationPath"] = null,
                         ["c3ContainerId"] = null,
-                        ["c3Containers"] = new[] { "el_beta", "el_alpha" },
+                        ["c3Containers"] = MultiC3Selection,
                     }));
         },
         _ => Text(summary),

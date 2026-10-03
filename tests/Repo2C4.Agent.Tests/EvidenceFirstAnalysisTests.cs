@@ -8,6 +8,8 @@ namespace Repo2C4.Agent.Tests;
 
 public sealed class EvidenceFirstAnalysisTests
 {
+    private static readonly string[] RequestedC3WithAttacker =
+        ["el_beta", "el_attacker", "el_beta"];
     [Fact]
     public void PromptUsesOnlyTheHostAuthorizedIntegrationReportAndPreservesExternalSemantics()
     {
@@ -190,7 +192,7 @@ public sealed class EvidenceFirstAnalysisTests
                 ["dryRun"] = false,
                 ["write"] = true,
                 ["destinationPath"] = "attacker-selected",
-                ["c3Containers"] = new[] { "el_beta", "el_attacker", "el_beta" },
+                ["c3Containers"] = RequestedC3WithAttacker,
             },
             TestContext.Current.CancellationToken);
 
