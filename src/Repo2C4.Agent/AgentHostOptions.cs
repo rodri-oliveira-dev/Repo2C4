@@ -286,7 +286,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                             out error);
                     }
 
-                    c3ContainerIds.Add(c3ContainerValue);
+                    c3ContainerIds.Add(c3ContainerValue!);
                     break;
 
                 case "--write-destination":
