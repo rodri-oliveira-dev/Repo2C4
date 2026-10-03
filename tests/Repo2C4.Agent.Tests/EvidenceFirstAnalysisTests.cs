@@ -8,6 +8,8 @@ namespace Repo2C4.Agent.Tests;
 
 public sealed class EvidenceFirstAnalysisTests
 {
+    private static readonly string[] RequestedC3WithAttacker =
+        ["el_beta", "el_attacker", "el_beta"];
     [Fact]
     public void PromptUsesOnlyTheHostAuthorizedIntegrationReportAndPreservesExternalSemantics()
     {
@@ -80,6 +82,7 @@ public sealed class EvidenceFirstAnalysisTests
             Assert.False(call.Write);
             Assert.Null(call.DestinationPath);
             Assert.Null(call.C3ContainerId);
+            Assert.Empty(call.C3ContainerIds);
         });
     }
 
@@ -134,6 +137,7 @@ public sealed class EvidenceFirstAnalysisTests
         Assert.False(generation.Write);
         Assert.Null(generation.DestinationPath);
         Assert.Null(generation.C3ContainerId);
+        Assert.Empty(generation.C3ContainerIds);
         Assert.True(chatClient.SawMaliciousToolData);
         Assert.True(chatClient.SawUntrustedDataPolicy);
         Assert.Contains("Requires review", response, StringComparison.Ordinal);
@@ -165,6 +169,56 @@ public sealed class EvidenceFirstAnalysisTests
         Assert.False(generation.Write);
         Assert.Null(generation.DestinationPath);
         Assert.Equal("el_web", generation.C3ContainerId);
+        Assert.Empty(generation.C3ContainerIds);
+    }
+
+    [Fact]
+    public async Task MultiC3PolicyAllowsOnlyExplicitAuthorizedSubset()
+    {
+        AnalysisToolHarness harness = new();
+        AIFunction generate = Assert.IsAssignableFrom<AIFunction>(
+            AgentMcpToolPolicy
+                .CreateSafeTools(
+                    harness.CreateTools(),
+                    authorizedC3ContainerId: null,
+                    authorizedC3ContainerIds: ["el_alpha", "el_beta", "el_gamma"])
+                .Single(tool => tool.Name == "generate_likec4"));
+
+        await generate.InvokeAsync(
+            new AIFunctionArguments
+            {
+                ["snapshotId"] = "snap-1",
+                ["model"] = CreateC2Model(),
+                ["dryRun"] = false,
+                ["write"] = true,
+                ["destinationPath"] = "attacker-selected",
+                ["c3Containers"] = RequestedC3WithAttacker,
+            },
+            TestContext.Current.CancellationToken);
+
+        GenerationCall generation = Assert.Single(harness.GenerationCalls);
+        Assert.True(generation.DryRun);
+        Assert.False(generation.Write);
+        Assert.Null(generation.DestinationPath);
+        Assert.Null(generation.C3ContainerId);
+        Assert.Equal(["el_beta"], generation.C3ContainerIds);
+    }
+
+    [Fact]
+    public void MultiC3PromptRequiresEvidenceSupportedSubsetAndExplicitReporting()
+    {
+        AgentHostOptions options = new("ollama", "model", "Document architecture")
+        {
+            C3ContainerIds = ["el_alpha", "el_beta", "el_unused"],
+        };
+
+        string prompt = EvidenceFirstAnalysisPrompt.BuildForWorkflow(options);
+
+        Assert.Contains("c3Containers", prompt, StringComparison.Ordinal);
+        Assert.Contains("never select all automatically", prompt, StringComparison.Ordinal);
+        Assert.Contains("el_alpha", prompt, StringComparison.Ordinal);
+        Assert.Contains("el_beta", prompt, StringComparison.Ordinal);
+        Assert.Contains("el_unused", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -184,6 +238,25 @@ public sealed class EvidenceFirstAnalysisTests
         Assert.NotNull(options);
         Assert.Equal("Document architecture", options.Goal);
         Assert.Equal("el_web", options.C3ContainerId);
+        Assert.Equal(["el_web"], options.AuthorizedC3ContainerIds);
+
+        parsed = AgentHostOptions.TryParse(
+            [
+                "--provider", "ollama",
+                "--model", "model",
+                "--goal", "Document architecture",
+                "--c3-container", "el_beta",
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_beta",
+            ],
+            out options,
+            out error);
+
+        Assert.True(parsed, error);
+        Assert.NotNull(options);
+        Assert.Null(options.C3ContainerId);
+        Assert.Equal(["el_alpha", "el_beta"], options.C3ContainerIds);
+        Assert.Equal(["el_alpha", "el_beta"], options.AuthorizedC3ContainerIds);
 
         parsed = AgentHostOptions.TryParse(
             [
@@ -299,12 +372,36 @@ public sealed class EvidenceFirstAnalysisTests
                 (string snapshotId, JsonElement model) => GetEvidenceReport(snapshotId, model),
                 "get_evidence_report"),
             AIFunctionFactory.Create(
-                (string snapshotId, JsonElement model, bool dryRun, bool write, string? destinationPath, string? c3ContainerId) =>
-                    GenerateLikeC4(snapshotId, model, dryRun, write, destinationPath, c3ContainerId),
+                (
+                    string snapshotId,
+                    JsonElement model,
+                    bool dryRun,
+                    bool write,
+                    string? destinationPath,
+                    string? c3ContainerId,
+                    string[]? c3Containers) =>
+                    GenerateLikeC4(
+                        snapshotId,
+                        model,
+                        dryRun,
+                        write,
+                        destinationPath,
+                        c3ContainerId,
+                        c3Containers),
                 "generate_likec4"),
             AIFunctionFactory.Create(
-                (string snapshotId, JsonElement model, string? destinationPath, string? c3ContainerId) =>
-                    ValidateLikeC4(snapshotId, model, destinationPath, c3ContainerId),
+                (
+                    string snapshotId,
+                    JsonElement model,
+                    string? destinationPath,
+                    string? c3ContainerId,
+                    string[]? c3Containers) =>
+                    ValidateLikeC4(
+                        snapshotId,
+                        model,
+                        destinationPath,
+                        c3ContainerId,
+                        c3Containers),
                 "validate_likec4"),
         ];
 
@@ -404,11 +501,17 @@ public sealed class EvidenceFirstAnalysisTests
             bool dryRun,
             bool write,
             string? destinationPath,
-            string? c3ContainerId)
+            string? c3ContainerId,
+            string[]? c3Containers)
         {
             Calls.Add("generate_likec4");
             ProposedModels.Add(model.Clone());
-            GenerationCalls.Add(new GenerationCall(dryRun, write, destinationPath, c3ContainerId));
+            GenerationCalls.Add(new GenerationCall(
+                dryRun,
+                write,
+                destinationPath,
+                c3ContainerId,
+                c3Containers ?? []));
             return new
             {
                 snapshotId,
@@ -422,11 +525,13 @@ public sealed class EvidenceFirstAnalysisTests
             string snapshotId,
             JsonElement model,
             string? destinationPath,
-            string? c3ContainerId)
+            string? c3ContainerId,
+            string[]? c3Containers)
         {
             _ = model;
             _ = destinationPath;
             _ = c3ContainerId;
+            _ = c3Containers;
             return new
             {
                 snapshotId,
@@ -440,7 +545,8 @@ public sealed class EvidenceFirstAnalysisTests
         bool DryRun,
         bool Write,
         string? DestinationPath,
-        string? C3ContainerId);
+        string? C3ContainerId,
+        IReadOnlyList<string> C3ContainerIds);
 
     private sealed class ScriptedAnalysisChatClient(
         JsonElement c1Model,

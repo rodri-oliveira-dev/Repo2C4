@@ -81,8 +81,10 @@ The normal local server exposes six tools:
 | `get_evidence` | Page through v1 evidence from a snapshot. | `snapshotId`, optional exact `category`, optional metadata `pathPrefix`, `pageSize`, opaque `cursor`. | Read-only. |
 | `get_snapshot` | Page file metadata or diagnostics without returning file bodies. | `snapshotId`, `section` = `files` or `diagnostics`, optional `pathPrefix`. | Read-only. |
 | `get_evidence_report` | Return a bounded provenance/review summary for a session-bound model. | `snapshotId`, complete `ArchitectureModel` v1. | Read-only. |
-| `generate_likec4` | Generate deterministic C1/C2 LikeC4 and optional selective C3. | `snapshotId`, complete model, optional `destinationPath`, optional `c3ContainerId`. | Preview by default. Explicit flags are required to write. |
-| `validate_likec4` | Validate a proposed model or existing generated workspace through the controlled official LikeC4 CLI adapter. | `snapshotId`, complete model, optional `destinationPath`, optional `c3ContainerId`. | Read-only. |
+| `generate_likec4` | Generate deterministic C1/C2 LikeC4 and optional selective multi-container C3. | `snapshotId`, complete model, optional `destinationPath`, preferred optional `c3Containers`, legacy optional `c3ContainerId`. | Preview by default. Explicit flags are required to write. |
+| `validate_likec4` | Validate a proposed model or existing generated workspace through the controlled official LikeC4 CLI adapter. | `snapshotId`, complete model, optional `destinationPath`, preferred optional `c3Containers`, legacy optional `c3ContainerId`. | Read-only. |
+
+Local `inspect_repository` also computes bounded Semantic C3 structural facts. Those internal facts stay in the session snapshot for C3 generation and are not exposed through a generic source-data tool. The client still submits the public reviewed C1/C2 model; after public-snapshot freshness validation, the server binds it to the canonical inspected facts before Semantic C3 generation. This prevents a client/model from injecting fabricated structural facts. Semantic C3 generation reports exact `c3Views` and includes `semantic-c3-evidence-report.md`. See [Semantic C3](semantic-c3.md).
 
 `inspect_remote_repository` is **not** exposed by default. It appears only when the host explicitly starts the server with `--allow-remote-acquisition`.
 
@@ -259,23 +261,23 @@ Unknown files are never deleted. Writes are prepared as a managed set, committed
 
 If state changes between preview and apply, the write is rejected with `managed_output_conflict`; preview again instead of forcing the write.
 
-## Selective C3
+## Selective multi-container C3
 
-C1/C2 are the default. `generate_likec4` and proposal-mode `validate_likec4` accept an optional `c3ContainerId`:
+C1/C2 are the default. For new clients, `generate_likec4` and proposal-mode `validate_likec4` accept the typed `c3Containers` collection:
 
 ```jsonc
 {
   "snapshotId": "<snapshot-id>",
-  "model": { "...": "complete C1/C2 ArchitectureModel v1" },
-  "c3ContainerId": "container_api"
+  "model": { "...": "complete C2 ArchitectureModel v1" },
+  "c3Containers": ["container_api", "container_worker"]
 }
 ```
 
-The ID must identify an existing C2 container in the supplied model. Only that container is expanded. Other containers do not receive C3 automatically.
+At most 8 C3 selections are accepted per call. Repeated IDs are canonicalized deterministically, and the workspace is additionally bounded to 256 components and 512 relations before emission. Every selected ID is validated against the supplied C2 model before managed-output preview or write. Invalid IDs, non-container selections, C1 input, insufficient evidence, schema mismatch or C3 budget violations fail with controlled errors rather than inventing components.
 
-The C3 builder derives bounded component candidates from evidence associated with the selected container's repository paths. Candidate/static signals remain reviewable; unsupported container IDs, insufficient evidence, schema mismatch or C3 limits fail with controlled model errors rather than inventing components.
+Only the explicitly requested containers are expanded; the server never selects every C2 container automatically. Generated component boundaries remain evidence-linked and reviewable. Successful proposal generation and proposal validation return a bounded `c3Views` array containing each selected `containerId` and emitted deterministic `viewId`.
 
-Use the same `c3ContainerId` when validating the proposal that was generated with C3.
+The legacy singular `c3ContainerId` remains accepted and preserves the prior single-container behavior, including the single `c3` view identifier. New multi-container clients should use `c3Containers`. Use the same selection when validating the proposal that was generated with C3.
 
 ## Optional public Git acquisition
 

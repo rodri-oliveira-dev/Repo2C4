@@ -1,3 +1,5 @@
+[Português (Brasil)](evidence-report.pt-BR.md)
+
 # Evidence report and architectural review
 
 Issue #17 adds a deterministic `evidence-report.md` generated from a reviewed v1 `ArchitectureModel`.
@@ -29,3 +31,14 @@ Repository-static or candidate signals are not upgraded to confirmed runtime rel
 ## MCP
 
 The read-only `get_evidence_report` tool accepts a session `snapshotId` and complete v1 model. The server verifies that the embedded snapshot matches the session snapshot and returns a bounded summary of the report: counts, review-required assertion IDs and warning codes. The Markdown body remains a CLI artifact; MCP does not return source bodies, configuration values, absolute paths, or write to the repository.
+
+
+## Semantic C3 evidence report
+
+When C3 is requested from a snapshot containing `semanticC3Facts`, generation additionally produces `semantic-c3-evidence-report.md`. It is separate from the C1/C2 report because C3 component provenance includes stable source-symbol facts as well as normal architecture evidence.
+
+The Semantic C3 report lists component/relation IDs, responsibility categories, repository-relative locations, structural signal classes, missing confidence signals, review status and bounded graph diagnostics. It never includes source bodies, arbitrary literals, configuration values or absolute paths.
+
+A `confirmed` internal C3 relation means the configured static confidence rule was satisfied (for example supported wiring plus a statically resolved collaboration). It is not runtime tracing. Component boundaries remain reviewable.
+
+See [Semantic C3](semantic-c3.md).

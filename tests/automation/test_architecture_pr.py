@@ -152,6 +152,23 @@ class ArchitecturePrTests(unittest.TestCase):
         with self.assertRaisesRegex(automation.AutomationError, "repository differs"):
             automation.validate_options(untrusted, self.root)
 
+    def test_public_snapshot_ignores_additive_semantic_metadata(self) -> None:
+        public = {
+            "schemaVersion": "1.0",
+            "repositoryId": "repo",
+            "files": [],
+            "evidence": [],
+            "diagnostics": [],
+        }
+        enriched = dict(public)
+        enriched["semanticC3Facts"] = {"schemaVersion": "1.0", "facts": [], "diagnostics": []}
+        enriched["externalIntegrationEvidence"] = {"evidence": [], "diagnostics": []}
+
+        self.assertEqual(
+            automation.public_snapshot(public),
+            automation.public_snapshot(enriched),
+        )
+
     def test_unmatched_reviewed_snapshot_blocks_generation(self) -> None:
         (self.root / "models" / "reviewed.json").write_text(
             json.dumps({"snapshot": {**SNAPSHOT, "repositoryId": "other"}}), encoding="utf-8"

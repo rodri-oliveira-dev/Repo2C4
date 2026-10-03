@@ -109,7 +109,7 @@ repo2c4 generate --model architecture.reviewed.json --output ./likec4 --apply
 repo2c4 validate --output ./likec4
 ```
 
-Generation previews by default, `--apply` writes only controlled output and does not overwrite manually edited files. Review `likec4/evidence-report.md` for hypotheses/provenance. C1/C2 are supported by default; generate **C3 for one selected existing C2 container only** with `--c3-container CONTAINER_ID` using a previously reviewed C2 model (see [selective C3 example](../examples/end-to-end/README.md)). A library-only inventory is not proof of a running container. LikeC4 must be installed for `validate`, and its DSL checks are not a substitute for review of architecture claims.
+Generation previews by default, `--apply` writes only controlled output and does not overwrite manually edited files. Review `likec4/evidence-report.md` for C1/C2 hypotheses/provenance. Repeat `--c3-container CONTAINER_ID` to select one or more reviewed C2 containers in the same workspace; when inspection persisted Semantic C3 facts, generation also writes `semantic-c3-evidence-report.md`. Class names alone do not become components, while older snapshots retain the generic C3 fallback. See [Semantic C3](semantic-c3.md) and the [selective C3 example](../examples/end-to-end/README.md). A library-only inventory is not proof of a running container. LikeC4 must be installed for `validate`, and its DSL checks are not a substitute for review of architecture claims.
 
 ## MCP client configuration and local filesystem policy
 

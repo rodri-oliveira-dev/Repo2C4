@@ -20,7 +20,7 @@ public sealed record EvidenceReportResult(
     string Content,
     EvidenceReportSummary Summary);
 
-public static class EvidenceReportGenerator
+public static partial class EvidenceReportGenerator
 {
     public const string FileName = "evidence-report.md";
 

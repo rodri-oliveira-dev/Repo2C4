@@ -313,7 +313,7 @@ public static class ExternalIntegrationArchitectureMapper
         _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(technology.Replace('-', ' ')),
     };
 
-    private static bool IsSupported(ExternalIntegrationEvidence evidence) => evidence.Kind switch
+    internal static bool IsSupported(ExternalIntegrationEvidence evidence) => evidence.Kind switch
     {
         ExternalIntegrationKind.Http => evidence.Direction == ExternalIntegrationDirection.Outbound,
         ExternalIntegrationKind.Messaging =>
@@ -334,7 +334,7 @@ public static class ExternalIntegrationArchitectureMapper
         _ => false,
     };
 
-    private static string? MessagingProviderName(string technology) => technology.ToLowerInvariant() switch
+    internal static string? MessagingProviderName(string technology) => technology.ToLowerInvariant() switch
     {
         "aws-eventbridge" => "Amazon EventBridge",
         "aws-kinesis" => "Amazon Kinesis",

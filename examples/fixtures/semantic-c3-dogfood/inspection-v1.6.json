@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.6",
+  "repository": {
+    "name": "semantic-c3-dogfood",
+    "commitSha": "66b1dc7c789c96c521d08d7012155cf309f3d3f2"
+  },
+  "projects": [
+    {"path":"src/Ingestion.Api/Ingestion.Api.csproj"},
+    {"path":"src/Ingestion.Persistence/Ingestion.Persistence.csproj"},
+    {"path":"src/Ingestion.Outbox.Worker/Ingestion.Outbox.Worker.csproj"},
+    {"path":"src/Consolidation.Api/Consolidation.Api.csproj"},
+    {"path":"src/Consolidation.Persistence/Consolidation.Persistence.csproj"},
+    {"path":"src/Consolidation.Worker/Consolidation.Worker.csproj"}
+  ],
+  "integrations": [
+    {
+      "id":"integration-0000000000000001",
+      "projectPath":"src/Ingestion.Persistence/Ingestion.Persistence.csproj",
+      "kind":"database","direction":"bidirectional","technology":"postgresql",
+      "target":"ingestion_db","resourceType":"database",
+      "source":{"path":"src/Ingestion.Persistence/IngestionDbContext.cs","line":5},
+      "confidence":"high","signals":["database:postgresql"]
+    },
+    {
+      "id":"integration-0000000000000002",
+      "projectPath":"src/Ingestion.Api/Ingestion.Api.csproj",
+      "kind":"cache","direction":"bidirectional","technology":"redis",
+      "target":"ingestion-idempotency","resourceType":"cache",
+      "source":{"path":"src/Ingestion.Api/Values/RedisIdempotencyStore.cs","line":3},
+      "confidence":"high","signals":["cache:redis"]
+    },
+    {
+      "id":"integration-0000000000000003",
+      "projectPath":"src/Ingestion.Outbox.Worker/Ingestion.Outbox.Worker.csproj",
+      "kind":"messaging","direction":"publish","technology":"rabbitmq",
+      "target":"lab.events.v1","resourceType":"exchange",
+      "source":{"path":"src/Ingestion.Outbox.Worker/RabbitMqOutboxMessagePublisher.cs","line":1},
+      "confidence":"high","signals":["rabbitmq:publish"]
+    },
+    {
+      "id":"integration-0000000000000004",
+      "projectPath":"src/Consolidation.Persistence/Consolidation.Persistence.csproj",
+      "kind":"database","direction":"bidirectional","technology":"postgresql",
+      "target":"consolidation_db","resourceType":"database",
+      "source":{"path":"src/Consolidation.Persistence/ConsolidationDbContext.cs","line":5},
+      "confidence":"high","signals":["database:postgresql"]
+    },
+    {
+      "id":"integration-0000000000000005",
+      "projectPath":"src/Consolidation.Worker/Consolidation.Worker.csproj",
+      "kind":"messaging","direction":"consume","technology":"rabbitmq",
+      "target":"consolidation.value-received.v1","resourceType":"queue",
+      "source":{"path":"src/Consolidation.Worker/ConsolidationConsumer.cs","line":3},
+      "confidence":"high","signals":["rabbitmq:consume"]
+    }
+  ],
+  "integrationDiscovery":{"enabled":true,"completed":true,"truncated":false}
+}

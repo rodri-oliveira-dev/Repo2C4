@@ -31,8 +31,9 @@ O Repo2C4 mantém a orquestração de IA fora do Core e do MCP. O Core não faz 
 
 - **Inspeção local limitada:** examina uma única raiz local explicitamente autorizada, ignora caminhos sensíveis/gerados obrigatórios e escapes por links, aplica budgets de arquivos/bytes/entradas e não executa código do repositório.
 - **Evidências .NET rastreáveis:** extrai declarações suportadas de solution/project/source com proveniência relativa ao repositório, mantendo declarações estáticas e candidatos de runtime semanticamente separados.
+- **Semantic C3:** persiste fatos estruturais C# limitados e propõe componentes por responsabilidade HTTP/application/worker/mensageria/persistence/integração somente quando há suporte estrutural; nome de classe sozinho nunca vira componente.
 - **LikeC4 determinístico:** gera workspaces C1/C2 revisáveis e os valida com a CLI oficial do LikeC4 instalada separadamente.
-- **C3 seletivo:** expande exatamente um container C2 selecionado explicitamente quando há evidência suficiente; os demais containers não recebem C3 automaticamente.
+- **C3 seletivo multi-container:** expande um ou mais containers C2 selecionados explicitamente quando há evidência suficiente; seleções repetidas compartilham um único workspace determinístico e containers não selecionados não recebem C3 automaticamente.
 - **Escrita review-first:** `generate` é preview por padrão. Na CLI, escrita exige `--apply`; no MCP exige `dryRun=false`, `write=true` e um destino relativo autorizado. Hashes dos arquivos gerenciados protegem edições humanas.
 - **CLI:** `repo2c4` oferece onboarding, inspeção, inferência opcional, geração e validação.
 - **Servidor MCP stdio:** `repo2c4-mcp` expõe evidências, geração e validação dentro de uma raiz autorizada. A seleção de modelo, quando existir, pertence ao cliente MCP.

@@ -49,6 +49,76 @@ public static class StableIds
         return Hash("rel", sourceId, destinationId, stableLogicalKey);
     }
 
+    public static string ForSemanticC3SourceSymbol(string projectPath, string symbolId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(symbolId);
+        if (!ContractValidator.IsNormalizedRelativePath(projectPath))
+        {
+            throw new ArgumentException(
+                "Source symbol project path must be a normalized repository-relative path.",
+                nameof(projectPath));
+        }
+
+        return Hash("sym", projectPath, symbolId);
+    }
+
+    public static string ForSemanticC3Component(
+        string containerId,
+        SemanticC3ComponentCategory category,
+        string stableLogicalKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(containerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stableLogicalKey);
+
+        if (!Enum.IsDefined(category))
+        {
+            throw new ArgumentOutOfRangeException(nameof(category));
+        }
+
+        return Hash("cmp", containerId, category.ToString(), stableLogicalKey);
+    }
+
+    public static string ForSemanticC3Fact(
+        string projectPath,
+        string sourcePath,
+        string sourceSymbolId,
+        SemanticC3FactKind kind,
+        string category,
+        string relatedSymbolId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceSymbolId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        ArgumentNullException.ThrowIfNull(relatedSymbolId);
+
+        if (!ContractValidator.IsNormalizedRelativePath(projectPath))
+        {
+            throw new ArgumentException(
+                "Semantic C3 fact project path must be repository-relative.",
+                nameof(projectPath));
+        }
+
+        if (!ContractValidator.IsNormalizedRelativePath(sourcePath))
+        {
+            throw new ArgumentException(
+                "Semantic C3 fact source path must be repository-relative.",
+                nameof(sourcePath));
+        }
+
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        return Hash(
+            "fact",
+            projectPath,
+            sourcePath,
+            sourceSymbolId,
+            kind.ToString(),
+            category,
+            relatedSymbolId);
+    }
+
     private static string Hash(string prefix, params string[] parts)
     {
         // Length-prefix fields so ["ab", "c"] cannot alias ["a", "bc"].

@@ -31,8 +31,9 @@ Repo2C4 keeps AI orchestration outside Core and MCP. Core performs no AI calls, 
 
 - **Bounded local inspection:** scans one explicitly authorized local root, skips mandatory sensitive/generated paths and linked path escapes, enforces file/byte/entry budgets, and does not execute repository code.
 - **Traceable .NET evidence:** extracts supported solution/project/source declarations with repository-relative provenance while keeping static declarations and runtime candidates distinct.
+- **Semantic C3:** persists bounded structural C# facts and proposes responsibility-level HTTP/application/worker/messaging/persistence/integration components only when structural evidence supports them; class names alone never become components.
 - **Deterministic LikeC4:** generates reviewable C1/C2 workspaces and validates them with the separately installed official LikeC4 CLI.
-- **Selective C3:** expands exactly one explicitly selected C2 container when enough evidence is available; other containers are not expanded automatically.
+- **Selective multi-container C3:** expands one or more explicitly selected C2 containers when enough evidence is available; repeated selections share one deterministic workspace and unselected containers are not expanded automatically.
 - **Review-first writes:** `generate` previews by default. CLI writes require `--apply`; MCP writes require explicit `dryRun=false`, `write=true`, and an authorized relative destination. Managed-file hashes protect human edits.
 - **CLI:** `repo2c4` exposes onboarding, inspection, optional inference, generation and validation.
 - **MCP stdio server:** `repo2c4-mcp` exposes evidence, generation and validation tools inside one authorized root. Model selection, if any, belongs to the MCP client.
@@ -46,14 +47,14 @@ Repo2C4 currently does **not**:
 
 - prove runtime communication, deployment topology, ownership or container boundaries merely from `ProjectReference`, package presence, SDKs or source candidates;
 - evaluate MSBuild, build or execute the inspected repository, run its hooks/scripts, or read arbitrary source bodies into the public evidence contract;
-- turn every .NET project into a C4 container or generate C3 for every container automatically;
+- turn every .NET project into a C4 container, turn every class into a C3 component, or generate C3 for every container automatically;
 - provide its own diagram renderer/editor—the generated workspace is rendered by LikeC4;
 - support private/authenticated remote Git acquisition, SSH/file URLs, submodules, or analysis that depends on Git LFS;
 - write generated architecture on inspection or inference alone;
 - let the MCP server call a hosted AI provider on its own;
 - remove the need for architectural review. `validate` verifies LikeC4 syntax/workspace integrity, not whether an architectural decision is true.
 
-For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [external integration interoperability](docs/external-integration-boundary.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
+For the precise security and evidence boundaries, see [contracts](docs/contracts.md), [Semantic C3](docs/semantic-c3.md), [external integration interoperability](docs/external-integration-boundary.md), [CLI](docs/cli.md), [MCP](docs/mcp.md), and [distribution/security guidance](docs/distribution.md).
 
 ## Quick Start
 
@@ -85,7 +86,7 @@ repo2c4 inspect \
 
 The resulting snapshot is deterministic for this fixture and can be compared with [`examples/end-to-end/snapshot.v1.json`](examples/end-to-end/snapshot.v1.json).
 
-For external integrations, first run `dotnet repo-inspect /absolute/repository --discover-integrations --output /absolute/repository/artifacts/inspection.json` with DotNetRepoInspector `v1.6.5`, then add `--integration-report /absolute/repository/artifacts/inspection.json` to `repo2c4 inspect`. Repo2C4 imports normalized `external.*` evidence through the public schema `1.6+` JSON boundary; it neither invokes DotNetRepoInspector nor reads its internal assemblies. See the [external integration boundary](docs/external-integration-boundary.md).
+For external integrations, first run `dotnet repo-inspect /absolute/repository --discover-integrations --output /absolute/repository/artifacts/inspection.json` with DotNetRepoInspector `v1.6.5`, then add `--integration-report /absolute/repository/artifacts/inspection.json` to `repo2c4 inspect`. Repo2C4 imports normalized `external.*` evidence through the public schema `1.6+` JSON boundary; it neither invokes DotNetRepoInspector nor reads its internal assemblies. Local inspection also persists bounded metadata-only `semanticC3Facts` for later selective C3 generation. See [Semantic C3](docs/semantic-c3.md) and the [external integration boundary](docs/external-integration-boundary.md).
 
 ### 3. Review the model and preview LikeC4
 
@@ -331,9 +332,9 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 
 
-### Selective C3
+### Selective multi-container C3
 
-C1/C2 generation remains the default. To derive a reviewable C3 proposal for exactly one existing C2 container, pass `--c3-container <container-id>` to the CLI or `c3ContainerId` to `generate_likec4` over MCP. The generated component boundaries are evidence-linked, bounded, and kept under review when repository-static signals cannot prove runtime behavior. Other containers are not expanded automatically.
+C1/C2 generation remains the default. The CLI accepts repeated `--c3-container <container-id>`; MCP clients should use the bounded `c3Containers` collection (with legacy `c3ContainerId` preserved for one container); and the Agent accepts repeated `--c3-container` values as an authorization set from which it must choose only evidence-supported targets. Generated component boundaries are evidence-linked, deterministic and reviewable. Unselected or unsupported containers are never expanded automatically.
 
 
 ### Managed regeneration

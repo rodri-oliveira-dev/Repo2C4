@@ -29,3 +29,17 @@ public sealed record ArchitectureC3Model(
     string SelectedContainerId,
     ImmutableArray<ArchitectureComponent> Components,
     ImmutableArray<ArchitectureComponentRelation> Relations);
+
+/// <summary>One selected C2 container and its bounded C3 extension inside a shared workspace.</summary>
+public sealed record ArchitectureC3Selection(
+    string SelectedContainerId,
+    ImmutableArray<ArchitectureComponent> Components,
+    ImmutableArray<ArchitectureComponentRelation> Relations);
+
+/// <summary>
+/// Canonical multi-container C3 workspace. All selections share exactly one reviewed C1/C2 base model/snapshot.
+/// </summary>
+public sealed record ArchitectureC3Workspace(
+    string SchemaVersion,
+    ArchitectureModel BaseModel,
+    ImmutableArray<ArchitectureC3Selection> Selections);

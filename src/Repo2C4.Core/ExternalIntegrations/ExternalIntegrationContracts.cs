@@ -137,6 +137,7 @@ public static class ExternalIntegrationSnapshotImporter
                     .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
                     .ThenBy(item => item.Message, StringComparer.Ordinal),
             ],
+            ExternalIntegrationEvidence = imported,
         };
         _ = ContractJson.SerializeSnapshot(merged);
         return new ExternalIntegrationSnapshotImportResult(

@@ -42,12 +42,14 @@ repo2c4 generate --model architecture.json --output DIR
 
 A entrada deve ser um `ArchitectureModel` v1 válido, proposto ou revisado por uma pessoa. O comando não infere um modelo C4 a partir do snapshot.
 
-São produzidos quatro arquivos dentro do diretório escolhido:
+A geração base C1/C2 produz:
 
 - `specification.c4`
 - `model.c4`
 - `views.c4`
 - `evidence-report.md`
+
+Quando C3 é selecionado, `c3.views.c4` é adicionado. Quando o snapshot do modelo contém fatos Semantic C3 persistidos, a geração também adiciona `semantic-c3-evidence-report.md`.
 
 A geração é somente preview por padrão. O Repo2C4 informa `added`, `modified`, `unchanged` ou `conflict` para cada saída gerenciada e não altera o filesystem.
 
@@ -61,13 +63,23 @@ A primeira aplicação bem-sucedida cria `.repo2c4-manifest.json`, contendo a ve
 
 `evidence-report.md` relaciona as afirmações do modelo aos IDs de evidência e às localizações relativas do repositório, separa hipóteses pendentes, avisos de varredura e itens sem suporte, sem copiar corpos de código nem valores sensíveis. Consulte [relatório de evidências e revisão arquitetural](evidence-report.md).
 
-Para solicitar C3 de exatamente um container C2 revisado, adicione `--c3-container ID`:
+Para solicitar C3 de um ou mais containers C2 revisados, repita `--c3-container ID`:
 
 ```bash
-repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
+repo2c4 generate \
+  --model architecture.c2.json \
+  --output DIR \
+  --c3-container el_web \
+  --c3-container el_worker
 ```
 
-Sem essa opção nenhum arquivo C3 é gerado. Uma seleção válida aninha as propostas de componentes revisáveis dentro do container selecionado em `model.c4` e adiciona `c3.views.c4`; os demais containers C2 não recebem vistas de componentes automaticamente. A proposta C3 é limitada, mantém sinais estáticos/candidatos sob revisão e falha quando o container selecionado não possui evidência suficiente.
+Quando o snapshot inspecionado contém `semanticC3Facts`, os containers selecionados usam os classificadores Semantic C3 em vez do agrupamento genérico legado. Nome de classe sozinho não é promovido: candidatos HTTP/application/worker/mensageria/persistence/integração exigem proveniência estrutural. Snapshots antigos sem fatos semânticos mantêm o fallback C3 genérico. Veja [Semantic C3](semantic-c3.pt-BR.md).
+
+Uma única ocorrência de `--c3-container` permanece compatível com o comportamento anterior. Com múltiplas seleções, o Repo2C4 constrói um único workspace canônico sobre o mesmo modelo/snapshot C2, aninha cada conjunto de componentes no seu container em um único `model.c4` e grava um único `c3.views.c4` com uma view C3 determinística por container selecionado. A ordem dos argumentos não altera a saída e IDs repetidos são deduplicados.
+
+Sem essa opção nenhum arquivo C3 é gerado. IDs desconhecidos, actors/software systems usados como seleção C3 e C3 solicitado sobre um modelo C1 falham como dados inválidos antes do preview ou da escrita gerenciada. Um container selecionado sem evidência C3 suficiente também falha em vez de fabricar componentes.
+
+Alterar o conjunto de containers selecionados é tratado como uma modificação normal das saídas gerenciadas quando os arquivos atuais ainda correspondem ao manifesto. Edições manuais existentes continuam protegidas como conflito e nunca são sobrescritas automaticamente.
 
 O diretório de saída e os arquivos gerenciados precisam permanecer dentro da raiz escolhida e não podem ser symlink, junction ou reparse point. Os nomes gerados são fixos pelo Repo2C4 e não podem ser definidos pelo conteúdo do modelo. As escritas são preparadas em um diretório transacional; o manifesto só é substituído após a preparação das saídas. Em caso de falha, arquivos previamente gerenciados são restaurados em best effort e arquivos desconhecidos nunca são excluídos.
 

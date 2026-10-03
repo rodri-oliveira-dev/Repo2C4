@@ -95,7 +95,8 @@ public sealed class AgentMcpTests
                 bool dryRun,
                 bool write,
                 string? destinationPath,
-                string? c3ContainerId) =>
+                string? c3ContainerId,
+                string[]? c3Containers) =>
             {
                 _ = snapshotId;
                 _ = model;
@@ -103,6 +104,7 @@ public sealed class AgentMcpTests
                 _ = write;
                 _ = destinationPath;
                 _ = c3ContainerId;
+                _ = c3Containers;
                 return JsonSerializer.SerializeToElement(new
                 {
                     isError = true,

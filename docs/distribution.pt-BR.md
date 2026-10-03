@@ -104,7 +104,7 @@ repo2c4 generate --model architecture.reviewed.json --output ./likec4 --apply
 repo2c4 validate --output ./likec4
 ```
 
-O primeiro `generate` é somente preview. A escrita exige `--apply` e respeita o manifesto de arquivos gerenciados; edições manuais não são sobrescritas. Examine `likec4/evidence-report.md`. O C1/C2 é o fluxo padrão. Para expandir somente **um container C2 existente**, utilize `--c3-container ID_DO_CONTAINER` com modelo C2 já revisado ([exemplo C3](../examples/end-to-end/README.md)). Uma biblioteca .NET isolada não implica um container em execução. O `validate` verifica o DSL LikeC4 instalado, não a veracidade das decisões arquiteturais.
+O primeiro `generate` é somente preview. A escrita exige `--apply` e respeita o manifesto de arquivos gerenciados; edições manuais não são sobrescritas. Examine `likec4/evidence-report.md` para C1/C2. Repita `--c3-container ID_DO_CONTAINER` para selecionar um ou mais containers C2 revisados no mesmo workspace; quando a inspeção persistiu fatos Semantic C3, a geração também grava `semantic-c3-evidence-report.md`. Nome de classe sozinho não vira componente e snapshots antigos mantêm o fallback C3 genérico. Veja [Semantic C3](semantic-c3.pt-BR.md) e o [exemplo C3](../examples/end-to-end/README.md). Uma biblioteca .NET isolada não implica um container em execução. O `validate` verifica o DSL LikeC4 instalado, não a veracidade das decisões arquiteturais.
 
 ## Instalação MCP e acesso ao sistema de arquivos
 

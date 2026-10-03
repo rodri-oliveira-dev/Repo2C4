@@ -135,6 +135,14 @@ def safe_output_root(root: Path, output_id: str) -> Path:
     return output
 
 
+def public_snapshot(snapshot: dict) -> dict:
+    """Return the stable v1 snapshot surface used for reviewed-model freshness checks."""
+    projected = dict(snapshot)
+    projected.pop("semanticC3Facts", None)
+    projected.pop("externalIntegrationEvidence", None)
+    return projected
+
+
 def prepare(args: argparse.Namespace, root: Path) -> bool:
     repository_root, model_path = validate_options(args, root)
     output = safe_output_root(root, args.output_id)
@@ -159,8 +167,9 @@ def prepare(args: argparse.Namespace, root: Path) -> bool:
                     "--provider", "openai", "--model-id", args.model_id,
                     "--allow-external-ai", "--output", str(candidate), cwd=root)
             model_path = candidate
-        elif json.loads(model_path.read_text(encoding="utf-8")).get("snapshot") != json.loads(
-                snapshot.read_text(encoding="utf-8")):
+        elif public_snapshot(
+                json.loads(model_path.read_text(encoding="utf-8")).get("snapshot", {})) != public_snapshot(
+                    json.loads(snapshot.read_text(encoding="utf-8"))):
             raise AutomationError("Reviewed model snapshot differs from the freshly inspected authorized repository.")
         command("dotnet", cli, "generate", "--model", str(model_path),
                 "--output", str(output), cwd=root)
