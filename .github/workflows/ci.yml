@@ -405,6 +405,20 @@ jobs:
           grep -Fq "component" "$workdir/c3/model.c4"
           "${cli[@]}" validate --output "$workdir/c3"
 
+          "${cli[@]}" generate \
+            --model examples/models/multi-c3.c2.v1.json \
+            --output "$workdir/c3-multi" \
+            --c3-container el_beta \
+            --c3-container el_alpha \
+            --c3-container el_alpha \
+            --apply
+          test -s "$workdir/c3-multi/c3.views.c4"
+          grep -Fq "view c3_el_alpha {" "$workdir/c3-multi/c3.views.c4"
+          grep -Fq "view c3_el_beta {" "$workdir/c3-multi/c3.views.c4"
+          test "$(grep -Ec '^[[:space:]]*view c3_' "$workdir/c3-multi/c3.views.c4")" -eq 2
+          grep -Fq "component" "$workdir/c3-multi/model.c4"
+          "${cli[@]}" validate --output "$workdir/c3-multi"
+
           preview="$("${cli[@]}" generate \
             --model examples/end-to-end/architecture.c2.v1.json \
             --output "$workdir/c2")"

@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Repeatable CLI `--c3-container` selection backed by one canonical multi-container C3 workspace, deterministic per-container LikeC4 views, duplicate-ID normalization, pre-write validation, and managed-output compatibility while preserving the single-container behavior.
 - Bounded Semantic C3 internal/external relation composition with explicit wiring+invocation confidence policy, deterministic edge deduplication, weak-cycle/cross-container safeguards, existing C1/C2 peer reuse, and a signal/missing-signal evidence report.
 - Reviewable Semantic C3 worker/messaging/persistence proposals that merge hosted-service evidence, distinguish supported publish/consume adapters through Integration Evidence, require observed use before promoting repository-shaped persistence, reuse existing C1/C2 external peers, and keep weak/unlinked evidence conservative.
 - Reviewable Semantic C3 HTTP/application proposals that aggregate routes by semantic boundary and distinguish DI-/handler-backed application services from name-only classes.

@@ -61,13 +61,21 @@ The first successful apply creates `.repo2c4-manifest.json`, which stores the mo
 
 `evidence-report.md` maps model assertions to evidence IDs and repository-relative locations, lists hypotheses, scan warnings and missing origins, and omits source bodies and sensitive values. See [evidence report and architectural review](evidence-report.md).
 
-To request C3 for exactly one reviewed C2 container, add `--c3-container ID`:
+To request C3 for one or more reviewed C2 containers, repeat `--c3-container ID`:
 
 ```bash
-repo2c4 generate --model architecture.c2.json --output DIR --c3-container el_web
+repo2c4 generate \
+  --model architecture.c2.json \
+  --output DIR \
+  --c3-container el_web \
+  --c3-container el_worker
 ```
 
-Without this option no C3 files are produced. A valid selection nests reviewed component proposals inside the selected container in `model.c4` and adds `c3.views.c4`; the remaining C2 containers do not receive component views automatically. The C3 proposal is bounded, keeps candidate/static signals under review, and fails when the selected container has insufficient evidence.
+A single `--c3-container` remains backward compatible with the previous behavior. With multiple selections, Repo2C4 builds one canonical workspace over the same C2 base model/snapshot, nests each component set under its selected container in one `model.c4`, and writes one `c3.views.c4` containing one deterministic C3 view per selected container. Argument order does not affect output and repeated container IDs are deduplicated.
+
+Without this option no C3 file is produced. Unknown IDs, actors/software systems passed as C3 selections, and C3 requested for a C1 model fail as invalid data before managed output is previewed or written. A selected container with insufficient C3 evidence also fails rather than fabricating components.
+
+Changing the selected-container set is treated as a normal managed-output modification when current files still match the manifest. Existing manual edits remain conflict-protected and are never overwritten automatically.
 
 The output directory and managed files must remain inside the selected root and must not be symlink, junction or reparse points. Generated filenames are fixed by Repo2C4 and cannot be supplied by model content. Writes are prepared in a transaction directory and the manifest is replaced only after all output files have been prepared; a failed commit restores previously managed files on a best-effort basis and never deletes unknown files.
 

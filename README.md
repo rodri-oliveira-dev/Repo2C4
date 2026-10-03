@@ -32,7 +32,7 @@ Repo2C4 keeps AI orchestration outside Core and MCP. Core performs no AI calls, 
 - **Bounded local inspection:** scans one explicitly authorized local root, skips mandatory sensitive/generated paths and linked path escapes, enforces file/byte/entry budgets, and does not execute repository code.
 - **Traceable .NET evidence:** extracts supported solution/project/source declarations with repository-relative provenance while keeping static declarations and runtime candidates distinct.
 - **Deterministic LikeC4:** generates reviewable C1/C2 workspaces and validates them with the separately installed official LikeC4 CLI.
-- **Selective C3:** expands exactly one explicitly selected C2 container when enough evidence is available; other containers are not expanded automatically.
+- **Selective multi-container C3:** expands one or more explicitly selected C2 containers when enough evidence is available; repeated selections share one deterministic workspace and unselected containers are not expanded automatically.
 - **Review-first writes:** `generate` previews by default. CLI writes require `--apply`; MCP writes require explicit `dryRun=false`, `write=true`, and an authorized relative destination. Managed-file hashes protect human edits.
 - **CLI:** `repo2c4` exposes onboarding, inspection, optional inference, generation and validation.
 - **MCP stdio server:** `repo2c4-mcp` exposes evidence, generation and validation tools inside one authorized root. Model selection, if any, belongs to the MCP client.
