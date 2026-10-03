@@ -14,6 +14,14 @@ public sealed class McpSemanticC3DogfoodTests
         "el_consolidation_worker",
     ];
 
+    private static readonly string[] CanonicalContainers =
+    [
+        "el_consolidation_api",
+        "el_consolidation_worker",
+        "el_ingestion_api",
+        "el_ingestion_outbox_worker",
+    ];
+
     [Fact]
     public async Task RealInspectionFeedsFourContainerSemanticC3WithoutExposingInternalFacts()
     {
@@ -48,7 +56,7 @@ public sealed class McpSemanticC3DogfoodTests
 
         Assert.True(generated.DryRun);
         Assert.False(generated.Written);
-        Assert.Equal(SelectedContainers, generated.C3Views.Select(view => view.ContainerId));
+        Assert.Equal(CanonicalContainers, generated.C3Views.Select(view => view.ContainerId));
         Assert.Equal(4, generated.C3Views.Length);
 
         McpLikeC4File semanticReport = Assert.Single(

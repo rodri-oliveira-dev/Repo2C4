@@ -19,6 +19,14 @@ public sealed class SemanticC3DogfoodTests
         "el_consolidation_worker",
     ];
 
+    private static readonly string[] CanonicalContainers =
+    [
+        "el_consolidation_api",
+        "el_consolidation_worker",
+        "el_ingestion_api",
+        "el_ingestion_outbox_worker",
+    ];
+
     [Fact]
     public async Task DotNetObservabilityGoldenProducesUsefulBoundedSemanticC3()
     {
@@ -53,7 +61,7 @@ public sealed class SemanticC3DogfoodTests
 
         Assert.NotNull(build.SemanticResult);
         Assert.Equal(4, build.Workspace.Selections.Length);
-        Assert.Equal(SelectedContainers, build.Workspace.Selections.Select(item => item.SelectedContainerId));
+        Assert.Equal(CanonicalContainers, build.Workspace.Selections.Select(item => item.SelectedContainerId));
 
         SemanticC3Proposal proposal = build.SemanticResult!.Proposal;
         AssertResponsibilities(
