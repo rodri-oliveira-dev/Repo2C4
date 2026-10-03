@@ -175,3 +175,12 @@ The Semantic C3 evidence report lists each candidate/relation, its evidence loca
 ## Out of scope
 
 The C1/C2 mapping policy itself does not implement LikeC4 emission, CLI/MCP/Agent orchestration, AI calls, runtime tracing or automatic PR generation. The additive Semantic C3 policies above only define conservative component proposals; generation/orchestration is handled by later phases.
+
+
+## Integrated Semantic C3 generation
+
+The Semantic C3 policies above are connected to the normal inspection/generation path. Local inspection persists bounded `semanticC3Facts`; an optional compatible integration report persists normalized `externalIntegrationEvidence`. A reviewed C2 model can then select one or more containers and reuse those persisted facts offline.
+
+The stable rule remains **class != component**. Responsibility candidates require architectural signals, and relations use the dedicated wiring/invocation confidence policy. Older v1 snapshots without semantic facts continue through the legacy generic selective-C3 grouping.
+
+See [Semantic C3](semantic-c3.md) for the end-to-end contract, budgets, dogfooding result and known limitations.
