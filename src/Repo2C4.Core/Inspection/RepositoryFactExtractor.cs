@@ -125,19 +125,23 @@ public static class RepositoryFactExtractor
             },
             cancellationToken);
 
+        SemanticC3FactSet? persistedSemanticFacts =
+            semanticFacts.Facts.IsEmpty && semanticFacts.Diagnostics.IsEmpty
+                ? null
+                : semanticFacts;
+
         RepositorySnapshot result = snapshot with
         {
             Evidence = [.. evidence.Items.OrderBy(item => item.Id, StringComparer.Ordinal)],
             Diagnostics =
             [
                 .. diagnostics
-                    .Concat(semanticFacts.Diagnostics)
                     .Distinct()
                     .OrderBy(item => item.Code, StringComparer.Ordinal)
                     .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
                     .ThenBy(item => item.Message, StringComparer.Ordinal),
             ],
-            SemanticC3Facts = semanticFacts,
+            SemanticC3Facts = persistedSemanticFacts,
         };
         ImmutableArray<ContractError> errors = ContractValidator.ValidateSnapshot(result);
         if (!errors.IsEmpty)
