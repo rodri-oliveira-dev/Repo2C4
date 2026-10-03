@@ -57,7 +57,14 @@ public sealed record AgentArchitectureProposal(
     string Level,
     string SnapshotId,
     JsonElement Model,
-    string? C3ContainerId);
+    string? C3ContainerId)
+{
+    public IReadOnlyList<string> C3ContainerIds
+    {
+        get;
+        init;
+    } = string.IsNullOrWhiteSpace(C3ContainerId) ? [] : [C3ContainerId];
+}
 
 /// <summary>Run-local capture of successful preview calls made through the safe MCP boundary.</summary>
 public sealed class AgentMcpInvocationState
@@ -94,9 +101,18 @@ public sealed class AgentMcpInvocationState
     public void RecordPreview(
         string snapshotId,
         JsonElement model,
-        string? c3ContainerId)
+        string? c3ContainerId,
+        IReadOnlyList<string>? c3ContainerIds = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+
+        string[] selectedC3Containers =
+        [
+            .. (c3ContainerIds ?? [])
+                .Concat(string.IsNullOrWhiteSpace(c3ContainerId) ? [] : [c3ContainerId])
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
 
         string level =
             model.ValueKind == JsonValueKind.Object
@@ -109,7 +125,10 @@ public sealed class AgentMcpInvocationState
             level,
             snapshotId,
             model.Clone(),
-            c3ContainerId);
+            selectedC3Containers.Length == 1 ? selectedC3Containers[0] : null)
+        {
+            C3ContainerIds = selectedC3Containers,
+        };
 
         lock (gate)
         {
@@ -289,7 +308,8 @@ public sealed class Repo2C4McpSessionFactory : IAgentMcpSessionFactory
                 discovered,
                 options.C3ContainerId,
                 invocationState,
-                options.IntegrationReportPath);
+                options.IntegrationReportPath,
+                options.C3ContainerIds);
             McpClientTool generateLikeC4 = discovered.Single(
                 tool => string.Equals(
                     tool.Name,
@@ -460,9 +480,18 @@ public static class AgentMcpToolPolicy
         IEnumerable<AITool> discovered,
         string? authorizedC3ContainerId,
         AgentMcpInvocationState? invocationState = null,
-        string? authorizedIntegrationReportPath = null)
+        string? authorizedIntegrationReportPath = null,
+        IReadOnlyList<string>? authorizedC3ContainerIds = null)
     {
         ArgumentNullException.ThrowIfNull(discovered);
+
+        string[] authorizedC3Containers =
+        [
+            .. (authorizedC3ContainerIds ?? [])
+                .Concat(string.IsNullOrWhiteSpace(authorizedC3ContainerId) ? [] : [authorizedC3ContainerId])
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
 
         List<AITool> tools = [];
         foreach (AITool tool in discovered)
@@ -485,11 +514,11 @@ public static class AgentMcpToolPolicy
                         authorizedIntegrationReportPath),
                     "generate_likec4" => new PreviewOnlyMcpFunction(
                         function,
-                        authorizedC3ContainerId,
+                        authorizedC3Containers,
                         invocationState),
                     "validate_likec4" => new ProposalOnlyValidationMcpFunction(
                         function,
-                        authorizedC3ContainerId),
+                        authorizedC3Containers),
                     _ => function,
                 };
 
@@ -539,14 +568,14 @@ public static class AgentMcpToolPolicy
 
     private sealed class PreviewOnlyMcpFunction(
         AIFunction inner,
-        string? authorizedC3ContainerId,
+        string[] authorizedC3Containers,
         AgentMcpInvocationState? invocationState)
         : DelegatingAIFunction(inner)
     {
         public override string Description =>
-            authorizedC3ContainerId is null
+            authorizedC3Containers.Length == 0
                 ? "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and disables C3."
-                : "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and permits C3 only for the user-selected container.";
+                : "Preview deterministic LikeC4. This Agent wrapper forces dryRun=true, write=false, ignores destinationPath and permits only an explicitly requested subset of the host-authorized C3 containers.";
 
         protected override async ValueTask<object?> InvokeCoreAsync(
             AIFunctionArguments arguments,
@@ -555,32 +584,26 @@ public static class AgentMcpToolPolicy
             ArgumentNullException.ThrowIfNull(arguments);
 
             AIFunctionArguments safeArguments = [];
-            bool requestedC3 = false;
             foreach ((string key, object? value) in arguments)
             {
-                if (key is "dryRun" or "write" or "destinationPath")
+                if (key is "dryRun" or "write" or "destinationPath" or "c3ContainerId" or "c3Containers")
                 {
-                    continue;
-                }
-
-                if (key == "c3ContainerId")
-                {
-                    requestedC3 = value is not null;
                     continue;
                 }
 
                 safeArguments[key] = value;
             }
 
-            string? safeC3ContainerId =
-                requestedC3 && authorizedC3ContainerId is not null
-                    ? authorizedC3ContainerId
-                    : null;
+            C3RequestSelection selection = SelectAuthorizedC3(
+                arguments,
+                authorizedC3Containers);
 
             safeArguments["dryRun"] = true;
             safeArguments["write"] = false;
             safeArguments["destinationPath"] = null;
-            safeArguments["c3ContainerId"] = safeC3ContainerId;
+            safeArguments["c3ContainerId"] = selection.LegacyContainerId;
+            safeArguments["c3Containers"] =
+                selection.ContainerIds.Length == 0 ? null : selection.ContainerIds;
 
             object? result = await base
                 .InvokeCoreAsync(safeArguments, cancellationToken)
@@ -594,7 +617,11 @@ public static class AgentMcpToolPolicy
                 && TryGetJsonElement(modelValue, out JsonElement model)
                 && model.ValueKind == JsonValueKind.Object)
             {
-                invocationState.RecordPreview(snapshotId, model, safeC3ContainerId);
+                invocationState.RecordPreview(
+                    snapshotId,
+                    model,
+                    selection.LegacyContainerId,
+                    selection.ContainerIds);
             }
 
             return result;
@@ -603,11 +630,11 @@ public static class AgentMcpToolPolicy
 
     private sealed class ProposalOnlyValidationMcpFunction(
         AIFunction inner,
-        string? authorizedC3ContainerId)
+        string[] authorizedC3Containers)
         : DelegatingAIFunction(inner)
     {
         public override string Description =>
-            "Validate only an in-memory proposal. This Agent wrapper ignores destinationPath and permits C3 only for the user-selected container.";
+            "Validate only an in-memory proposal. This Agent wrapper ignores destinationPath and permits only an explicitly requested subset of the host-authorized C3 containers.";
 
         protected override ValueTask<object?> InvokeCoreAsync(
             AIFunctionArguments arguments,
@@ -616,32 +643,100 @@ public static class AgentMcpToolPolicy
             ArgumentNullException.ThrowIfNull(arguments);
 
             AIFunctionArguments safeArguments = [];
-            bool requestedC3 = false;
             foreach ((string key, object? value) in arguments)
             {
-                if (key == "destinationPath")
+                if (key is "destinationPath" or "c3ContainerId" or "c3Containers")
                 {
-                    continue;
-                }
-
-                if (key == "c3ContainerId")
-                {
-                    requestedC3 = value is not null;
                     continue;
                 }
 
                 safeArguments[key] = value;
             }
 
+            C3RequestSelection selection = SelectAuthorizedC3(
+                arguments,
+                authorizedC3Containers);
             safeArguments["destinationPath"] = null;
-            safeArguments["c3ContainerId"] =
-                requestedC3 && authorizedC3ContainerId is not null
-                    ? authorizedC3ContainerId
-                    : null;
+            safeArguments["c3ContainerId"] = selection.LegacyContainerId;
+            safeArguments["c3Containers"] =
+                selection.ContainerIds.Length == 0 ? null : selection.ContainerIds;
 
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }
     }
+
+    private static C3RequestSelection SelectAuthorizedC3(
+        AIFunctionArguments arguments,
+        IReadOnlyList<string> authorized)
+    {
+        string[] requested = ReadRequestedC3(arguments);
+        HashSet<string> allowed = authorized.ToHashSet(StringComparer.Ordinal);
+        string[] selected =
+        [
+            .. requested
+                .Where(allowed.Contains)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
+
+        bool legacyOnly =
+            arguments.TryGetValue("c3ContainerId", out object? legacyValue)
+            && legacyValue is not null
+            && !arguments.TryGetValue("c3Containers", out object? multiValue);
+
+        if (legacyOnly && authorized.Count == 1 && selected.Length == 0)
+        {
+            selected = [authorized[0]];
+        }
+
+        return new C3RequestSelection(
+            legacyOnly && selected.Length == 1 ? selected[0] : null,
+            selected);
+    }
+
+    private static string[] ReadRequestedC3(AIFunctionArguments arguments)
+    {
+        List<string> requested = [];
+
+        if (arguments.TryGetValue("c3ContainerId", out object? legacy) &&
+            legacy is string legacyId &&
+            !string.IsNullOrWhiteSpace(legacyId))
+        {
+            requested.Add(legacyId);
+        }
+
+        if (arguments.TryGetValue("c3Containers", out object? multiple) &&
+            multiple is not null)
+        {
+            switch (multiple)
+            {
+                case JsonElement element when element.ValueKind == JsonValueKind.Array:
+                    requested.AddRange(
+                        element.EnumerateArray()
+                            .Where(item => item.ValueKind == JsonValueKind.String)
+                            .Select(item => item.GetString())
+                            .Where(id => !string.IsNullOrWhiteSpace(id))
+                            .Cast<string>());
+                    break;
+
+                case IEnumerable<string> strings:
+                    requested.AddRange(strings.Where(id => !string.IsNullOrWhiteSpace(id)));
+                    break;
+
+                case IEnumerable<object?> objects:
+                    requested.AddRange(
+                        objects.OfType<string>()
+                            .Where(id => !string.IsNullOrWhiteSpace(id)));
+                    break;
+            }
+        }
+
+        return [.. requested];
+    }
+
+    private sealed record C3RequestSelection(
+        string? LegacyContainerId,
+        string[] ContainerIds);
 
     private static bool IsMcpErrorResult(object? result) =>
         result is JsonElement element

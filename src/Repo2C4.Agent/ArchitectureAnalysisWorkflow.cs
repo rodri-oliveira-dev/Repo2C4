@@ -739,6 +739,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
                         ["write"] = false,
                         ["destinationPath"] = null,
                         ["c3ContainerId"] = proposal.C3ContainerId,
+                        ["c3Containers"] =
+                            proposal.C3ContainerIds.Count == 0
+                                ? null
+                                : proposal.C3ContainerIds,
                     },
                     cancellationToken).ConfigureAwait(false);
 
@@ -806,6 +810,10 @@ internal sealed class AgentArchitectureWorkflowOperations(
                         ["model"] = proposal.Model,
                         ["destinationPath"] = null,
                         ["c3ContainerId"] = proposal.C3ContainerId,
+                        ["c3Containers"] =
+                            proposal.C3ContainerIds.Count == 0
+                                ? null
+                                : proposal.C3ContainerIds,
                     },
                     cancellationToken).ConfigureAwait(false);
 

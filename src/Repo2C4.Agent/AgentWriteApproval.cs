@@ -26,7 +26,14 @@ public sealed record AgentWritePlanItem(
     IReadOnlyList<AgentWriteChangePreview> Changes,
     IReadOnlyList<string> RequiresReviewIds,
     string PreviewFingerprint,
-    bool HasConflicts);
+    bool HasConflicts)
+{
+    public IReadOnlyList<string> C3ContainerIds
+    {
+        get;
+        init;
+    } = string.IsNullOrWhiteSpace(C3ContainerId) ? [] : [C3ContainerId];
+}
 
 public sealed record AgentWriteApprovalPlan(
     string DestinationRoot,
@@ -123,7 +130,10 @@ internal sealed class Repo2C4McpWriteGateway(
                 approved.Level,
                 approved.SnapshotId,
                 approved.Model,
-                approved.C3ContainerId);
+                approved.C3ContainerId)
+            {
+                C3ContainerIds = approved.C3ContainerIds,
+            };
 
             AgentWritePlanItem current = await PreviewAsync(
                 proposal,
@@ -174,6 +184,10 @@ internal sealed class Repo2C4McpWriteGateway(
                         ["write"] = true,
                         ["destinationPath"] = approved.DestinationPath,
                         ["c3ContainerId"] = approved.C3ContainerId,
+                        ["c3Containers"] =
+                            approved.C3ContainerIds.Count == 0
+                                ? null
+                                : approved.C3ContainerIds,
                     },
                     cancellationToken).ConfigureAwait(false);
 
@@ -304,6 +318,10 @@ internal sealed class Repo2C4McpWriteGateway(
                 ["write"] = false,
                 ["destinationPath"] = destinationPath,
                 ["c3ContainerId"] = proposal.C3ContainerId,
+                ["c3Containers"] =
+                    proposal.C3ContainerIds.Count == 0
+                        ? null
+                        : proposal.C3ContainerIds,
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -356,7 +374,10 @@ internal sealed class Repo2C4McpWriteGateway(
             changes,
             GetRequiresReviewIds(proposal.Model),
             fingerprint,
-            hasConflicts);
+            hasConflicts)
+        {
+            C3ContainerIds = proposal.C3ContainerIds,
+        };
     }
 
     private static string CombineDestination(string root, string level) =>
@@ -407,7 +428,7 @@ internal sealed class Repo2C4McpWriteGateway(
             + "\n"
             + proposal.Level
             + "\n"
-            + (proposal.C3ContainerId ?? string.Empty)
+            + string.Join(",", proposal.C3ContainerIds)
             + "\n"
             + destinationPath
             + "\n"
@@ -468,6 +489,13 @@ public sealed class ConsoleWriteApprovalPrompt(
         {
             await output.WriteLineAsync(
                 item.Level + " -> " + item.DestinationPath).ConfigureAwait(false);
+
+            if (item.C3ContainerIds.Count > 0)
+            {
+                await output.WriteLineAsync(
+                    "  C3 containers: " + string.Join(", ", item.C3ContainerIds))
+                    .ConfigureAwait(false);
+            }
 
             foreach (AgentWriteChangePreview change in item.Changes)
             {

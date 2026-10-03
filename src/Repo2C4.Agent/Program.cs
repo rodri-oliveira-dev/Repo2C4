@@ -229,7 +229,7 @@ public static class Program
     {
         standardError.WriteLine("Repo2C4 Agent host");
         standardError.WriteLine(
-            "Usage: repo2c4-agent --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--integration-report <relative-file>] [--write-destination <relative-root>] [--c3-container <container-id>] [--max-validation-attempts 1-3] [--max-duration-seconds 1-1800] [--max-tool-calls 1-100] [--max-workflow-iterations 1-3] [--max-evidence-pages 1-50] [--max-response-chars 1024-100000] [--max-context-chars 4096-200000] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
+            "Usage: repo2c4-agent --provider ollama|openai --model <model> --repository-root <absolute-path> --goal <objective> [--integration-report <relative-file>] [--write-destination <relative-root>] [--c3-container <container-id> ...] [--max-validation-attempts 1-3] [--max-duration-seconds 1-1800] [--max-tool-calls 1-100] [--max-workflow-iterations 1-3] [--max-evidence-pages 1-50] [--max-response-chars 1024-100000] [--max-context-chars 4096-200000] [--mcp-server-path <absolute-path>] [--timeout-seconds 1-300]");
         standardError.WriteLine(
             "Agent Framework Workflows orchestrates proposal -> evidence report -> dry-run preview -> validation with bounded validation attempts and workflow iterations.");
         standardError.WriteLine(
@@ -237,7 +237,7 @@ public static class Program
         standardError.WriteLine(
             "Optional --write-destination enables a separate Agent Framework HITL approval after successful validation; C1/C2 are written under <destination>/c1 and <destination>/c2 only after explicit local approval.");
         standardError.WriteLine(
-            "C3 is disabled unless --c3-container selects one container; the host never allows the model to select a different C3 target.");
+            "C3 is disabled unless --c3-container authorizes one or more containers (maximum 8). Repeat the option for multiple candidates; the Agent must request only the evidence-supported subset and the host rejects escalation outside that set.");
         standardError.WriteLine(
             "If --mcp-server-path is omitted, the installed repo2c4-mcp command is used. A .dll path is launched with dotnet.");
         standardError.WriteLine(
