@@ -61,6 +61,8 @@ After the client connects, inspect the authorized root itself:
 
 For selective C3, new clients should pass only the evidence-supported C2 container IDs in `c3Containers` to both proposal generation and proposal validation, for example `["container_api", "container_worker"]`. The collection is bounded to 8 selections and duplicates are deduplicated deterministically. Legacy `c3ContainerId` remains supported for one container.
 
+Clients do not reconstruct or submit internal Semantic C3 facts. The server retains the canonical bounded facts produced by inspection and uses them only after the submitted public snapshot passes freshness validation. When active, Semantic C3 responses include generated `c3Views` and `semantic-c3-evidence-report.md`. See [Semantic C3](semantic-c3.md).
+
 The host selects the AI model. Repo2C4 MCP has no cloud-provider key and does not promote hypotheses to facts.
 
 ## Reproducible smoke

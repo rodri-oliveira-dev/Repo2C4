@@ -84,6 +84,8 @@ The normal local server exposes six tools:
 | `generate_likec4` | Generate deterministic C1/C2 LikeC4 and optional selective multi-container C3. | `snapshotId`, complete model, optional `destinationPath`, preferred optional `c3Containers`, legacy optional `c3ContainerId`. | Preview by default. Explicit flags are required to write. |
 | `validate_likec4` | Validate a proposed model or existing generated workspace through the controlled official LikeC4 CLI adapter. | `snapshotId`, complete model, optional `destinationPath`, preferred optional `c3Containers`, legacy optional `c3ContainerId`. | Read-only. |
 
+Local `inspect_repository` also computes bounded Semantic C3 structural facts. Those internal facts stay in the session snapshot for C3 generation and are not exposed through a generic source-data tool. The client still submits the public reviewed C1/C2 model; after public-snapshot freshness validation, the server binds it to the canonical inspected facts before Semantic C3 generation. This prevents a client/model from injecting fabricated structural facts. Semantic C3 generation reports exact `c3Views` and includes `semantic-c3-evidence-report.md`. See [Semantic C3](semantic-c3.md).
+
 `inspect_remote_repository` is **not** exposed by default. It appears only when the host explicitly starts the server with `--allow-remote-acquisition`.
 
 ## First local inspection

@@ -63,6 +63,8 @@ As evidências importadas usam categorias `external.*`, entram no mesmo snapshot
 
 Para C3 seletivo, clientes novos devem passar somente os IDs de containers C2 sustentados por evidência em `c3Containers` tanto na geração quanto na validação da proposta, por exemplo `["container_api", "container_worker"]`. A coleção é limitada a 8 seleções e duplicatas são deduplicadas deterministicamente. O `c3ContainerId` legado continua suportado para um único container.
 
+Clientes não reconstroem nem enviam os fatos Semantic C3 internos. O servidor mantém os fatos canônicos e limitados produzidos pela inspeção e só os utiliza após o snapshot público enviado passar pela validação de freshness. Quando ativo, Semantic C3 inclui as `c3Views` geradas e `semantic-c3-evidence-report.md`. Veja [Semantic C3](semantic-c3.pt-BR.md).
+
 O host escolhe o modelo de IA. O MCP Repo2C4 não possui chave de provedor cloud e não transforma hipótese em fato.
 
 ## Smoke reproduzível
