@@ -13,7 +13,9 @@ public sealed class RepositoryFactExtractorTests
         fixture.Add("OnlyLib.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
 
         RepositoryScanOptions options = new(fixture.Root, "legacy_snapshot_surface");
-        RepositorySnapshot result = RepositoryFactExtractor.Extract(options);
+        RepositorySnapshot result = RepositoryFactExtractor.Extract(
+            options,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(result.SemanticC3Facts);
         Assert.DoesNotContain(
