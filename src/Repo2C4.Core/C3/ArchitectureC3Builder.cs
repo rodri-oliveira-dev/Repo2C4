@@ -17,7 +17,29 @@ public static class ArchitectureC3Builder
         ArchitectureModel baseModel,
         string selectedContainerId)
     {
+        ArgumentNullException.ThrowIfNull(baseModel);
         ArgumentException.ThrowIfNullOrWhiteSpace(selectedContainerId);
+
+        ImmutableArray<ContractError> baseErrors =
+            ContractValidator.ValidateModel(baseModel);
+        if (!baseErrors.IsEmpty)
+        {
+            throw new ContractValidationException(baseErrors);
+        }
+
+        ArchitectureElement? selected = baseModel.Elements.FirstOrDefault(item =>
+            item.Id == selectedContainerId &&
+            item.Kind == ArchitectureElementKind.Container);
+        if (selected is null)
+        {
+            throw new ContractValidationException(
+            [
+                new ContractError(
+                    "c3.containerMissing",
+                    "$.selectedContainerId",
+                    "Selected C3 container must exist in the C2 base model."),
+            ]);
+        }
 
         ArchitectureC3Workspace workspace = BuildMany(
             baseModel,
