@@ -25,6 +25,7 @@ public static class SemanticC3FactExtractor
         @"[ \t]*(?:(?:public|internal|private|protected|abstract|sealed|static|partial|readonly|ref)\s+)*" +
         @"(?<kind>class|interface|struct|record(?:\s+class|\s+struct)?)\s+" +
         @"(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})(?:\s*<[^>{;\r\n]+>)?" +
+        @"(?:\s*\([^()\r\n]{0,1024}\))?" +
         @"(?:\s*:\s*(?<bases>[^\{\r\n]+))?");
 
     private static readonly Regex MethodRegex = CreateRegex(

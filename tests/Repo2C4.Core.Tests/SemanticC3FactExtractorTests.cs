@@ -104,6 +104,32 @@ public sealed class SemanticC3FactExtractorTests
     }
 
     [Fact]
+    public void ExtractsDbContextWithPrimaryConstructor()
+    {
+        using Fixture fixture = new();
+        fixture.Add("App.csproj", "<Project />");
+        fixture.Add("Data.cs", """
+            namespace Demo;
+
+            public sealed class DemoDbContext(DbContextOptions<DemoDbContext> options)
+                : DbContext(options)
+            {
+                public static void Save() { }
+            }
+            """);
+
+        SemanticC3FactSet result = Extract(fixture);
+
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.TypeDeclaration &&
+            fact.SourceSymbol.SymbolId == "T:Demo.DemoDbContext");
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.PersistenceCandidate &&
+            fact.Category == "semantic.persistence.dbContext" &&
+            fact.SourceSymbol.SymbolId == "T:Demo.DemoDbContext");
+    }
+
+    [Fact]
     public void ExtractsMinimalApiLambdaDependenciesAndExplicitHandlers()
     {
         using Fixture fixture = new();
