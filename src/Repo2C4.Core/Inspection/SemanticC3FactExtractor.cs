@@ -701,7 +701,7 @@ public static class SemanticC3FactExtractor
         ParameterDeclaration[] primaryParameters = [];
         if (index < end && source[index] == '(')
         {
-            int close = FindMatchingCloseParenthesis(source, index);
+            int close = FindMatchingParenthesisBounded(source, index);
             if (close > index &&
                 close < end &&
                 close - index <= 1_025)
