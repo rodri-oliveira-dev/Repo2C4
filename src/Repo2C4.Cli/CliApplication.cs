@@ -504,15 +504,21 @@ internal static class CliApplication
         TextWriter standardError,
         CancellationToken cancellationToken)
     {
-        if (!TryParseOptions(
-            args,
-            ["--model", "--output", "--c3-container"],
-            ["--apply"],
-            out Dictionary<string, string> values,
-            out HashSet<string> flags,
-            out string? parseError))
+        if (!TryExtractRepeatedValueOption(
+                args,
+                "--c3-container",
+                out string[] remainingArgs,
+                out string[] selectedContainers,
+                out string? repeatedOptionError) ||
+            !TryParseOptions(
+                remainingArgs,
+                ["--model", "--output"],
+                ["--apply"],
+                out Dictionary<string, string> values,
+                out HashSet<string> flags,
+                out string? parseError))
         {
-            standardError.WriteLine(parseError);
+            standardError.WriteLine(repeatedOptionError ?? parseError);
             return CliExitCodes.UsageError;
         }
 
@@ -541,16 +547,10 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
-            IReadOnlyList<LikeC4GeneratedFile> files;
-            if (values.TryGetValue("--c3-container", out string? selectedContainer))
-            {
-                ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, selectedContainer);
-                files = LikeC4Emitter.EmitWithC3(model, c3);
-            }
-            else
-            {
-                files = LikeC4Emitter.Emit(model);
-            }
+            ArchitectureC3Workspace c3Workspace =
+                ArchitectureC3Builder.BuildMany(model, selectedContainers);
+            IReadOnlyList<LikeC4GeneratedFile> files =
+                LikeC4Emitter.EmitWithC3(c3Workspace);
 
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
             List<LikeC4GeneratedFile> managedFiles =
@@ -681,6 +681,44 @@ internal static class CliApplication
         }
     }
 
+    private static bool TryExtractRepeatedValueOption(
+        string[] args,
+        string option,
+        out string[] remainingArgs,
+        out string[] values,
+        out string? error)
+    {
+        List<string> remaining = [];
+        List<string> repeatedValues = [];
+
+        for (int index = 0; index < args.Length; index++)
+        {
+            string token = args[index];
+            if (!string.Equals(token, option, StringComparison.Ordinal))
+            {
+                remaining.Add(token);
+                continue;
+            }
+
+            if (index + 1 >= args.Length ||
+                args[index + 1].StartsWith("--", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(args[index + 1]))
+            {
+                remainingArgs = [];
+                values = [];
+                error = "Missing value for option: " + option + ".";
+                return false;
+            }
+
+            repeatedValues.Add(args[++index]);
+        }
+
+        remainingArgs = [.. remaining];
+        values = [.. repeatedValues];
+        error = null;
+        return true;
+    }
+
     private static bool TryParseOptions(
         string[] args,
         string[] valueOptions,
@@ -776,8 +814,8 @@ internal static class CliApplication
                 output.WriteLine("Collects bounded evidence only. Remote HTTPS acquisition uses an isolated temporary workspace and writes separate acquisition provenance.");
                 return CliExitCodes.Success;
             case "generate":
-                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
-                output.WriteLine("Previews deterministic C1/C2 outputs and evidence-report.md; --apply writes only managed, unchanged outputs. --c3-container ID adds selected C3.");
+                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID ...] [--apply]");
+                output.WriteLine("Previews deterministic C1/C2 outputs and evidence-report.md; --apply writes only managed, unchanged outputs. Repeat --c3-container ID to add multiple selected C3 views to one workspace.");
                 return CliExitCodes.Success;
             case "validate":
                 output.WriteLine("Usage: repo2c4 validate --output DIR");
