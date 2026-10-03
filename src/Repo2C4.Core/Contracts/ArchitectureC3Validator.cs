@@ -322,7 +322,56 @@ public static class ArchitectureC3WorkspaceValidator
                     continue;
                 }
 
-                errors.Add(error with { Path = path + error.Path.TrimStart('$') });
+                errors.Add(error with
+                {
+                    Path = path + error.Path.TrimStart('
+            }
+
+            if (selection.Components.IsDefault || selection.Relations.IsDefault)
+            {
+                continue;
+            }
+
+            for (int componentIndex = 0; componentIndex < selection.Components.Length; componentIndex++)
+            {
+                ArchitectureComponent? component = selection.Components[componentIndex];
+                if (component is null || string.IsNullOrWhiteSpace(component.Id))
+                {
+                    continue;
+                }
+
+                if (!componentIds.Add(component.Id))
+                {
+                    errors.Add(new ContractError(
+                        "id.duplicate",
+                        path + ".components[" + componentIndex + "].id",
+                        "C3 component IDs must be unique across all selected containers."));
+                }
+            }
+
+            for (int relationIndex = 0; relationIndex < selection.Relations.Length; relationIndex++)
+            {
+                ArchitectureComponentRelation? relation = selection.Relations[relationIndex];
+                if (relation is null || string.IsNullOrWhiteSpace(relation.Id))
+                {
+                    continue;
+                }
+
+                if (!relationIds.Add(relation.Id))
+                {
+                    errors.Add(new ContractError(
+                        "id.duplicate",
+                        path + ".relations[" + relationIndex + "].id",
+                        "C3 relation IDs must be unique across all selected containers."));
+                }
+            }
+        }
+
+        return [.. errors];
+    }
+}
+),
+                });
             }
 
             if (selection.Components.IsDefault || selection.Relations.IsDefault)
