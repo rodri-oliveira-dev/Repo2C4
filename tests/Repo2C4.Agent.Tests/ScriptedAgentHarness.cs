@@ -199,6 +199,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         IReadOnlyList<bool>? validationResults = null,
         string? writeDestination = null,
         string? integrationReportPath = null,
+        IReadOnlyList<string>? c3ContainerIds = null,
         CancellationToken cancellationToken = default)
     {
         string repositoryRoot = FindRepositoryRoot();
@@ -227,6 +228,7 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             McpServerPath = mcpServerPath,
             WriteDestination = writeDestination,
             IntegrationReportPath = integrationReportPath,
+            C3ContainerIds = c3ContainerIds ?? [],
             MaxValidationAttempts = Math.Min(
                 Math.Max(validationResults?.Count ?? 1, 1),
                 3),
@@ -379,6 +381,76 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         });
     }
 
+    public static JsonElement BuildMultiContainerC2(JsonElement snapshot)
+    {
+        string[] alphaEvidence = EvidenceIdsForPrefix(snapshot, "src/Alpha/");
+        string[] betaEvidence = EvidenceIdsForPrefix(snapshot, "src/Beta/");
+        string[] systemEvidence =
+        [
+            .. alphaEvidence
+                .Concat(betaEvidence)
+                .Take(3),
+        ];
+
+        return JsonSerializer.SerializeToElement(new
+        {
+            schemaVersion = "1.0",
+            level = "C2",
+            snapshot,
+            elements = new object[]
+            {
+                new
+                {
+                    id = "el_system",
+                    kind = "softwareSystem",
+                    name = "Multi C3 fixture",
+                    evidenceIds = systemEvidence,
+                    status = "requiresReview",
+                    reviewReason = "Repository evidence does not fully establish the software-system boundary.",
+                },
+                new
+                {
+                    id = "el_alpha",
+                    kind = "container",
+                    name = "Alpha API",
+                    parentId = "el_system",
+                    evidenceIds = alphaEvidence,
+                    status = "requiresReview",
+                    reviewReason = "Static host evidence does not prove the deployment boundary.",
+                },
+                new
+                {
+                    id = "el_beta",
+                    kind = "container",
+                    name = "Beta API",
+                    parentId = "el_system",
+                    evidenceIds = betaEvidence,
+                    status = "requiresReview",
+                    reviewReason = "Static host evidence does not prove the deployment boundary.",
+                },
+            },
+            relations = Array.Empty<object>(),
+        });
+    }
+
+    private static string[] EvidenceIdsForPrefix(
+        JsonElement snapshot,
+        string prefix) =>
+    [
+        .. snapshot.GetProperty("evidence")
+            .EnumerateArray()
+            .Where(item =>
+                item.TryGetProperty("relativePath", out JsonElement path)
+                && path.ValueKind == JsonValueKind.String
+                && path.GetString() is string relativePath
+                && relativePath.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(item => item.GetProperty("id").GetString())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal),
+    ];
+
     public static string SnapshotId(ScriptedChatInvocation invocation) =>
         invocation.FindStructuredResult("snapshotId")
             .GetProperty("snapshotId")
@@ -485,6 +557,97 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
         return turns;
     }
 
+    public static IReadOnlyList<Func<ScriptedChatInvocation, ChatMessage>> MultiC3AnalysisTurns(
+        string summary) =>
+    [
+        invocation =>
+        {
+            EnsureTool(invocation, "inspect_repository");
+            return ToolCalls(
+                Call(
+                    "inspect-1",
+                    "inspect_repository",
+                    new Dictionary<string, object?>
+                    {
+                        ["repositoryPath"] = ".",
+                    }));
+        },
+        invocation =>
+        {
+            string snapshotId = SnapshotId(invocation);
+            EnsureTool(invocation, "get_evidence");
+            EnsureTool(invocation, "get_snapshot");
+
+            return ToolCalls(
+                Call(
+                    "evidence-1",
+                    "get_evidence",
+                    new Dictionary<string, object?>
+                    {
+                        ["snapshotId"] = snapshotId,
+                        ["pageSize"] = 100,
+                    }),
+                Call(
+                    "files-1",
+                    "get_snapshot",
+                    new Dictionary<string, object?>
+                    {
+                        ["snapshotId"] = snapshotId,
+                        ["section"] = "files",
+                        ["pageSize"] = 100,
+                    }),
+                Call(
+                    "diagnostics-1",
+                    "get_snapshot",
+                    new Dictionary<string, object?>
+                    {
+                        ["snapshotId"] = snapshotId,
+                        ["section"] = "diagnostics",
+                        ["pageSize"] = 100,
+                    }));
+        },
+        invocation =>
+        {
+            string snapshotId = invocation.FindStructuredResult("repositoryId")
+                .GetProperty("snapshotId")
+                .GetString()
+                ?? throw new InvalidOperationException("Snapshot ID is unavailable.");
+            JsonElement snapshot = BuildSnapshot(invocation);
+            JsonElement c1 = BuildReviewOnlyModel("C1", snapshot, "Multi C3 fixture");
+            JsonElement c2 = BuildMultiContainerC2(snapshot);
+
+            EnsureTool(invocation, "generate_likec4");
+            return ToolCalls(
+                Call(
+                    "preview-c1",
+                    "generate_likec4",
+                    new Dictionary<string, object?>
+                    {
+                        ["snapshotId"] = snapshotId,
+                        ["model"] = c1,
+                        ["dryRun"] = true,
+                        ["write"] = false,
+                        ["destinationPath"] = null,
+                        ["c3ContainerId"] = null,
+                        ["c3Containers"] = null,
+                    }),
+                Call(
+                    "preview-c2",
+                    "generate_likec4",
+                    new Dictionary<string, object?>
+                    {
+                        ["snapshotId"] = snapshotId,
+                        ["model"] = c2,
+                        ["dryRun"] = true,
+                        ["write"] = false,
+                        ["destinationPath"] = null,
+                        ["c3ContainerId"] = null,
+                        ["c3Containers"] = new[] { "el_beta", "el_alpha" },
+                    }));
+        },
+        _ => Text(summary),
+    ];
+
     public static IReadOnlyList<Func<ScriptedChatInvocation, ChatMessage>> ApprovalTurns() =>
     [
         invocation =>
@@ -541,12 +704,18 @@ internal sealed class DeterministicAgentHarness : IAsyncDisposable
             Queue<bool> outcomes = new(
                 validationResults.SelectMany(outcome => new[] { outcome, outcome }));
             AIFunction validate = AIFunctionFactory.Create(
-                (string snapshotId, JsonElement model, string? destinationPath, string? c3ContainerId) =>
+                (
+                    string snapshotId,
+                    JsonElement model,
+                    string? destinationPath,
+                    string? c3ContainerId,
+                    string[]? c3Containers) =>
                 {
                     _ = snapshotId;
                     _ = model;
                     _ = destinationPath;
                     _ = c3ContainerId;
+                    _ = c3Containers;
 
                     bool isValid = outcomes.Count == 0 || outcomes.Dequeue();
                     return JsonSerializer.SerializeToElement(new
