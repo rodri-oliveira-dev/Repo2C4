@@ -14,7 +14,7 @@
   ],
   "integrations": [
     {
-      "id":"integration-dogfood-ingestion-db",
+      "id":"integration-0000000000000001",
       "projectPath":"src/Ingestion.Persistence/Ingestion.Persistence.csproj",
       "kind":"database","direction":"bidirectional","technology":"postgresql",
       "target":"ingestion_db","resourceType":"database",
@@ -22,7 +22,7 @@
       "confidence":"high","signals":["database:postgresql"]
     },
     {
-      "id":"integration-dogfood-redis",
+      "id":"integration-0000000000000002",
       "projectPath":"src/Ingestion.Api/Ingestion.Api.csproj",
       "kind":"cache","direction":"bidirectional","technology":"redis",
       "target":"ingestion-idempotency","resourceType":"cache",
@@ -30,7 +30,7 @@
       "confidence":"high","signals":["cache:redis"]
     },
     {
-      "id":"integration-dogfood-rabbit-publish",
+      "id":"integration-0000000000000003",
       "projectPath":"src/Ingestion.Outbox.Worker/Ingestion.Outbox.Worker.csproj",
       "kind":"messaging","direction":"publish","technology":"rabbitmq",
       "target":"lab.events.v1","resourceType":"exchange",
@@ -38,7 +38,7 @@
       "confidence":"high","signals":["rabbitmq:publish"]
     },
     {
-      "id":"integration-dogfood-consolidation-db",
+      "id":"integration-0000000000000004",
       "projectPath":"src/Consolidation.Persistence/Consolidation.Persistence.csproj",
       "kind":"database","direction":"bidirectional","technology":"postgresql",
       "target":"consolidation_db","resourceType":"database",
@@ -46,7 +46,7 @@
       "confidence":"high","signals":["database:postgresql"]
     },
     {
-      "id":"integration-dogfood-rabbit-consume",
+      "id":"integration-0000000000000005",
       "projectPath":"src/Consolidation.Worker/Consolidation.Worker.csproj",
       "kind":"messaging","direction":"consume","technology":"rabbitmq",
       "target":"consolidation.value-received.v1","resourceType":"queue",
