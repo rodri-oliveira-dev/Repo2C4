@@ -740,6 +740,7 @@ internal sealed class AgentArchitectureWorkflowOperations(
                         ["destinationPath"] = null,
                         ["c3ContainerId"] = proposal.C3ContainerId,
                         ["c3Containers"] =
+                            proposal.C3ContainerId is not null ||
                             proposal.C3ContainerIds.Count == 0
                                 ? null
                                 : proposal.C3ContainerIds,
@@ -811,6 +812,7 @@ internal sealed class AgentArchitectureWorkflowOperations(
                         ["destinationPath"] = null,
                         ["c3ContainerId"] = proposal.C3ContainerId,
                         ["c3Containers"] =
+                            proposal.C3ContainerId is not null ||
                             proposal.C3ContainerIds.Count == 0
                                 ? null
                                 : proposal.C3ContainerIds,

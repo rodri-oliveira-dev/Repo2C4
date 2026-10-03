@@ -176,8 +176,8 @@ public static class Repo2C4McpCapabilities
             ["get_evidence"] = ["snapshotId"],
             ["get_snapshot"] = ["snapshotId"],
             ["get_evidence_report"] = ["snapshotId", "model"],
-            ["generate_likec4"] = ["snapshotId", "model", "dryRun", "write"],
-            ["validate_likec4"] = ["snapshotId", "model"],
+            ["generate_likec4"] = ["snapshotId", "model", "dryRun", "write", "c3Containers"],
+            ["validate_likec4"] = ["snapshotId", "model", "c3Containers"],
         };
 
     public static IReadOnlyCollection<string> RequiredToolNames => RequiredNames;
@@ -603,7 +603,9 @@ public static class AgentMcpToolPolicy
             safeArguments["destinationPath"] = null;
             safeArguments["c3ContainerId"] = selection.LegacyContainerId;
             safeArguments["c3Containers"] =
-                selection.ContainerIds.Length == 0 ? null : selection.ContainerIds;
+                selection.LegacyContainerId is not null || selection.ContainerIds.Length == 0
+                    ? null
+                    : selection.ContainerIds;
 
             object? result = await base
                 .InvokeCoreAsync(safeArguments, cancellationToken)
@@ -659,7 +661,9 @@ public static class AgentMcpToolPolicy
             safeArguments["destinationPath"] = null;
             safeArguments["c3ContainerId"] = selection.LegacyContainerId;
             safeArguments["c3Containers"] =
-                selection.ContainerIds.Length == 0 ? null : selection.ContainerIds;
+                selection.LegacyContainerId is not null || selection.ContainerIds.Length == 0
+                    ? null
+                    : selection.ContainerIds;
 
             return base.InvokeCoreAsync(safeArguments, cancellationToken);
         }

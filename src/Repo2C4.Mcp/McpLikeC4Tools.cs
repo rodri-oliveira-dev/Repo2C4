@@ -150,8 +150,10 @@ internal sealed class McpLikeC4Tools
                 NormalizeDestinationForResponse(destinationPath),
                 files,
                 changes,
-                plan?.HasConflicts ?? false,
-                emission.Views));
+                plan?.HasConflicts ?? false)
+            {
+                C3Views = emission.Views,
+            });
         }
 
         if (plan is null || outputRoot is null)
@@ -197,8 +199,10 @@ internal sealed class McpLikeC4Tools
             NormalizeDestinationForResponse(destinationPath),
             files,
             [.. plan.Changes.Select(ToMcpChange)],
-            false,
-            emission.Views));
+            false)
+        {
+            C3Views = emission.Views,
+        });
     }
 
     [Description("Return a metadata-only evidence provenance report for a session-bound v1 model.")]
@@ -328,8 +332,10 @@ internal sealed class McpLikeC4Tools
                 result.IsValid,
                 result.ExitCode,
                 result.TimedOut,
-                [.. result.Diagnostics],
-                c3Views));
+                [.. result.Diagnostics])
+            {
+                C3Views = c3Views,
+            });
         }
         finally
         {

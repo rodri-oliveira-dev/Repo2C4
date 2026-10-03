@@ -185,6 +185,7 @@ internal sealed class Repo2C4McpWriteGateway(
                         ["destinationPath"] = approved.DestinationPath,
                         ["c3ContainerId"] = approved.C3ContainerId,
                         ["c3Containers"] =
+                            approved.C3ContainerId is not null ||
                             approved.C3ContainerIds.Count == 0
                                 ? null
                                 : approved.C3ContainerIds,
@@ -319,6 +320,7 @@ internal sealed class Repo2C4McpWriteGateway(
                 ["destinationPath"] = destinationPath,
                 ["c3ContainerId"] = proposal.C3ContainerId,
                 ["c3Containers"] =
+                    proposal.C3ContainerId is not null ||
                     proposal.C3ContainerIds.Count == 0
                         ? null
                         : proposal.C3ContainerIds,

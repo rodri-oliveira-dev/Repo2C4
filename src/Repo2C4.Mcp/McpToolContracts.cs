@@ -92,8 +92,14 @@ public sealed record McpGenerateLikeC4Result(
     string? DestinationPath,
     McpLikeC4File[] Files,
     McpGeneratedFileChange[] Changes,
-    bool HasConflicts,
-    McpC3View[] C3Views);
+    bool HasConflicts)
+{
+    public McpC3View[] C3Views
+    {
+        get;
+        init;
+    } = [];
+}
 
 public sealed record McpValidateLikeC4Result(
     string SnapshotId,
@@ -102,5 +108,11 @@ public sealed record McpValidateLikeC4Result(
     bool IsValid,
     int ExitCode,
     bool TimedOut,
-    Repo2C4.Core.LikeC4.LikeC4ValidationDiagnostic[] Diagnostics,
-    McpC3View[] C3Views);
+    Repo2C4.Core.LikeC4.LikeC4ValidationDiagnostic[] Diagnostics)
+{
+    public McpC3View[] C3Views
+    {
+        get;
+        init;
+    } = [];
+}
