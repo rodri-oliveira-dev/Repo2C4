@@ -81,8 +81,8 @@ O servidor local normal expõe seis tools:
 | `get_evidence` | Pagina evidências v1 de um snapshot. | `snapshotId`, `category` exata opcional, `pathPrefix` opcional de metadados, `pageSize`, `cursor` opaco. | Somente leitura. |
 | `get_snapshot` | Pagina metadados de arquivos ou diagnósticos sem retornar corpos de arquivos. | `snapshotId`, `section` = `files` ou `diagnostics`, `pathPrefix` opcional. | Somente leitura. |
 | `get_evidence_report` | Devolve resumo limitado de proveniência/revisão para um modelo vinculado à sessão. | `snapshotId`, `ArchitectureModel` v1 completo. | Somente leitura. |
-| `generate_likec4` | Gera LikeC4 C1/C2 determinístico e C3 seletivo opcional. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3ContainerId` opcional. | Preview por padrão. Flags explícitas são obrigatórias para escrever. |
-| `validate_likec4` | Valida modelo proposto ou workspace gerado existente pelo adaptador controlado da CLI oficial LikeC4. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3ContainerId` opcional. | Somente leitura. |
+| `generate_likec4` | Gera LikeC4 C1/C2 determinístico e C3 seletivo multi-container opcional. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3Containers` opcional preferencial, `c3ContainerId` opcional legado. | Preview por padrão. Flags explícitas são obrigatórias para escrever. |
+| `validate_likec4` | Valida modelo proposto ou workspace gerado existente pelo adaptador controlado da CLI oficial LikeC4. | `snapshotId`, modelo completo, `destinationPath` opcional, `c3Containers` opcional preferencial, `c3ContainerId` opcional legado. | Somente leitura. |
 
 `inspect_remote_repository` **não** é exposta por padrão. Ela aparece somente quando o host inicia explicitamente o servidor com `--allow-remote-acquisition`.
 
@@ -259,23 +259,23 @@ Arquivos desconhecidos nunca são excluídos. As escritas são preparadas como c
 
 Se o estado mudar entre preview e apply, a escrita falha com `managed_output_conflict`; faça novo preview em vez de forçar.
 
-## C3 seletivo
+## C3 seletivo multi-container
 
-C1/C2 são o padrão. `generate_likec4` e `validate_likec4` em modo de proposta aceitam `c3ContainerId` opcional:
+C1/C2 são o padrão. Para clientes novos, `generate_likec4` e `validate_likec4` em modo de proposta aceitam a coleção tipada `c3Containers`:
 
 ```jsonc
 {
   "snapshotId": "<snapshot-id>",
-  "model": { "...": "ArchitectureModel v1 C1/C2 completo" },
-  "c3ContainerId": "container_api"
+  "model": { "...": "ArchitectureModel v1 C2 completo" },
+  "c3Containers": ["container_api", "container_worker"]
 }
 ```
 
-O ID deve identificar um container C2 existente no modelo informado. Somente esse container é expandido. Outros containers não recebem C3 automaticamente.
+Cada chamada aceita no máximo 8 seleções C3. IDs repetidos são canonicalizados deterministicamente e o workspace também fica limitado a 256 componentes e 512 relações antes da emissão. Todo ID selecionado é validado contra o modelo C2 informado antes do preview ou da escrita gerenciada. ID inválido, seleção que não é container, entrada C1, evidência insuficiente, schema incompatível ou estouro de budget C3 falham de forma controlada em vez de inventar componentes.
 
-O builder C3 deriva candidatos de componentes limitados a partir das evidências associadas aos caminhos do container selecionado. Sinais candidatos/estáticos continuam revisáveis; container inexistente, evidência insuficiente, schema incompatível ou limites C3 falham de forma controlada em vez de inventar componentes.
+Somente os containers solicitados explicitamente são expandidos; o servidor nunca seleciona automaticamente todos os containers C2. Fronteiras de componentes continuam ligadas a evidências e revisáveis. Geração e validação de proposta bem-sucedidas retornam um array limitado `c3Views` com o `containerId` selecionado e o `viewId` determinístico emitido.
 
-Use o mesmo `c3ContainerId` ao validar a proposta gerada com C3.
+O campo singular legado `c3ContainerId` continua aceito e preserva o comportamento anterior de um único container, incluindo o identificador de view `c3`. Clientes multi-container novos devem usar `c3Containers`. Use a mesma seleção ao validar a proposta gerada com C3.
 
 ## Aquisição Git pública opcional
 

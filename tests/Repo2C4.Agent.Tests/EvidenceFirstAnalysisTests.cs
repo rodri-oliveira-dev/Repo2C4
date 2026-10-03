@@ -169,7 +169,7 @@ public sealed class EvidenceFirstAnalysisTests
         Assert.False(generation.Write);
         Assert.Null(generation.DestinationPath);
         Assert.Equal("el_web", generation.C3ContainerId);
-        Assert.Equal(["el_web"], generation.C3ContainerIds);
+        Assert.Empty(generation.C3ContainerIds);
     }
 
     [Fact]
