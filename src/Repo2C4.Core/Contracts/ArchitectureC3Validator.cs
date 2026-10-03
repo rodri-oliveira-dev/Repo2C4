@@ -228,7 +228,6 @@ public static class ArchitectureC3Validator
     }
 }
 
-
 /// <summary>Validates multiple C3 selections against one shared base model and global C3 identity space.</summary>
 public static class ArchitectureC3WorkspaceValidator
 {
@@ -251,10 +250,7 @@ public static class ArchitectureC3WorkspaceValidator
         }
 
         ImmutableArray<ContractError> baseErrors = ContractValidator.ValidateModel(workspace.BaseModel);
-        errors.AddRange(baseErrors.Select(error =>
-            error with
-            {
-                Path = "$.baseModel" + error.Path.TrimStart('
+        errors.AddRange(baseErrors.Select(error => error with { Path = "$.baseModel" + error.Path.TrimStart('$') }));
         if (!baseErrors.IsEmpty)
         {
             return [.. errors];
@@ -269,8 +265,7 @@ public static class ArchitectureC3WorkspaceValidator
             return [.. errors];
         }
 
-        if (!workspace.Selections.IsEmpty &&
-            workspace.BaseModel.Level != ArchitectureLevel.C2)
+        if (!workspace.Selections.IsEmpty && workspace.BaseModel.Level != ArchitectureLevel.C2)
         {
             errors.Add(new ContractError(
                 "c3.baseLevel",
@@ -327,133 +322,7 @@ public static class ArchitectureC3WorkspaceValidator
                     continue;
                 }
 
-                errors.Add(error with
-                {
-                    Path = path + error.Path.TrimStart('$'),
-                });
-            }
-
-            if (selection.Components.IsDefault || selection.Relations.IsDefault)
-            {
-                continue;
-            }
-
-            for (int componentIndex = 0; componentIndex < selection.Components.Length; componentIndex++)
-            {
-                ArchitectureComponent? component = selection.Components[componentIndex];
-                if (component is null || string.IsNullOrWhiteSpace(component.Id))
-                {
-                    continue;
-                }
-
-                if (!componentIds.Add(component.Id))
-                {
-                    errors.Add(new ContractError(
-                        "id.duplicate",
-                        path + ".components[" + componentIndex + "].id",
-                        "C3 component IDs must be unique across all selected containers."));
-                }
-            }
-
-            for (int relationIndex = 0; relationIndex < selection.Relations.Length; relationIndex++)
-            {
-                ArchitectureComponentRelation? relation = selection.Relations[relationIndex];
-                if (relation is null || string.IsNullOrWhiteSpace(relation.Id))
-                {
-                    continue;
-                }
-
-                if (!relationIds.Add(relation.Id))
-                {
-                    errors.Add(new ContractError(
-                        "id.duplicate",
-                        path + ".relations[" + relationIndex + "].id",
-                        "C3 relation IDs must be unique across all selected containers."));
-                }
-            }
-        }
-
-        return [.. errors];
-    }
-}
-),
-            }));
-        if (!baseErrors.IsEmpty)
-        {
-            return [.. errors];
-        }
-
-        if (workspace.Selections.IsDefault)
-        {
-            errors.Add(new ContractError(
-                "collection.missing",
-                "$.selections",
-                "C3 selections must be an initialized collection."));
-            return [.. errors];
-        }
-
-        if (!workspace.Selections.IsEmpty &&
-            workspace.BaseModel.Level != ArchitectureLevel.C2)
-        {
-            errors.Add(new ContractError(
-                "c3.baseLevel",
-                "$.baseModel.level",
-                "C3 requires a C2 base model."));
-        }
-
-        HashSet<string> selectedContainerIds = new(StringComparer.Ordinal);
-        HashSet<string> componentIds = new(StringComparer.Ordinal);
-        HashSet<string> relationIds = new(StringComparer.Ordinal);
-
-        for (int i = 0; i < workspace.Selections.Length; i++)
-        {
-            ArchitectureC3Selection? selection = workspace.Selections[i];
-            string path = "$.selections[" + i + "]";
-
-            if (selection is null)
-            {
-                errors.Add(new ContractError(
-                    "c3.selectionMissing",
-                    path,
-                    "C3 selection must not be null."));
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(selection.SelectedContainerId))
-            {
-                errors.Add(new ContractError(
-                    "c3.containerMissing",
-                    path + ".selectedContainerId",
-                    "Selected C3 container ID is required."));
-            }
-            else if (!selectedContainerIds.Add(selection.SelectedContainerId))
-            {
-                errors.Add(new ContractError(
-                    "c3.selectionDuplicate",
-                    path + ".selectedContainerId",
-                    "A C3 container may appear only once in the canonical workspace."));
-            }
-
-            ArchitectureC3Model model = new(
-                workspace.SchemaVersion,
-                workspace.BaseModel,
-                selection.SelectedContainerId,
-                selection.Components,
-                selection.Relations);
-
-            foreach (ContractError error in ArchitectureC3Validator.Validate(model))
-            {
-                if (error.Path.StartsWith("$.baseModel", StringComparison.Ordinal) ||
-                    error.Code == "schema.unsupported" ||
-                    error.Code == "c3.baseLevel")
-                {
-                    continue;
-                }
-
-                errors.Add(error with
-                {
-                    Path = path + error.Path.TrimStart('$'),
-                });
+                errors.Add(error with { Path = path + error.Path.TrimStart('$') });
             }
 
             if (selection.Components.IsDefault || selection.Relations.IsDefault)
