@@ -111,10 +111,16 @@ public sealed class SemanticC3FactExtractorTests
         fixture.Add("Data.cs", """
             namespace Demo;
 
-            public sealed class DemoDbContext(DbContextOptions<DemoDbContext> options)
+            public sealed class DemoDbContext(
+                DbContextOptions<DemoDbContext> options,
+                IClock clock)
                 : DbContext(options)
             {
                 public static void Save() { }
+            }
+
+            public interface IClock
+            {
             }
             """);
 
@@ -133,6 +139,12 @@ public sealed class SemanticC3FactExtractorTests
                 "M:Demo.DemoDbContext.#ctor(",
                 StringComparison.Ordinal) &&
             fact.RelatedSymbolId == "T:DbContextOptions<DemoDbContext>:0");
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.ConstructorInjection &&
+            fact.SourceSymbol.SymbolId.StartsWith(
+                "M:Demo.DemoDbContext.#ctor(",
+                StringComparison.Ordinal) &&
+            fact.RelatedSymbolId == "T:IClock:1");
     }
 
     [Fact]
