@@ -212,6 +212,182 @@ public sealed class CliHostTests
     }
 
     [Fact]
+    public void GenerateRepeatedC3ContainerOptionsCreateOneCanonicalMultiViewWorkspace()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "multi-c3.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        int exitCode = Run([
+            "generate",
+            "--model", model,
+            "--output", outputDirectory,
+            "--c3-container", "el_delta",
+            "--c3-container", "el_alpha",
+            "--c3-container", "el_beta",
+            "--c3-container", "el_alpha",
+            "--apply",
+        ]);
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        string generatedModel = File.ReadAllText(Path.Combine(outputDirectory, "model.c4"));
+        Assert.Equal(3, generatedModel.Split(" = component ", StringSplitOptions.None).Length - 1);
+
+        string views = File.ReadAllText(Path.Combine(outputDirectory, "c3.views.c4"));
+        Assert.Contains("view c3_el_alpha {", views, StringComparison.Ordinal);
+        Assert.Contains("view c3_el_beta {", views, StringComparison.Ordinal);
+        Assert.Contains("view c3_el_delta {", views, StringComparison.Ordinal);
+        Assert.DoesNotContain("c3_el_gamma", views, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GenerateMultiC3IsDeterministicAcrossArgumentOrderAndDuplicates()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "multi-c3.c2.v1.json");
+        using TempDirectory first = new();
+        using TempDirectory second = new();
+        string firstOutput = Path.Combine(first.Path, "likec4");
+        string secondOutput = Path.Combine(second.Path, "likec4");
+
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run([
+                "generate", "--model", model, "--output", firstOutput,
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_beta",
+                "--c3-container", "el_gamma",
+                "--apply",
+            ]));
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run([
+                "generate", "--model", model, "--output", secondOutput,
+                "--c3-container", "el_gamma",
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_beta",
+                "--apply",
+            ]));
+
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(firstOutput, "model.c4")),
+            File.ReadAllText(Path.Combine(secondOutput, "model.c4")));
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(firstOutput, "c3.views.c4")),
+            File.ReadAllText(Path.Combine(secondOutput, "c3.views.c4")));
+    }
+
+    [Theory]
+    [InlineData("el_missing")]
+    [InlineData("el_suite")]
+    [InlineData("el_user")]
+    public void GenerateInvalidC3SelectionFailsBeforeWriting(string selection)
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "multi-c3.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        int exitCode = Run([
+            "generate",
+            "--model", model,
+            "--output", outputDirectory,
+            "--c3-container", selection,
+            "--apply",
+        ]);
+
+        Assert.Equal(CliExitCodes.InvalidData, exitCode);
+        Assert.False(Directory.Exists(outputDirectory));
+    }
+
+    [Fact]
+    public void GenerateRejectsC3SelectionForC1BeforeWriting()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "EndToEnd", "architecture.c1.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        int exitCode = Run([
+            "generate",
+            "--model", model,
+            "--output", outputDirectory,
+            "--c3-container", "el_library_repo",
+            "--apply",
+        ]);
+
+        Assert.Equal(CliExitCodes.InvalidData, exitCode);
+        Assert.False(Directory.Exists(outputDirectory));
+    }
+
+    [Fact]
+    public void ManagedRegenerationUpdatesSelectionButProtectsManualMultiC3Edits()
+    {
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "multi-c3.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run([
+                "generate", "--model", model, "--output", outputDirectory,
+                "--c3-container", "el_alpha",
+                "--apply",
+            ]));
+
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run([
+                "generate", "--model", model, "--output", outputDirectory,
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_beta",
+                "--apply",
+            ]));
+
+        string c3Views = Path.Combine(outputDirectory, "c3.views.c4");
+        Assert.Contains("c3_el_beta", File.ReadAllText(c3Views), StringComparison.Ordinal);
+
+        File.AppendAllText(c3Views, "// manual multi-c3 edit");
+        int conflict = Run([
+            "generate", "--model", model, "--output", outputDirectory,
+            "--c3-container", "el_alpha",
+            "--apply",
+        ]);
+
+        Assert.Equal(CliExitCodes.IoError, conflict);
+        Assert.EndsWith(
+            "// manual multi-c3 edit",
+            File.ReadAllText(c3Views),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MultiC3GenerateAndValidateUsesOfficialLikeC4WhenIntegrationIsEnabled()
+    {
+        if (!string.Equals(
+            Environment.GetEnvironmentVariable("REPO2C4_LIKEC4_INTEGRATION"),
+            "1",
+            StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        string model = Path.Combine(AppContext.BaseDirectory, "Models", "multi-c3.c2.v1.json");
+        using TempDirectory temp = new();
+        string outputDirectory = Path.Combine(temp.Path, "likec4");
+
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run([
+                "generate", "--model", model, "--output", outputDirectory,
+                "--c3-container", "el_alpha",
+                "--c3-container", "el_beta",
+                "--apply",
+            ]));
+        Assert.Equal(
+            CliExitCodes.Success,
+            Run(["validate", "--output", outputDirectory]));
+    }
+
+    [Fact]
     public void GenerateInvalidModelUsesDistinctInvalidDataExitCode()
     {
         using TempDirectory temp = new();
