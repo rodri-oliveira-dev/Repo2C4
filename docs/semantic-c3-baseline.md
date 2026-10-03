@@ -59,3 +59,12 @@ boundaries remain reviewable, and no unsupported component is fabricated.
 This baseline deliberately does not implement semantic detection. It records
 the starting point so issues #63-#69 can prove material improvement against a
 stable reference.
+
+
+## Phase 9 result
+
+Phase 9 now dogfoods a reduced offline golden derived from `rodri-oliveira-dev/dotnet-observability-lab` main commit `66b1dc7c789c96c521d08d7012155cf309f3d3f2`.
+
+The acceptance path exercises persisted inspection facts, reviewed C2, four selected containers, responsibility-level Semantic C3, internal relations, reviewed PostgreSQL/Redis/RabbitMQ peers, deterministic managed regeneration and official LikeC4 validation. It also asserts that utility/telemetry types are not promoted and that `Consolidation.Worker` does not acquire a Redis edge merely because Redis exists elsewhere in the environment.
+
+This is materially more informative than the frozen v1.1.0 `HTTP interface / Integration adapter / Application dependency` grouping while remaining bounded and review-first. See [Semantic C3](semantic-c3.md).
