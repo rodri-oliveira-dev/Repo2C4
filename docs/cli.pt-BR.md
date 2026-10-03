@@ -42,12 +42,14 @@ repo2c4 generate --model architecture.json --output DIR
 
 A entrada deve ser um `ArchitectureModel` v1 válido, proposto ou revisado por uma pessoa. O comando não infere um modelo C4 a partir do snapshot.
 
-São produzidos quatro arquivos dentro do diretório escolhido:
+A geração base C1/C2 produz:
 
 - `specification.c4`
 - `model.c4`
 - `views.c4`
 - `evidence-report.md`
+
+Quando C3 é selecionado, `c3.views.c4` é adicionado. Quando o snapshot do modelo contém fatos Semantic C3 persistidos, a geração também adiciona `semantic-c3-evidence-report.md`.
 
 A geração é somente preview por padrão. O Repo2C4 informa `added`, `modified`, `unchanged` ou `conflict` para cada saída gerenciada e não altera o filesystem.
 
@@ -70,6 +72,8 @@ repo2c4 generate \
   --c3-container el_web \
   --c3-container el_worker
 ```
+
+Quando o snapshot inspecionado contém `semanticC3Facts`, os containers selecionados usam os classificadores Semantic C3 em vez do agrupamento genérico legado. Nome de classe sozinho não é promovido: candidatos HTTP/application/worker/mensageria/persistence/integração exigem proveniência estrutural. Snapshots antigos sem fatos semânticos mantêm o fallback C3 genérico. Veja [Semantic C3](semantic-c3.pt-BR.md).
 
 Uma única ocorrência de `--c3-container` permanece compatível com o comportamento anterior. Com múltiplas seleções, o Repo2C4 constrói um único workspace canônico sobre o mesmo modelo/snapshot C2, aninha cada conjunto de componentes no seu container em um único `model.c4` e grava um único `c3.views.c4` com uma view C3 determinística por container selecionado. A ordem dos argumentos não altera a saída e IDs repetidos são deduplicados.
 
