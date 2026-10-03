@@ -938,15 +938,44 @@ public static class SemanticC3FactExtractor
 
     private static string[] SplitTypeList(string value) =>
         [.. SplitCommaSeparated(value)
-            .Select(item => NormalizeTypeToken(item))
+            .Select(NormalizeBaseTypeToken)
             .Where(item => item.Length > 0)
             .Take(MaxBaseTypesPerType)];
+
+    private static string NormalizeBaseTypeToken(string value)
+    {
+        int angle = 0;
+        int square = 0;
+        for (int index = 0; index < value.Length; index++)
+        {
+            switch (value[index])
+            {
+                case '<':
+                    angle++;
+                    break;
+                case '>':
+                    angle = Math.Max(0, angle - 1);
+                    break;
+                case '[':
+                    square++;
+                    break;
+                case ']':
+                    square = Math.Max(0, square - 1);
+                    break;
+                case '(' when angle == 0 && square == 0:
+                    return NormalizeTypeToken(value[..index]);
+            }
+        }
+
+        return NormalizeTypeToken(value);
+    }
 
     private static IEnumerable<string> SplitCommaSeparated(string value)
     {
         int start = 0;
         int angle = 0;
         int square = 0;
+        int round = 0;
 
         for (int i = 0; i < value.Length; i++)
         {
@@ -964,7 +993,13 @@ public static class SemanticC3FactExtractor
                 case ']':
                     square = Math.Max(0, square - 1);
                     break;
-                case ',' when angle == 0 && square == 0:
+                case '(':
+                    round++;
+                    break;
+                case ')':
+                    round = Math.Max(0, round - 1);
+                    break;
+                case ',' when angle == 0 && square == 0 && round == 0:
                     yield return value[start..i];
                     start = i + 1;
                     break;
