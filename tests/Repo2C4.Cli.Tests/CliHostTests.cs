@@ -59,6 +59,70 @@ public sealed class CliHostTests
     }
 
     [Fact]
+    public void SnapshotBudgetTruncatesSemanticFactsToRemainConsumableByCli()
+    {
+        const string projectPath = "src/App/App.csproj";
+        const string sourcePath = "src/App/Service.cs";
+        SemanticC3Fact[] facts =
+        [
+            .. Enumerable.Range(0, 5_000).Select(index =>
+            {
+                string symbolId = "M:Demo.Service.Method" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "()";
+                SemanticC3SourceSymbolIdentity symbol = new(
+                    StableIds.ForSemanticC3SourceSymbol(projectPath, symbolId),
+                    projectPath,
+                    symbolId);
+                return new SemanticC3Fact(
+                    StableIds.ForSemanticC3Fact(
+                        projectPath,
+                        sourcePath,
+                        symbolId,
+                        SemanticC3FactKind.MethodDeclaration,
+                        "semantic.test",
+                        string.Empty),
+                    projectPath,
+                    sourcePath,
+                    1,
+                    symbol,
+                    SemanticC3FactKind.MethodDeclaration,
+                    "semantic.test",
+                    new string('x', 512),
+                    null);
+            }),
+        ];
+        RepositorySnapshot snapshot = new(
+            ContractSchema.Version,
+            "repo_budget",
+            [
+                new RepositoryFile(projectPath, 100, null),
+                new RepositoryFile(sourcePath, 100, null),
+            ],
+            [],
+            [])
+        {
+            SemanticC3Facts = new SemanticC3FactSet(
+                SemanticC3ContractSchema.Version,
+                [.. facts],
+                []),
+        };
+
+        Assert.True(
+            System.Text.Encoding.UTF8.GetByteCount(ContractJson.SerializeSnapshot(snapshot) + "\n")
+            > CliApplication.MaxModelBytes);
+
+        RepositorySnapshot bounded = CliApplication.FitSnapshotToCliInputBudget(snapshot);
+        string json = ContractJson.SerializeSnapshot(bounded) + "\n";
+
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= CliApplication.MaxModelBytes);
+        Assert.NotNull(bounded.SemanticC3Facts);
+        Assert.True(bounded.SemanticC3Facts.Facts.Length < facts.Length);
+        Assert.Contains(
+            bounded.SemanticC3Facts.Diagnostics,
+            diagnostic => diagnostic.Code == "semanticC3.snapshotByteLimit");
+        Assert.Equal(json.TrimEnd('\n'), ContractJson.SerializeSnapshot(ContractJson.DeserializeSnapshot(json)));
+    }
+
+    [Fact]
     public void InspectImportsExternalEvidenceAndKeepsOutputPathOnStdout()
     {
         using TempDirectory temp = new();

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Repo2C4.Core.Contracts;
+using Repo2C4.Core.ExternalIntegrations;
 using Xunit;
 
 namespace Repo2C4.Core.Tests;
@@ -77,6 +78,48 @@ public sealed class ContractTests
         };
 
         AssertHasError(ContractValidator.ValidateSnapshot(snapshot), "id.duplicate");
+        Assert.Throws<ContractValidationException>(() => ContractJson.SerializeSnapshot(snapshot));
+    }
+
+    [Fact]
+    public void DuplicateRepositoryEvidenceWithExternalEvidenceReturnsStructuredValidationErrors()
+    {
+        RepositorySnapshot snapshot = CreateSnapshot();
+        Evidence persisted = snapshot.Evidence[1];
+        ExternalIntegrationEvidence external = new(
+            persisted.Id,
+            persisted.Category,
+            persisted.Description,
+            null,
+            "src/App/App.csproj",
+            ExternalIntegrationKind.Http,
+            ExternalIntegrationDirection.Outbound,
+            "HTTP",
+            null,
+            null,
+            null,
+            null,
+            persisted.RelativePath,
+            persisted.Line ?? 1,
+            ExternalIntegrationConfidence.High,
+            ["test"]);
+
+        snapshot = snapshot with
+        {
+            Evidence = [snapshot.Evidence[0], persisted, persisted],
+            ExternalIntegrationEvidence = new ExternalIntegrationEvidenceResult(
+                "1.6",
+                null,
+                null,
+                true,
+                false,
+                [external],
+                []),
+        };
+
+        ImmutableArray<ContractError> errors = ContractValidator.ValidateSnapshot(snapshot);
+
+        AssertHasError(errors, "id.duplicate");
         Assert.Throws<ContractValidationException>(() => ContractJson.SerializeSnapshot(snapshot));
     }
 

@@ -446,9 +446,14 @@ public static class ContractValidator
             Add(errors, "external.findings.limit", path + ".evidence", "Persisted external integration evidence exceeds the bounded limit.");
         }
 
-        Dictionary<string, Evidence> evidenceById = repositoryEvidence
-            .Where(item => item is not null)
-            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        Dictionary<string, Evidence> evidenceById = new(StringComparer.Ordinal);
+        foreach (Evidence? item in repositoryEvidence)
+        {
+            if (item is not null && !string.IsNullOrWhiteSpace(item.Id))
+            {
+                _ = evidenceById.TryAdd(item.Id, item);
+            }
+        }
         HashSet<string> ids = new(StringComparer.Ordinal);
 
         for (int index = 0; index < result.Evidence.Length; index++)

@@ -25,7 +25,7 @@ public static class CliExitCodes
 
 internal static class CliApplication
 {
-    private const long MaxModelBytes = 4L * 1024 * 1024;
+    internal const long MaxModelBytes = 4L * 1024 * 1024;
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
 
     public static async Task<int> RunAsync(
@@ -494,9 +494,114 @@ internal static class CliApplication
         RepositorySnapshot snapshot,
         CancellationToken cancellationToken)
     {
-        string json = NormalizeText(ContractJson.SerializeSnapshot(snapshot));
+        RepositorySnapshot boundedSnapshot = FitSnapshotToCliInputBudget(snapshot);
+        string json = NormalizeText(ContractJson.SerializeSnapshot(boundedSnapshot));
         await WriteTextFileAsync(output, json, overwrite: false, cancellationToken).ConfigureAwait(false);
     }
+
+    internal static RepositorySnapshot FitSnapshotToCliInputBudget(RepositorySnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (GetSerializedSnapshotByteCount(snapshot) <= MaxModelBytes)
+        {
+            return snapshot;
+        }
+
+        SemanticC3FactSet? semanticFacts = snapshot.SemanticC3Facts;
+        if (semanticFacts is null || semanticFacts.Facts.IsEmpty)
+        {
+            throw SnapshotTooLarge();
+        }
+
+        RepositoryDiagnostic limitDiagnostic = new(
+            "semanticC3.snapshotByteLimit",
+            DiagnosticSeverity.Warning,
+            null,
+            "Semantic C3 facts were truncated so the persisted snapshot remains within the 4 MiB CLI input budget.");
+        RepositoryDiagnostic[] semanticDiagnostics =
+        [
+            .. semanticFacts.Diagnostics
+                .Append(limitDiagnostic)
+                .Distinct()
+                .OrderBy(item => item.Code, StringComparer.Ordinal)
+                .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
+                .ThenBy(item => item.Message, StringComparer.Ordinal),
+        ];
+        SemanticC3Fact[] orderedFacts =
+        [
+            .. semanticFacts.Facts.OrderBy(item => item.Id, StringComparer.Ordinal),
+        ];
+
+        int low = 0;
+        int high = orderedFacts.Length;
+        int bestCount = -1;
+        while (low <= high)
+        {
+            int count = low + ((high - low) / 2);
+            RepositorySnapshot candidate = snapshot with
+            {
+                SemanticC3Facts = semanticFacts with
+                {
+                    Facts = [.. orderedFacts.Take(count)],
+                    Diagnostics = [.. semanticDiagnostics],
+                },
+            };
+
+            if (GetSerializedSnapshotByteCount(candidate) <= MaxModelBytes)
+            {
+                bestCount = count;
+                low = count + 1;
+            }
+            else
+            {
+                high = count - 1;
+            }
+        }
+
+        if (bestCount >= 0)
+        {
+            return snapshot with
+            {
+                SemanticC3Facts = semanticFacts with
+                {
+                    Facts = [.. orderedFacts.Take(bestCount)],
+                    Diagnostics = [.. semanticDiagnostics],
+                },
+            };
+        }
+
+        RepositorySnapshot withoutSemanticFacts = snapshot with
+        {
+            SemanticC3Facts = null,
+            Diagnostics =
+            [
+                .. snapshot.Diagnostics
+                    .Append(limitDiagnostic)
+                    .Distinct()
+                    .OrderBy(item => item.Code, StringComparer.Ordinal)
+                    .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
+                    .ThenBy(item => item.Message, StringComparer.Ordinal),
+            ],
+        };
+        if (GetSerializedSnapshotByteCount(withoutSemanticFacts) <= MaxModelBytes)
+        {
+            return withoutSemanticFacts;
+        }
+
+        throw SnapshotTooLarge();
+    }
+
+    private static int GetSerializedSnapshotByteCount(RepositorySnapshot snapshot) =>
+        Encoding.UTF8.GetByteCount(NormalizeText(ContractJson.SerializeSnapshot(snapshot)));
+
+    private static ContractValidationException SnapshotTooLarge() =>
+        new(
+        [
+            new ContractError(
+                "snapshot.size",
+                "$",
+                "Snapshot exceeds the 4 MiB CLI input limit even after bounded Semantic C3 facts are omitted."),
+        ]);
 
     private static async Task<int> RunGenerateAsync(
         string[] args,
