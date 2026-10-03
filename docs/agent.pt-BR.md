@@ -181,9 +181,9 @@ Os status públicos são `completed`, `requires_review`, `validation_failed`, `c
 
 Um workspace LikeC4 válido **não** prova que as afirmações arquiteturais são verdadeiras. Qualidade da evidência e estado de revisão continuam visíveis.
 
-## C3 seletivo com o Agent
+## C3 seletivo multi-container com o Agent
 
-C1/C2 continuam sendo o padrão. Para solicitar C3, primeiro identifique o ID exato de um container já existente na proposta C2 revisada e autorize somente esse container na execução:
+C1/C2 continuam sendo o padrão. Repita `--c3-container` para autorizar um conjunto limitado de possíveis alvos C3 na execução:
 
 ```bash
 repo2c4-agent \
@@ -191,10 +191,13 @@ repo2c4-agent \
   --model SEU_MODELO_LOCAL \
   --repository-root "/caminho/absoluto/do/repositorio" \
   --c3-container "container_api" \
-  --goal "Documente C1/C2 e, somente com evidência suficiente, proponha C3 para container_api."
+  --c3-container "container_worker" \
+  --goal "Documente C1/C2 e proponha C3 somente para containers relevantes sustentados por evidência."
 ```
 
-O valor deve ser o ID arquitetural/do modelo do container C2, não um nome de projeto inferido do repositório. O host fixa essa seleção: conteúdo do repositório e o modelo não podem trocar o C3 para outro container. Se o container não existir na proposta C2 ou a evidência for insuficiente, o C3 é omitido em vez de inventado.
+Podem ser autorizados no máximo 8 IDs. Esses valores formam uma allow-list; eles não instruem o Agent a expandir todos. O Agent deve solicitar explicitamente apenas o subconjunto relevante ao objetivo e sustentado pelas evidências C2 revisadas. O host intersecta a solicitação com a allow-list, portanto conteúdo do repositório ou saída do modelo não conseguem escalar C3 para outro alvo. Fronteiras ambíguas ou sem suporte permanecem `requiresReview` ou são omitidas.
+
+Uma única ocorrência de `--c3-container` preserva o comportamento anterior. Em propostas multi-container, os IDs efetivamente selecionados são preservados no dry-run, validação, tentativas de correção e plano HITL específico do destino. O prompt de aprovação mostra os containers C3 selecionados antes de qualquer escrita protegida.
 
 ## Aprovação humana e escrita
 
@@ -228,6 +231,7 @@ Defaults seguros são configuráveis somente dentro de faixas limitadas:
 | Tool calls | `--max-tool-calls` | 40 | 1–100 |
 | Iterações do workflow | `--max-workflow-iterations` | 3 | 1–3 |
 | Tentativas de validação | `--max-validation-attempts` | 2 | 1–3 |
+| Containers C3 autorizados | `--c3-container` repetido | 0 | 0–8 |
 | Páginas de evidência | `--max-evidence-pages` | 20 | 1–50 |
 | Resposta acumulada | `--max-response-chars` | 32000 | 1024–100000 |
 | Contexto acumulado | `--max-context-chars` | 64000 | 4096–200000 |

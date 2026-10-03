@@ -331,9 +331,9 @@ CLI help is written to stdout. MCP help and diagnostics are written **only to st
 
 
 
-### Selective C3
+### Selective multi-container C3
 
-C1/C2 generation remains the default. To derive a reviewable C3 proposal for exactly one existing C2 container, pass `--c3-container <container-id>` to the CLI or `c3ContainerId` to `generate_likec4` over MCP. The generated component boundaries are evidence-linked, bounded, and kept under review when repository-static signals cannot prove runtime behavior. Other containers are not expanded automatically.
+C1/C2 generation remains the default. The CLI accepts repeated `--c3-container <container-id>`; MCP clients should use the bounded `c3Containers` collection (with legacy `c3ContainerId` preserved for one container); and the Agent accepts repeated `--c3-container` values as an authorization set from which it must choose only evidence-supported targets. Generated component boundaries are evidence-linked, deterministic and reviewable. Unselected or unsupported containers are never expanded automatically.
 
 
 ### Managed regeneration

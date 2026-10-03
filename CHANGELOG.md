@@ -5,6 +5,7 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### Added
+- Bounded Semantic C3 multi-container support across MCP and Agent: typed `c3Containers` with legacy singular compatibility, deterministic `c3Views` reporting, pre-write ID/budget validation, repeated Agent authorization with evidence-supported subset selection, and exact C3 selection preserved through preview, validation and HITL write approval.
 - Repeatable CLI `--c3-container` selection backed by one canonical multi-container C3 workspace, deterministic per-container LikeC4 views, duplicate-ID normalization, pre-write validation, and managed-output compatibility while preserving the single-container behavior.
 - Bounded Semantic C3 internal/external relation composition with explicit wiring+invocation confidence policy, deterministic edge deduplication, weak-cycle/cross-container safeguards, existing C1/C2 peer reuse, and a signal/missing-signal evidence report.
 - Reviewable Semantic C3 worker/messaging/persistence proposals that merge hosted-service evidence, distinguish supported publish/consume adapters through Integration Evidence, require observed use before promoting repository-shaped persistence, reuse existing C1/C2 external peers, and keep weak/unlinked evidence conservative.
