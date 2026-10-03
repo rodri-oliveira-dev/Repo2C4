@@ -250,7 +250,10 @@ public static class ArchitectureC3WorkspaceValidator
         }
 
         ImmutableArray<ContractError> baseErrors = ContractValidator.ValidateModel(workspace.BaseModel);
-        errors.AddRange(baseErrors.Select(error => error with { Path = "$.baseModel" + error.Path.TrimStart('$') }));
+        errors.AddRange(baseErrors.Select(error => error with
+        {
+            Path = "$.baseModel" + error.Path.TrimStart((char)36),
+        }));
         if (!baseErrors.IsEmpty)
         {
             return [.. errors];
@@ -265,7 +268,8 @@ public static class ArchitectureC3WorkspaceValidator
             return [.. errors];
         }
 
-        if (!workspace.Selections.IsEmpty && workspace.BaseModel.Level != ArchitectureLevel.C2)
+        if (!workspace.Selections.IsEmpty &&
+            workspace.BaseModel.Level != ArchitectureLevel.C2)
         {
             errors.Add(new ContractError(
                 "c3.baseLevel",
@@ -324,53 +328,7 @@ public static class ArchitectureC3WorkspaceValidator
 
                 errors.Add(error with
                 {
-                    Path = path + error.Path.TrimStart('
-            }
-
-            if (selection.Components.IsDefault || selection.Relations.IsDefault)
-            {
-                continue;
-            }
-
-            for (int componentIndex = 0; componentIndex < selection.Components.Length; componentIndex++)
-            {
-                ArchitectureComponent? component = selection.Components[componentIndex];
-                if (component is null || string.IsNullOrWhiteSpace(component.Id))
-                {
-                    continue;
-                }
-
-                if (!componentIds.Add(component.Id))
-                {
-                    errors.Add(new ContractError(
-                        "id.duplicate",
-                        path + ".components[" + componentIndex + "].id",
-                        "C3 component IDs must be unique across all selected containers."));
-                }
-            }
-
-            for (int relationIndex = 0; relationIndex < selection.Relations.Length; relationIndex++)
-            {
-                ArchitectureComponentRelation? relation = selection.Relations[relationIndex];
-                if (relation is null || string.IsNullOrWhiteSpace(relation.Id))
-                {
-                    continue;
-                }
-
-                if (!relationIds.Add(relation.Id))
-                {
-                    errors.Add(new ContractError(
-                        "id.duplicate",
-                        path + ".relations[" + relationIndex + "].id",
-                        "C3 relation IDs must be unique across all selected containers."));
-                }
-            }
-        }
-
-        return [.. errors];
-    }
-}
-),
+                    Path = path + error.Path.TrimStart((char)36),
                 });
             }
 
