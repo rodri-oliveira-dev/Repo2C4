@@ -100,14 +100,17 @@ public static class SemanticC3RelationBuilder
                     break;
 
                 case SemanticC3FactKind.ConstructorInjection:
+                    DependencyResolution constructorDestination = ResolveDependency(
+                        fact.RelatedSymbolId,
+                        componentIndex,
+                        registrations,
+                        interfaces);
                     AddWiringSignal(
                         fact,
-                        componentIndex.FindByMethodOwner(fact.SourceSymbol),
-                        ResolveDependency(
-                            fact.RelatedSymbolId,
-                            componentIndex,
-                            registrations,
-                            interfaces),
+                        componentIndex.FindByMethodOwner(
+                            fact.SourceSymbol,
+                            constructorDestination.Component?.Category),
+                        constructorDestination,
                         signals);
                     break;
 
@@ -143,14 +146,16 @@ public static class SemanticC3RelationBuilder
                     break;
 
                 case SemanticC3FactKind.SymbolInvocation:
+                    SemanticC3ComponentCandidate? invocationDestination =
+                        ResolveInvocationDestination(fact.RelatedSymbolId, componentIndex);
                     SemanticC3ComponentCandidate? invocationSource =
                         handlerIndex.MethodOwners.TryGetValue(
                             fact.SourceSymbol.Id,
                             out HandlerOwner? invocationHandler)
                             ? invocationHandler.Component
-                            : componentIndex.FindByMethodOwner(fact.SourceSymbol);
-                    SemanticC3ComponentCandidate? invocationDestination =
-                        ResolveInvocationDestination(fact.RelatedSymbolId, componentIndex);
+                            : componentIndex.FindByMethodOwner(
+                                fact.SourceSymbol,
+                                invocationDestination?.Category);
                     AddInvocationSignal(
                         fact,
                         invocationSource,
@@ -1024,7 +1029,8 @@ public static class SemanticC3RelationBuilder
         }
 
         public SemanticC3ComponentCandidate? FindByMethodOwner(
-            SemanticC3SourceSymbolIdentity methodSymbol)
+            SemanticC3SourceSymbolIdentity methodSymbol,
+            SemanticC3ComponentCategory? destinationCategory = null)
         {
             string? declaringType = DeclaringTypeId(methodSymbol.SymbolId);
             if (declaringType is null)
@@ -1038,7 +1044,22 @@ public static class SemanticC3RelationBuilder
                     component.SourceSymbol?.ProjectPath == methodSymbol.ProjectPath &&
                     component.SourceSymbol.SymbolId == declaringType),
             ];
-            return matches.Length == 1 ? matches[0] : null;
+            if (matches.Length == 1)
+            {
+                return matches[0];
+            }
+
+            if (destinationCategory is null)
+            {
+                return null;
+            }
+
+            SemanticC3ComponentCandidate[] supported =
+            [
+                .. matches.Where(component =>
+                    IsSupportedPair(component.Category, destinationCategory.Value)),
+            ];
+            return supported.Length == 1 ? supported[0] : null;
         }
 
         public SemanticC3ComponentCandidate? FindByTypeName(string typeName)

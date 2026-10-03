@@ -221,6 +221,11 @@ public static class ArchitectureC3Builder
             selectedContainerId,
             factSet,
             integrations);
+        SemanticC3Proposal backgroundApplication =
+            SemanticC3BackgroundApplicationProposer.Propose(
+                baseModel,
+                selectedContainerId,
+                factSet);
         SemanticC3Proposal adapters = SemanticC3IntegrationProposer.Propose(
             baseModel,
             selectedContainerId,
@@ -231,6 +236,7 @@ public static class ArchitectureC3Builder
             selectedContainerId,
             http,
             workers,
+            backgroundApplication,
             adapters);
 
         return SemanticC3RelationBuilder.Build(
