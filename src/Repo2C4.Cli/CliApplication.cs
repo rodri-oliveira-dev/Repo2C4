@@ -509,8 +509,13 @@ internal static class CliApplication
                 "--c3-container",
                 out string[] remainingArgs,
                 out string[] selectedContainers,
-                out string? repeatedOptionError) ||
-            !TryParseOptions(
+                out string? repeatedOptionError))
+        {
+            standardError.WriteLine(repeatedOptionError);
+            return CliExitCodes.UsageError;
+        }
+
+        if (!TryParseOptions(
                 remainingArgs,
                 ["--model", "--output"],
                 ["--apply"],
@@ -518,7 +523,7 @@ internal static class CliApplication
                 out HashSet<string> flags,
                 out string? parseError))
         {
-            standardError.WriteLine(repeatedOptionError ?? parseError);
+            standardError.WriteLine(parseError);
             return CliExitCodes.UsageError;
         }
 
