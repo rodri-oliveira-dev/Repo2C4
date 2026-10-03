@@ -10,6 +10,9 @@ internal static class McpLimits
     internal const int MaxPageSize = 100;
     internal const int DefaultPageSize = 50;
     internal const int MaxSummaryItems = 20;
+    internal const int MaxC3ContainersPerCall = 8;
+    internal const int MaxC3ComponentsPerCall = 256;
+    internal const int MaxC3RelationsPerCall = 512;
     internal const int MaxResponseBytes = 1_048_576;
     internal const int ProtocolEnvelopeReserveBytes = 4_096;
 }

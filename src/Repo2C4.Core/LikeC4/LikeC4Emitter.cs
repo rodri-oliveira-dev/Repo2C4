@@ -7,6 +7,9 @@ namespace Repo2C4.Core.LikeC4;
 /// <summary>A generated LikeC4 source file kept entirely in memory.</summary>
 public sealed record LikeC4GeneratedFile(string FileName, string Content);
 
+/// <summary>Stable descriptor for one emitted C3 view and its selected C2 container.</summary>
+public sealed record LikeC4C3View(string ContainerId, string ViewId);
+
 /// <summary>Pure, deterministic emission of a validated v1 architecture model into LikeC4 source files.</summary>
 public static class LikeC4Emitter
 {
@@ -128,6 +131,33 @@ public static class LikeC4Emitter
                     selections,
                     references,
                     viewIdentifiers)),
+        ];
+    }
+
+    public static ImmutableArray<LikeC4C3View> DescribeC3Views(
+        ArchitectureC3Workspace workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        ImmutableArray<ContractError> errors =
+            ArchitectureC3WorkspaceValidator.Validate(workspace);
+        if (!errors.IsEmpty)
+        {
+            throw new ContractValidationException(errors);
+        }
+
+        ArchitectureC3Selection[] selections =
+        [
+            .. workspace.Selections
+                .OrderBy(selection => selection.SelectedContainerId, StringComparer.Ordinal),
+        ];
+        Dictionary<string, string> identifiers = BuildC3ViewIdentifiers(selections);
+
+        return
+        [
+            .. selections.Select(selection => new LikeC4C3View(
+                selection.SelectedContainerId,
+                identifiers[selection.SelectedContainerId])),
         ];
     }
 
