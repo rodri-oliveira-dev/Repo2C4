@@ -596,12 +596,12 @@ internal static class CliApplication
 
     private static ContractValidationException SnapshotTooLarge() =>
         new(
-        [
-            new ContractError(
-                "snapshot.size",
-                "$",
-                "Snapshot exceeds the 4 MiB CLI input limit even after bounded Semantic C3 facts are omitted."),
-        ]);
+            [
+                new ContractError(
+                    "snapshot.size",
+                    "$",
+                    "Snapshot exceeds the 4 MiB CLI input limit even after bounded Semantic C3 facts are omitted."),
+            ]);
 
     private static async Task<int> RunGenerateAsync(
         string[] args,

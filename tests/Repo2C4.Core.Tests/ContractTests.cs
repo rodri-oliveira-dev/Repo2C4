@@ -85,11 +85,10 @@ public sealed class ContractTests
     public void DuplicateRepositoryEvidenceWithExternalEvidenceReturnsStructuredValidationErrors()
     {
         RepositorySnapshot snapshot = CreateSnapshot();
-        Evidence persisted = snapshot.Evidence[1];
         ExternalIntegrationEvidence external = new(
-            persisted.Id,
-            persisted.Category,
-            persisted.Description,
+            "ev_external",
+            "external.http.outbound",
+            "Observed outbound HTTP dependency.",
             null,
             "src/App/App.csproj",
             ExternalIntegrationKind.Http,
@@ -99,14 +98,15 @@ public sealed class ContractTests
             null,
             null,
             null,
-            persisted.RelativePath,
-            persisted.Line ?? 1,
+            "src/App/App.csproj",
+            1,
             ExternalIntegrationConfidence.High,
             ["test"]);
+        Evidence persisted = external.ToRepositoryEvidence();
 
         snapshot = snapshot with
         {
-            Evidence = [snapshot.Evidence[0], persisted, persisted],
+            Evidence = [.. snapshot.Evidence, persisted, persisted],
             ExternalIntegrationEvidence = new ExternalIntegrationEvidenceResult(
                 "1.6",
                 null,
