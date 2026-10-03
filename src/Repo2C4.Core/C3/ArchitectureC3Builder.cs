@@ -3,7 +3,7 @@ using Repo2C4.Core.Contracts;
 
 namespace Repo2C4.Core.C3;
 
-/// <summary>Builds a bounded, evidence-first C3 proposal for one explicitly selected container.</summary>
+/// <summary>Builds bounded, evidence-first C3 proposals for explicitly selected C2 containers.</summary>
 public static class ArchitectureC3Builder
 {
     private static readonly (string Prefix, string Name, string Responsibility)[] Categories =
@@ -13,30 +13,138 @@ public static class ArchitectureC3Builder
         ("dotnet.project.reference", "Application dependency", "Represents a build-time dependency that may indicate an application-layer collaboration."),
     ];
 
-    public static ArchitectureC3Model Build(ArchitectureModel baseModel, string selectedContainerId)
+    public static ArchitectureC3Model Build(
+        ArchitectureModel baseModel,
+        string selectedContainerId)
     {
-        ArgumentNullException.ThrowIfNull(baseModel);
         ArgumentException.ThrowIfNullOrWhiteSpace(selectedContainerId);
 
-        ImmutableArray<ContractError> baseErrors = ContractValidator.ValidateModel(baseModel);
+        ArchitectureC3Workspace workspace = BuildMany(
+            baseModel,
+            [selectedContainerId]);
+
+        ArchitectureC3Selection selection = workspace.Selections[0];
+        return new ArchitectureC3Model(
+            workspace.SchemaVersion,
+            workspace.BaseModel,
+            selection.SelectedContainerId,
+            selection.Components,
+            selection.Relations);
+    }
+
+    public static ArchitectureC3Workspace BuildMany(
+        ArchitectureModel baseModel,
+        IEnumerable<string> selectedContainerIds)
+    {
+        ArgumentNullException.ThrowIfNull(baseModel);
+        ArgumentNullException.ThrowIfNull(selectedContainerIds);
+
+        ImmutableArray<ContractError> baseErrors =
+            ContractValidator.ValidateModel(baseModel);
         if (!baseErrors.IsEmpty)
         {
             throw new ContractValidationException(baseErrors);
         }
 
-        ArchitectureElement? selected = baseModel.Elements
-            .FirstOrDefault(item => item.Id == selectedContainerId && item.Kind == ArchitectureElementKind.Container);
-        if (selected is null)
+        string[] requested = [.. selectedContainerIds];
+        if (requested.Length == 0)
+        {
+            return new ArchitectureC3Workspace(
+                ContractSchema.Version,
+                baseModel,
+                []);
+        }
+
+        if (baseModel.Level != ArchitectureLevel.C2)
         {
             throw new ContractValidationException(
             [
                 new ContractError(
-                    "c3.containerMissing",
-                    "$.selectedContainerId",
-                    "Selected C3 container must exist in the C2 base model."),
+                    "c3.baseLevel",
+                    "$.baseModel.level",
+                    "C3 requires a C2 base model."),
             ]);
         }
 
+        List<ContractError> selectionErrors = [];
+        Dictionary<string, ArchitectureElement> elements = baseModel.Elements
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+
+        for (int i = 0; i < requested.Length; i++)
+        {
+            string? id = requested[i];
+            string path = "$.selectedContainerIds[" + i + "]";
+
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                selectionErrors.Add(new ContractError(
+                    "c3.containerMissing",
+                    path,
+                    "Selected C3 container ID is required."));
+                continue;
+            }
+
+            if (!elements.TryGetValue(id, out ArchitectureElement? element))
+            {
+                selectionErrors.Add(new ContractError(
+                    "c3.containerMissing",
+                    path,
+                    "Selected C3 container must exist in the C2 base model."));
+                continue;
+            }
+
+            if (element.Kind != ArchitectureElementKind.Container)
+            {
+                selectionErrors.Add(new ContractError(
+                    "c3.containerKind",
+                    path,
+                    "Selected C3 element must be a C2 container."));
+            }
+        }
+
+        if (selectionErrors.Count > 0)
+        {
+            throw new ContractValidationException([.. selectionErrors]);
+        }
+
+        string[] canonicalIds =
+        [
+            .. requested
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
+
+        ArchitectureC3Selection[] selections =
+        [
+            .. canonicalIds.Select(id =>
+            {
+                ArchitectureC3Model model = BuildSingle(baseModel, elements[id]);
+                return new ArchitectureC3Selection(
+                    model.SelectedContainerId,
+                    model.Components,
+                    model.Relations);
+            }),
+        ];
+
+        ArchitectureC3Workspace workspace = new(
+            ContractSchema.Version,
+            baseModel,
+            [.. selections]);
+
+        ImmutableArray<ContractError> errors =
+            ArchitectureC3WorkspaceValidator.Validate(workspace);
+        if (!errors.IsEmpty)
+        {
+            throw new ContractValidationException(errors);
+        }
+
+        return workspace;
+    }
+
+    private static ArchitectureC3Model BuildSingle(
+        ArchitectureModel baseModel,
+        ArchitectureElement selected)
+    {
         Dictionary<string, Evidence> evidenceById = baseModel.Snapshot.Evidence
             .ToDictionary(item => item.Id, StringComparer.Ordinal);
         Evidence[] directEvidence =
@@ -91,14 +199,19 @@ public static class ArchitectureC3Builder
                      .OrderBy(item => item.Id, StringComparer.Ordinal))
         {
             ArchitectureComponent? component = components.FirstOrDefault(candidate =>
-                candidate.EvidenceIds.Intersect(baseRelation.EvidenceIds, StringComparer.Ordinal).Any());
+                candidate.EvidenceIds.Intersect(
+                    baseRelation.EvidenceIds,
+                    StringComparer.Ordinal).Any());
             if (component is null)
             {
                 continue;
             }
 
             relations.Add(new ArchitectureComponentRelation(
-                StableIds.ForRelation(component.Id, baseRelation.DestinationId, "c3|" + baseRelation.Id),
+                StableIds.ForRelation(
+                    component.Id,
+                    baseRelation.DestinationId,
+                    "c3|" + baseRelation.Id),
                 component.Id,
                 baseRelation.DestinationId,
                 baseRelation.Description,
