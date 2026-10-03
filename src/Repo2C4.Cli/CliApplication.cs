@@ -552,10 +552,10 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
-            ArchitectureC3Workspace c3Workspace =
-                ArchitectureC3Builder.BuildMany(model, selectedContainers);
+            ArchitectureC3BuildResult c3Build =
+                ArchitectureC3Builder.BuildManyDetailed(model, selectedContainers);
             IReadOnlyList<LikeC4GeneratedFile> files =
-                LikeC4Emitter.EmitWithC3(c3Workspace);
+                LikeC4Emitter.EmitWithC3(c3Build.Workspace);
 
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
             List<LikeC4GeneratedFile> managedFiles =
@@ -563,6 +563,19 @@ internal static class CliApplication
                 .. files.Select(file => new LikeC4GeneratedFile(file.FileName, NormalizeText(file.Content))),
                 new LikeC4GeneratedFile(report.FileName, NormalizeText(report.Content)),
             ];
+
+            if (c3Build.SemanticResult is not null &&
+                model.Snapshot.SemanticC3Facts is not null)
+            {
+                EvidenceReportResult semanticReport =
+                    EvidenceReportGenerator.GenerateSemanticC3(
+                        model,
+                        c3Build.SemanticResult,
+                        model.Snapshot.SemanticC3Facts);
+                managedFiles.Add(new LikeC4GeneratedFile(
+                    semanticReport.FileName,
+                    NormalizeText(semanticReport.Content)));
+            }
 
             string outputRoot = Path.GetFullPath(outputPath);
             if (Directory.Exists(outputRoot) && IsReparsePoint(outputRoot))

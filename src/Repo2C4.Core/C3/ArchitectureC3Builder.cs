@@ -22,6 +22,22 @@ public static class ArchitectureC3Builder
         ArchitectureModel baseModel,
         string selectedContainerId)
     {
+        ArchitectureC3BuildResult result = BuildDetailed(
+            baseModel,
+            selectedContainerId);
+        ArchitectureC3Selection selection = result.Workspace.Selections[0];
+        return new ArchitectureC3Model(
+            result.Workspace.SchemaVersion,
+            result.Workspace.BaseModel,
+            selection.SelectedContainerId,
+            selection.Components,
+            selection.Relations);
+    }
+
+    public static ArchitectureC3BuildResult BuildDetailed(
+        ArchitectureModel baseModel,
+        string selectedContainerId)
+    {
         ArgumentNullException.ThrowIfNull(baseModel);
         ArgumentException.ThrowIfNullOrWhiteSpace(selectedContainerId);
 
@@ -46,17 +62,7 @@ public static class ArchitectureC3Builder
             ]);
         }
 
-        ArchitectureC3Workspace workspace = BuildMany(
-            baseModel,
-            [selectedContainerId]);
-
-        ArchitectureC3Selection selection = workspace.Selections[0];
-        return new ArchitectureC3Model(
-            workspace.SchemaVersion,
-            workspace.BaseModel,
-            selection.SelectedContainerId,
-            selection.Components,
-            selection.Relations);
+        return BuildManyDetailed(baseModel, [selectedContainerId]);
     }
 
     public static ArchitectureC3Workspace BuildMany(
