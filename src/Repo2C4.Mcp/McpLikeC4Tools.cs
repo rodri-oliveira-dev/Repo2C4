@@ -82,7 +82,10 @@ internal sealed class McpLikeC4Tools
     {
         cancellationToken.ThrowIfCancellationRequested();
         McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
-        ArchitectureModel boundModel = model with { Snapshot = entry.Snapshot };
+        ArchitectureModel boundModel = model with
+        {
+            Snapshot = entry.Snapshot,
+        };
 
         if (write && dryRun)
         {
@@ -267,7 +270,10 @@ internal sealed class McpLikeC4Tools
     {
         cancellationToken.ThrowIfCancellationRequested();
         McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
-        ArchitectureModel boundModel = model with { Snapshot = entry.Snapshot };
+        ArchitectureModel boundModel = model with
+        {
+            Snapshot = entry.Snapshot,
+        };
 
         string workspace;
         string workspaceLabel;
