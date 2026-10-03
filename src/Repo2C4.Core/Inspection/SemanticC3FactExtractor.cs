@@ -25,7 +25,7 @@ public static class SemanticC3FactExtractor
         @"[ \t]*(?:(?:public|internal|private|protected|abstract|sealed|static|partial|readonly|ref)\s+)*" +
         @"(?<kind>class|interface|struct|record(?:\s+class|\s+struct)?)\s+" +
         @"(?<name>[A-Za-z_][A-Za-z0-9_]{0,127})(?:\s*<[^>{;\r\n]+>)?" +
-        @"(?:\s*\([^()\r\n]{0,1024}\))?" +
+        @"(?:\s*\((?<primaryParams>[^()\r\n]{0,1024})\))?" +
         @"(?:\s*:\s*(?<bases>[^\{\r\n]+))?");
 
     private static readonly Regex MethodRegex = CreateRegex(
@@ -712,13 +712,39 @@ public static class SemanticC3FactExtractor
                 attributes,
                 []);
 
+            List<MethodDeclaration> methods = [];
+            if (match.Groups["primaryParams"].Success &&
+                !type.IsInterface)
+            {
+                ParameterDeclaration[] primaryParameters =
+                    ParseParameters(match.Groups["primaryParams"].Value);
+                methods.Add(new MethodDeclaration(
+                    type.Name,
+                    MethodSymbolId(type, "#ctor", primaryParameters, isConstructor: true),
+                    true,
+                    type.Line,
+                    [],
+                    primaryParameters,
+                    -1,
+                    -1,
+                    match.Index));
+            }
+
             if (bodyStart >= 0)
             {
-                type = type with
-                {
-                    Methods = ParseMethods(masked, braceDepth, lineStarts, type),
-                };
+                methods.AddRange(ParseMethods(masked, braceDepth, lineStarts, type));
             }
+
+            type = type with
+            {
+                Methods =
+                [
+                    .. methods
+                        .GroupBy(method => method.SymbolId, StringComparer.Ordinal)
+                        .Select(group => group.OrderBy(method => method.StartIndex).First())
+                        .OrderBy(method => method.StartIndex),
+                ],
+            };
 
             types.Add(type);
         }

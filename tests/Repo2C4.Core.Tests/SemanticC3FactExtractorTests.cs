@@ -127,6 +127,12 @@ public sealed class SemanticC3FactExtractorTests
             fact.Kind == SemanticC3FactKind.PersistenceCandidate &&
             fact.Category == "semantic.persistence.dbContext" &&
             fact.SourceSymbol.SymbolId == "T:Demo.DemoDbContext");
+        Assert.Contains(result.Facts, fact =>
+            fact.Kind == SemanticC3FactKind.ConstructorInjection &&
+            fact.SourceSymbol.SymbolId.StartsWith(
+                "M:Demo.DemoDbContext.#ctor(",
+                StringComparison.Ordinal) &&
+            fact.RelatedSymbolId == "T:DbContextOptions<DemoDbContext>:0");
     }
 
     [Fact]
