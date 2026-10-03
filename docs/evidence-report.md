@@ -1,3 +1,5 @@
+[Português (Brasil)](evidence-report.pt-BR.md)
+
 # Evidence report and architectural review
 
 Issue #17 adds a deterministic `evidence-report.md` generated from a reviewed v1 `ArchitectureModel`.

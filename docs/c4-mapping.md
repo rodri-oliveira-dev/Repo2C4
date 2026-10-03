@@ -1,3 +1,5 @@
+[Português (Brasil)](c4-mapping.pt-BR.md)
+
 # C1/C2 mapping policy
 
 Repo2C4 maps repository evidence into a reviewable `ArchitectureModel` without treating repository structure as deployed architecture. The evidence contract in `docs/contracts.md` remains the source of truth. These rules define how evidence may be proposed for C1/C2; they do not add a second architecture model and they do not authorize automatic promotion of hypotheses to confirmed facts.
