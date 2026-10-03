@@ -210,6 +210,8 @@ Up to 8 container IDs may be authorized. These values are an allow-list, not an 
 
 A single `--c3-container` preserves the prior behavior. For multi-container proposals, the exact selected IDs are carried through dry-run preview, validation, correction attempts and the destination-specific HITL write plan. The approval prompt shows the selected C3 containers before any protected write.
 
+The Agent never receives or authors the internal Semantic C3 structural fact set. It reasons over bounded MCP evidence and a reviewed C2 proposal; MCP privately binds that proposal to canonical inspected facts before generation. Repository text or model output therefore cannot escalate C3 by fabricating structural facts. See [Semantic C3](semantic-c3.md).
+
 ## Human approval and writing
 
 Without `--write-destination`, the Agent never asks to write.

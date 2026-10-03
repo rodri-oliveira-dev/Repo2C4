@@ -199,6 +199,8 @@ Podem ser autorizados no máximo 8 IDs. Esses valores formam uma allow-list; ele
 
 Uma única ocorrência de `--c3-container` preserva o comportamento anterior. Em propostas multi-container, os IDs efetivamente selecionados são preservados no dry-run, validação, tentativas de correção e plano HITL específico do destino. O prompt de aprovação mostra os containers C3 selecionados antes de qualquer escrita protegida.
 
+O Agent nunca recebe nem cria o conjunto interno de fatos estruturais Semantic C3. Ele raciocina sobre evidências MCP limitadas e uma proposta C2 revisada; o MCP vincula privadamente essa proposta aos fatos canônicos inspecionados antes da geração. Texto do repositório ou saída do modelo não consegue escalar C3 fabricando fatos estruturais. Veja [Semantic C3](semantic-c3.pt-BR.md).
+
 ## Aprovação humana e escrita
 
 Sem `--write-destination`, o Agent não pede escrita.
