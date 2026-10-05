@@ -14,7 +14,7 @@ permissions:
 jobs:
   openai-agent-smoke:
     name: Optional real-provider agent smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       REPO2C4_AGENT_MODEL: ${{ inputs.model }}
