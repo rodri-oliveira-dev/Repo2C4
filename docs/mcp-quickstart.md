@@ -59,7 +59,9 @@ After the client connects, inspect the authorized root itself:
 8. Only after explicit local approval, call `generate_likec4` with `dryRun=false`, `write=true` and the exact repository-relative destination.
 9. Call `validate_likec4` again with the written `destinationPath`.
 
-For selective C3, pass the exact ID of an existing C2 container as `c3ContainerId` to both proposal generation and proposal validation.
+For selective C3, new clients should pass only the evidence-supported C2 container IDs in `c3Containers` to both proposal generation and proposal validation, for example `["container_api", "container_worker"]`. The collection is bounded to 8 selections and duplicates are deduplicated deterministically. Legacy `c3ContainerId` remains supported for one container.
+
+Clients do not reconstruct or submit internal Semantic C3 facts. The server retains the canonical bounded facts produced by inspection and uses them only after the submitted public snapshot passes freshness validation. When active, Semantic C3 responses include generated `c3Views` and `semantic-c3-evidence-report.md`. See [Semantic C3](semantic-c3.md).
 
 The host selects the AI model. Repo2C4 MCP has no cloud-provider key and does not promote hypotheses to facts.
 

@@ -4,6 +4,16 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### Added
+- End-to-end Semantic C3 dogfooding derived from `dotnet-observability-lab`, with persisted bounded structural facts, sanitized external-integration correlation, responsibility-level four-container golden coverage, semantic provenance report, managed regeneration, real CLI/MCP paths and official LikeC4 validation while preserving legacy C3 fallback for older snapshots.
+- Bounded Semantic C3 multi-container support across MCP and Agent: typed `c3Containers` with legacy singular compatibility, deterministic `c3Views` reporting, pre-write ID/budget validation, repeated Agent authorization with evidence-supported subset selection, and exact C3 selection preserved through preview, validation and HITL write approval.
+- Repeatable CLI `--c3-container` selection backed by one canonical multi-container C3 workspace, deterministic per-container LikeC4 views, duplicate-ID normalization, pre-write validation, and managed-output compatibility while preserving the single-container behavior.
+- Bounded Semantic C3 internal/external relation composition with explicit wiring+invocation confidence policy, deterministic edge deduplication, weak-cycle/cross-container safeguards, existing C1/C2 peer reuse, and a signal/missing-signal evidence report.
+- Reviewable Semantic C3 worker/messaging/persistence proposals that merge hosted-service evidence, distinguish supported publish/consume adapters through Integration Evidence, require observed use before promoting repository-shaped persistence, reuse existing C1/C2 external peers, and keep weak/unlinked evidence conservative.
+- Reviewable Semantic C3 HTTP/application proposals that aggregate routes by semantic boundary and distinguish DI-/handler-backed application services from name-only classes.
+- Bounded, cancellation-aware C# structural fact extraction for Semantic C3, covering symbols, DI/wiring, Minimal API/controllers, hosted services, DbContext, messaging role signals and conservative intra-project collaboration facts without build/code execution or source/literal propagation.
+- Additive, versioned Semantic C3 contract foundation with deterministic component taxonomy, stable source-symbol identity, reviewable internal/external relations, conceptual multi-container selection, and a reproducible v1.1.0 dogfooding baseline.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added

@@ -30,8 +30,14 @@
     <None Include="../fixtures/external-integrations/*.json"
           Link="ExternalIntegrationFixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/semantic-c3/*.json"
+          Link="SemanticC3Fixtures/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../examples/fixtures/external-integrations-e2e/**"
           Link="ExternalIntegrationE2E/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/fixtures/semantic-c3-dogfood/**"
+          Link="SemanticC3Dogfood/%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

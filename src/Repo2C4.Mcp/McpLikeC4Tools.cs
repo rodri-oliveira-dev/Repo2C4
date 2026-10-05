@@ -35,8 +35,9 @@ internal sealed class McpLikeC4Tools
             "dryRun defaults to true and performs no writes. Writing requires dryRun=false, write=true and an explicit " +
             "repository-relative destinationPath inside the authorized root; managed outputs use a manifest, preview/diff and conflict protection. " +
             "The model snapshot must exactly match snapshotId and unsupported static/candidate evidence cannot be promoted " +
-            "to a confirmed container boundary or runtime relation. Optional c3ContainerId adds a bounded C3 view only for " +
-            "that existing C2 container; omission preserves C1/C2 behavior.",
+            "to a confirmed container boundary or runtime relation. Optional c3Containers selects up to " +
+            McpLimits.MaxC3ContainersPerCall + " C2 containers for one bounded C3 workspace. The legacy c3ContainerId remains supported; " +
+            "omission preserves C1/C2 behavior.",
             readOnly: false,
             idempotent: false));
 
@@ -54,7 +55,7 @@ internal sealed class McpLikeC4Tools
             "validate_likec4",
             "Validate deterministic LikeC4 with the controlled official LikeC4 CLI adapter. " +
             "When destinationPath is omitted, the supplied v1 ArchitectureModel is emitted into an isolated temporary workspace " +
-            "and validated without repository writes; optional c3ContainerId selects the same C3 proposal as generate_likec4. " +
+            "and validated without repository writes; optional c3Containers (or legacy c3ContainerId) selects the same C3 proposal as generate_likec4. " +
             "When destinationPath is supplied, it must be an existing directory inside the authorized root and its existing files " +
             "are validated. Validation failures are returned as structured bounded diagnostics.",
             readOnly: true,
@@ -73,12 +74,18 @@ internal sealed class McpLikeC4Tools
         bool write = false,
         [Description("Repository-relative destination directory inside the authorized root. Required only for writing.")]
         string? destinationPath = null,
-        [Description("Optional C2 container ID. When supplied, only that container receives an additional C3 component view.")]
+        [Description("Legacy optional C2 container ID. Prefer c3Containers for multi-container C3.")]
         string? c3ContainerId = null,
+        [Description("Optional bounded collection of C2 container IDs for one deterministic multi-container C3 workspace.")]
+        string[]? c3Containers = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
+        ArchitectureModel boundModel = model with
+        {
+            Snapshot = entry.Snapshot,
+        };
 
         if (write && dryRun)
         {
@@ -98,7 +105,8 @@ internal sealed class McpLikeC4Tools
                 "destination_required: writing requires an explicit repository-relative destinationPath.");
         }
 
-        IReadOnlyList<LikeC4GeneratedFile> generated = EmitForSelection(model, c3ContainerId);
+        McpC3Emission emission = EmitForSelection(boundModel, c3ContainerId, c3Containers);
+        IReadOnlyList<LikeC4GeneratedFile> generated = emission.Files;
         McpLikeC4File[] files =
         [
             .. generated.Select(file => new McpLikeC4File(
@@ -146,7 +154,10 @@ internal sealed class McpLikeC4Tools
                 NormalizeDestinationForResponse(destinationPath),
                 files,
                 changes,
-                plan?.HasConflicts ?? false));
+                plan?.HasConflicts ?? false)
+            {
+                C3Views = emission.Views,
+            });
         }
 
         if (plan is null || outputRoot is null)
@@ -192,7 +203,10 @@ internal sealed class McpLikeC4Tools
             NormalizeDestinationForResponse(destinationPath),
             files,
             [.. plan.Changes.Select(ToMcpChange)],
-            false));
+            false)
+        {
+            C3Views = emission.Views,
+        });
     }
 
     [Description("Return a metadata-only evidence provenance report for a session-bound v1 model.")]
@@ -248,20 +262,29 @@ internal sealed class McpLikeC4Tools
         ArchitectureModel model,
         [Description("Optional existing repository-relative LikeC4 directory. Omit to validate the proposed model in a temporary workspace.")]
         string? destinationPath = null,
-        [Description("Optional C2 container ID to include the same proposed C3 output as generate_likec4 when validating without destinationPath.")]
+        [Description("Legacy optional C2 container ID. Prefer c3Containers for multi-container C3.")]
         string? c3ContainerId = null,
+        [Description("Optional bounded collection of C2 container IDs for proposal validation when destinationPath is omitted.")]
+        string[]? c3Containers = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         McpSnapshotStore.SnapshotEntry entry = ValidateModelBinding(snapshotId, model);
+        ArchitectureModel boundModel = model with
+        {
+            Snapshot = entry.Snapshot,
+        };
 
         string workspace;
         string workspaceLabel;
         string? temporaryWorkspace = null;
+        McpC3View[] c3Views = [];
 
         if (string.IsNullOrWhiteSpace(destinationPath))
         {
-            IReadOnlyList<LikeC4GeneratedFile> generated = EmitForSelection(model, c3ContainerId);
+            McpC3Emission emission = EmitForSelection(boundModel, c3ContainerId, c3Containers);
+            IReadOnlyList<LikeC4GeneratedFile> generated = emission.Files;
+            c3Views = emission.Views;
             temporaryWorkspace = Directory.CreateTempSubdirectory("repo2c4-mcp-likec4-").FullName;
             workspace = temporaryWorkspace;
             workspaceLabel = "proposed";
@@ -317,7 +340,10 @@ internal sealed class McpLikeC4Tools
                 result.IsValid,
                 result.ExitCode,
                 result.TimedOut,
-                [.. result.Diagnostics]));
+                [.. result.Diagnostics])
+            {
+                C3Views = c3Views,
+            });
         }
         finally
         {
@@ -328,19 +354,53 @@ internal sealed class McpLikeC4Tools
         }
     }
 
-    private static IReadOnlyList<LikeC4GeneratedFile> EmitForSelection(
+    private static McpC3Emission EmitForSelection(
         ArchitectureModel model,
-        string? c3ContainerId)
+        string? c3ContainerId,
+        IReadOnlyList<string>? c3Containers)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(c3ContainerId))
+            string[] selected = NormalizeC3Selections(c3ContainerId, c3Containers);
+            if (selected.Length == 0)
             {
-                return LikeC4Emitter.Emit(model);
+                return new McpC3Emission(
+                    LikeC4Emitter.Emit(model),
+                    []);
             }
 
-            ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, c3ContainerId);
-            return LikeC4Emitter.EmitWithC3(model, c3);
+            ArchitectureC3BuildResult build =
+                (c3Containers is null || c3Containers.Count == 0) &&
+                !string.IsNullOrWhiteSpace(c3ContainerId)
+                    ? ArchitectureC3Builder.BuildDetailed(model, c3ContainerId)
+                    : ArchitectureC3Builder.BuildManyDetailed(model, selected);
+
+            EnsureC3Budget(build.Workspace);
+
+            List<LikeC4GeneratedFile> files =
+            [
+                .. LikeC4Emitter.EmitWithC3(build.Workspace),
+            ];
+
+            if (build.SemanticResult is not null &&
+                model.Snapshot.SemanticC3Facts is not null)
+            {
+                EvidenceReportResult semanticReport =
+                    EvidenceReportGenerator.GenerateSemanticC3(
+                        model,
+                        build.SemanticResult,
+                        model.Snapshot.SemanticC3Facts);
+                files.Add(new LikeC4GeneratedFile(
+                    semanticReport.FileName,
+                    semanticReport.Content));
+            }
+
+            McpC3View[] views =
+            [
+                .. LikeC4Emitter.DescribeC3Views(build.Workspace)
+                    .Select(view => new McpC3View(view.ContainerId, view.ViewId)),
+            ];
+            return new McpC3Emission(files, views);
         }
         catch (ContractValidationException exception)
         {
@@ -350,6 +410,47 @@ internal sealed class McpLikeC4Tools
             throw new McpException("model_invalid: " + safeErrors);
         }
     }
+
+    private static string[] NormalizeC3Selections(
+        string? c3ContainerId,
+        IReadOnlyList<string>? c3Containers)
+    {
+        int collectionCount = c3Containers?.Count ?? 0;
+        int requestedCount =
+            collectionCount + (string.IsNullOrWhiteSpace(c3ContainerId) ? 0 : 1);
+        if (requestedCount > McpLimits.MaxC3ContainersPerCall)
+        {
+            throw new McpException(
+                "c3_budget_exceeded: at most " +
+                McpLimits.MaxC3ContainersPerCall +
+                " C3 container selections are allowed per call.");
+        }
+
+        return
+        [
+            .. (c3Containers ?? [])
+                .Concat(string.IsNullOrWhiteSpace(c3ContainerId) ? [] : [c3ContainerId])
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
+    }
+
+    private static void EnsureC3Budget(ArchitectureC3Workspace workspace)
+    {
+        int components = workspace.Selections.Sum(selection => selection.Components.Length);
+        int relations = workspace.Selections.Sum(selection => selection.Relations.Length);
+
+        if (components > McpLimits.MaxC3ComponentsPerCall ||
+            relations > McpLimits.MaxC3RelationsPerCall)
+        {
+            throw new McpException(
+                "c3_budget_exceeded: C3 workspace exceeds the bounded component/relation budget.");
+        }
+    }
+
+    private sealed record McpC3Emission(
+        IReadOnlyList<LikeC4GeneratedFile> Files,
+        McpC3View[] Views);
 
     private McpSnapshotStore.SnapshotEntry ValidateModelBinding(
         string snapshotId,
@@ -371,8 +472,8 @@ internal sealed class McpLikeC4Tools
         string suppliedSnapshot;
         try
         {
-            expectedSnapshot = ContractJson.SerializeSnapshot(entry.Snapshot);
-            suppliedSnapshot = ContractJson.SerializeSnapshot(model.Snapshot);
+            expectedSnapshot = ContractJson.SerializeSnapshot(PublicSnapshot(entry.Snapshot));
+            suppliedSnapshot = ContractJson.SerializeSnapshot(PublicSnapshot(model.Snapshot));
         }
         catch (ContractValidationException exception)
         {
@@ -391,6 +492,13 @@ internal sealed class McpLikeC4Tools
         EnsureReviewBoundaries(model, entry.Snapshot);
         return entry;
     }
+
+    private static RepositorySnapshot PublicSnapshot(RepositorySnapshot snapshot) =>
+        snapshot with
+        {
+            SemanticC3Facts = null,
+            ExternalIntegrationEvidence = null,
+        };
 
     private static void EnsureReviewBoundaries(
         ArchitectureModel model,

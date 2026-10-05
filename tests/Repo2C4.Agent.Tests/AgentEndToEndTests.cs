@@ -420,6 +420,75 @@ public sealed class AgentEndToEndTests
     }
 
     [Fact]
+    public async Task MultiC3UsesRealMcpSelectsRelevantSubsetAndCarriesSelectionToHitl()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        await using DeterministicAgentHarness harness =
+            await DeterministicAgentHarness.CreateAsync(
+                "agent-multi-c3",
+                [true],
+                writeDestination: "generated",
+                c3ContainerIds: ["el_alpha", "el_beta", "el_unused"],
+                cancellationToken: cancellationToken);
+
+        const string summary =
+            """
+            Confirmed facts
+            Alpha and Beta expose evidence-backed HTTP host candidates.
+
+            Requires review
+            Their deployment and internal component boundaries remain review-required.
+
+            Diagnostics/blockers
+            el_unused is authorized by the host but unsupported by the C2 evidence and was intentionally omitted.
+
+            Proposal
+            C1/C2 previews were produced and C3 was requested only for el_alpha and el_beta.
+            """;
+
+        using ScriptedChatClient analysis =
+            new([.. DeterministicAgentHarness.MultiC3AnalysisTurns(summary)]);
+
+        ArchitectureWorkflowResult workflow = await harness.RunWorkflowAsync(
+            analysis,
+            cancellationToken);
+
+        Assert.Equal(ArchitectureWorkflowStatus.RequiresReview, workflow.Status);
+        AgentArchitectureProposal c2 = Assert.Single(
+            harness.Session.InvocationState.SnapshotProposals(),
+            proposal => proposal.Level == "C2");
+        Assert.Null(c2.C3ContainerId);
+        Assert.Equal(["el_alpha", "el_beta"], c2.C3ContainerIds);
+        Assert.DoesNotContain("el_unused", c2.C3ContainerIds);
+
+        string structuredResults = JsonSerializer.Serialize(
+            analysis.Invocations.SelectMany(invocation => invocation.StructuredResults));
+        Assert.Contains("c3Views", structuredResults, StringComparison.Ordinal);
+        Assert.Contains("c3_el_alpha", structuredResults, StringComparison.Ordinal);
+        Assert.Contains("c3_el_beta", structuredResults, StringComparison.Ordinal);
+        Assert.DoesNotContain("el_unused", structuredResults, StringComparison.Ordinal);
+
+        DeterministicApprovalPrompt prompt = new(HumanApprovalDecision.Deny);
+        using ScriptedChatClient approval = CreateApprovalClient();
+
+        WriteApprovalResult write = await harness.RunWriteAsync(
+            approval,
+            prompt,
+            workflow,
+            cancellationToken);
+
+        Assert.Equal(WriteApprovalStatus.Denied, write.Status);
+        AgentWritePlanItem c2Plan = Assert.Single(
+            prompt.Plan!.Items,
+            item => item.Level == "C2");
+        Assert.Equal(["el_alpha", "el_beta"], c2Plan.C3ContainerIds);
+        Assert.False(HasGeneratedFiles(harness.RepositoryPath));
+
+        analysis.AssertExhausted();
+        approval.AssertExhausted();
+    }
+
+    [Fact]
     public async Task RealLikeC4ValidatorRunsOnlyInOptInIntegrationPass()
     {
         if (!string.Equals(

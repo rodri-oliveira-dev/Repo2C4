@@ -45,11 +45,7 @@ public static class EvidenceFirstAnalysisPrompt
         string attemptContext)
     {
         string inspectionCall = InspectionCall(options);
-        string c3Policy = options.C3ContainerId is null
-            ? "C3 is not authorized for this run. Do not send c3ContainerId to any tool."
-            : "C3 is authorized only for the explicitly selected container ID "
-                + JsonSerializer.Serialize(options.C3ContainerId)
-                + ". Request C3 only from a C2 proposal that contains that exact element as a container; otherwise omit C3.";
+        string c3Policy = C3Policy(options, correction: false);
 
         return """
             Produce evidence-first Repo2C4 architecture proposals for this objective:
@@ -93,11 +89,7 @@ public static class EvidenceFirstAnalysisPrompt
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Goal);
 
         string inspectionCall = InspectionCall(options);
-        string c3Policy = options.C3ContainerId is null
-            ? "C3 is not authorized for this run. Do not send c3ContainerId to any tool."
-            : "C3 is authorized only for the explicitly selected container ID "
-                + JsonSerializer.Serialize(options.C3ContainerId)
-                + ". Request C3 only from a C2 proposal that contains that exact element as a container; otherwise explain why C3 cannot be proposed.";
+        string c3Policy = C3Policy(options, correction: true);
 
         return """
             Perform one evidence-first Repo2C4 architecture analysis for the following user objective:
@@ -135,8 +127,31 @@ public static class EvidenceFirstAnalysisPrompt
               Diagnostics/blockers
               Proposal
               
-              In Proposal, identify the C1/C2 previews produced and whether C3 was omitted, unavailable or previewed for the authorized selected container.
+              In Proposal, identify the C1/C2 previews produced and list the exact C3 container IDs requested, or explain why C3 was omitted/unavailable.
               """;
+    }
+
+    private static string C3Policy(
+        AgentHostOptions options,
+        bool correction)
+    {
+        string[] authorized = [.. options.AuthorizedC3ContainerIds];
+        if (authorized.Length == 0)
+        {
+            return "C3 is not authorized for this run. Do not send c3ContainerId or c3Containers to any tool.";
+        }
+
+        string unavailable = correction
+            ? "explain why a requested C3 cannot be proposed"
+            : "omit unsupported C3 targets";
+        return "C3 is authorized only for this bounded set of container IDs: "
+            + JsonSerializer.Serialize(authorized)
+            + ". Choose only the subset relevant to the objective and supported by the C2 evidence; never select all automatically. "
+            + "Send that explicit subset in c3Containers on the C2 generate_likec4 call. "
+            + "Do not include ambiguous or unsupported component boundaries; keep useful uncertainty requiresReview. "
+            + "If evidence is insufficient, "
+            + unavailable
+            + ".";
     }
 
     private static string InspectionCall(AgentHostOptions options) =>

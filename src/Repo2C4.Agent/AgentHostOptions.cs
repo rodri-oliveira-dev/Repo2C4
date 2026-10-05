@@ -6,6 +6,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
     public const string OllamaProvider = "ollama";
     public const string OpenAiProvider = "openai";
     public const string OpenAiApiKeyEnvironmentVariable = "OPENAI_API_KEY";
+    public const int MaxC3ContainersPerRun = 8;
 
     public static readonly Uri DefaultOllamaEndpoint = new("http://127.0.0.1:11434/");
 
@@ -58,6 +59,20 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         get;
         init;
     }
+
+    public IReadOnlyList<string> C3ContainerIds
+    {
+        get;
+        init;
+    } = [];
+
+    public IReadOnlyList<string> AuthorizedC3ContainerIds =>
+    [
+        .. C3ContainerIds
+            .Concat(string.IsNullOrWhiteSpace(C3ContainerId) ? [] : [C3ContainerId])
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal),
+    ];
 
     public int MaxValidationAttempts
     {
@@ -122,7 +137,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
         string? repositoryRoot = null;
         string? integrationReportPath = null;
         string? mcpServerPath = null;
-        string? c3ContainerId = null;
+        List<string> c3ContainerIds = [];
         string? writeDestination = null;
         int timeoutSeconds = 90;
         int maxDurationSeconds = 300;
@@ -252,19 +267,26 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
                     break;
 
                 case "--c3-container":
-                    if (!TryReadUniqueValue(
-                            args,
-                            ref index,
-                            c3ContainerId,
-                            "--c3-container",
-                            out string? c3ContainerValue,
-                            out error))
+                    if (!TryReadValue(args, ref index, out string? c3ContainerValue))
                     {
-                        options = null;
-                        return false;
+                        return Fail(
+                            "--c3-container requires a non-empty value.",
+                            out options,
+                            out error);
                     }
 
-                    c3ContainerId = c3ContainerValue;
+                    if (c3ContainerIds.Count >= MaxC3ContainersPerRun)
+                    {
+                        return Fail(
+                            "--c3-container may be specified at most " +
+                            MaxC3ContainersPerRun.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture) +
+                            " times.",
+                            out options,
+                            out error);
+                    }
+
+                    c3ContainerIds.Add(c3ContainerValue!);
                     break;
 
                 case "--write-destination":
@@ -497,14 +519,25 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             }
         }
 
-        string? configuredC3ContainerId = c3ContainerId?.Trim();
-        if (configuredC3ContainerId is not null && !IsValidArchitectureId(configuredC3ContainerId))
+        string[] configuredC3ContainerIds =
+        [
+            .. c3ContainerIds
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal),
+        ];
+        if (configuredC3ContainerIds.Any(id => !IsValidArchitectureId(id)))
         {
             return Fail(
                 "--c3-container must be a valid lowercase architecture element ID.",
                 out options,
                 out error);
         }
+
+        string? configuredC3ContainerId =
+            configuredC3ContainerIds.Length == 1
+                ? configuredC3ContainerIds[0]
+                : null;
 
         string? configuredWriteDestination = writeDestination?.Trim();
         if (configuredWriteDestination is not null
@@ -557,6 +590,7 @@ public sealed record AgentHostOptions(string Provider, string Model, string? Pro
             IntegrationReportPath = configuredIntegrationReportPath,
             McpServerPath = mcpServerPath?.Trim(),
             C3ContainerId = configuredC3ContainerId,
+            C3ContainerIds = configuredC3ContainerIds,
             MaxValidationAttempts = maxValidationAttempts,
             MaxToolCalls = maxToolCalls,
             MaxWorkflowIterations = maxWorkflowIterations,

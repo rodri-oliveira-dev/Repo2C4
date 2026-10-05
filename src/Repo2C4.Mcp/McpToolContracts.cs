@@ -46,6 +46,10 @@ public sealed record McpLikeC4File(
     string Content,
     int Utf8Bytes);
 
+public sealed record McpC3View(
+    string ContainerId,
+    string ViewId);
+
 public sealed class CamelCaseGeneratedChangeKindConverter : JsonConverter<GeneratedFileChangeKind>
 {
     public override GeneratedFileChangeKind Read(
@@ -88,7 +92,14 @@ public sealed record McpGenerateLikeC4Result(
     string? DestinationPath,
     McpLikeC4File[] Files,
     McpGeneratedFileChange[] Changes,
-    bool HasConflicts);
+    bool HasConflicts)
+{
+    public McpC3View[] C3Views
+    {
+        get;
+        init;
+    } = [];
+}
 
 public sealed record McpValidateLikeC4Result(
     string SnapshotId,
@@ -97,4 +108,11 @@ public sealed record McpValidateLikeC4Result(
     bool IsValid,
     int ExitCode,
     bool TimedOut,
-    Repo2C4.Core.LikeC4.LikeC4ValidationDiagnostic[] Diagnostics);
+    Repo2C4.Core.LikeC4.LikeC4ValidationDiagnostic[] Diagnostics)
+{
+    public McpC3View[] C3Views
+    {
+        get;
+        init;
+    } = [];
+}

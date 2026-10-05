@@ -283,6 +283,299 @@ public static class ContractValidator
                 Add(errors, "diagnostic.severity", diagnosticPath + ".severity", "Unknown diagnostic severity.");
             }
         }
+
+        ValidateSemanticC3Facts(snapshot.SemanticC3Facts, paths, path, errors);
+        ValidateExternalIntegrationEvidence(
+            snapshot.ExternalIntegrationEvidence,
+            snapshot.Evidence,
+            paths,
+            path,
+            errors);
+    }
+
+    private static void ValidateSemanticC3Facts(
+        SemanticC3FactSet? factSet,
+        HashSet<string> inventoriedPaths,
+        string snapshotPath,
+        List<ContractError> errors)
+    {
+        if (factSet is null)
+        {
+            return;
+        }
+
+        string path = snapshotPath + ".semanticC3Facts";
+        if (factSet.SchemaVersion != SemanticC3ContractSchema.Version)
+        {
+            Add(errors, "semanticC3.schema", path + ".schemaVersion", "Unsupported Semantic C3 fact schema.");
+        }
+
+        if (factSet.Facts.IsDefault || factSet.Diagnostics.IsDefault)
+        {
+            Add(errors, "collection.missing", path, "Semantic C3 facts and diagnostics must be initialized.");
+            return;
+        }
+
+        if (factSet.Facts.Length > 20_000)
+        {
+            Add(errors, "semanticC3.factLimit", path + ".facts", "Semantic C3 fact count exceeds the persisted limit.");
+        }
+
+        HashSet<string> ids = new(StringComparer.Ordinal);
+        for (int index = 0; index < factSet.Facts.Length; index++)
+        {
+            SemanticC3Fact? fact = factSet.Facts[index];
+            string factPath = path + ".facts[" + index + "]";
+            if (fact is null)
+            {
+                Add(errors, "semanticC3.factMissing", factPath, "Semantic C3 fact must not be null.");
+                continue;
+            }
+
+            CheckId(fact.Id, factPath + ".id", errors);
+            if (IsValidId(fact.Id) && !ids.Add(fact.Id))
+            {
+                Add(errors, "id.duplicate", factPath + ".id", "Semantic C3 fact IDs must be unique.");
+            }
+
+            CheckPath(fact.ProjectPath, factPath + ".projectPath", errors);
+            CheckPath(fact.SourcePath, factPath + ".sourcePath", errors);
+            if (IsNormalizedRelativePath(fact.ProjectPath) &&
+                !inventoriedPaths.Contains(fact.ProjectPath))
+            {
+                Add(errors, "semanticC3.projectMissing", factPath + ".projectPath", "Semantic C3 project must exist in the inventory.");
+            }
+
+            if (IsNormalizedRelativePath(fact.SourcePath) &&
+                !inventoriedPaths.Contains(fact.SourcePath))
+            {
+                Add(errors, "semanticC3.sourceMissing", factPath + ".sourcePath", "Semantic C3 source must exist in the inventory.");
+            }
+
+            if (fact.Line is <= 0)
+            {
+                Add(errors, "semanticC3.line", factPath + ".line", "Semantic C3 line must be a positive 1-based index.");
+            }
+
+            if (!Enum.IsDefined(fact.Kind))
+            {
+                Add(errors, "semanticC3.kind", factPath + ".kind", "Unknown Semantic C3 fact kind.");
+            }
+
+            CheckBoundedMetadataText(fact.Category, factPath + ".category", 256, errors);
+            CheckBoundedMetadataText(fact.Description, factPath + ".description", 512, errors);
+
+            if (fact.SourceSymbol is null)
+            {
+                Add(errors, "semanticC3.symbolMissing", factPath + ".sourceSymbol", "Semantic C3 source symbol is required.");
+            }
+            else
+            {
+                CheckId(fact.SourceSymbol.Id, factPath + ".sourceSymbol.id", errors);
+                CheckPath(fact.SourceSymbol.ProjectPath, factPath + ".sourceSymbol.projectPath", errors);
+                CheckBoundedMetadataText(fact.SourceSymbol.SymbolId, factPath + ".sourceSymbol.symbolId", 1_024, errors);
+                if (!string.Equals(fact.SourceSymbol.ProjectPath, fact.ProjectPath, StringComparison.Ordinal))
+                {
+                    Add(errors, "semanticC3.symbolProject", factPath + ".sourceSymbol.projectPath", "Source symbol project must match the fact project.");
+                }
+
+                if (IsNormalizedRelativePath(fact.ProjectPath) &&
+                    !string.IsNullOrWhiteSpace(fact.SourceSymbol.SymbolId))
+                {
+                    string stable = StableIds.ForSemanticC3SourceSymbol(
+                        fact.ProjectPath,
+                        fact.SourceSymbol.SymbolId);
+                    if (!string.Equals(stable, fact.SourceSymbol.Id, StringComparison.Ordinal))
+                    {
+                        Add(errors, "semanticC3.symbolId", factPath + ".sourceSymbol.id", "Semantic C3 source symbol ID is not stable for its project/symbol identity.");
+                    }
+                }
+            }
+
+            if (fact.RelatedSymbolId is not null)
+            {
+                CheckBoundedMetadataText(fact.RelatedSymbolId, factPath + ".relatedSymbolId", 1_024, errors);
+            }
+        }
+
+        for (int index = 0; index < factSet.Diagnostics.Length; index++)
+        {
+            RepositoryDiagnostic? diagnostic = factSet.Diagnostics[index];
+            string diagnosticPath = path + ".diagnostics[" + index + "]";
+            if (diagnostic is null)
+            {
+                Add(errors, "diagnostic.missing", diagnosticPath, "Semantic C3 diagnostic must not be null.");
+                continue;
+            }
+
+            CheckBoundedMetadataText(diagnostic.Code, diagnosticPath + ".code", 256, errors);
+            CheckBoundedMetadataText(diagnostic.Message, diagnosticPath + ".message", 512, errors);
+            if (diagnostic.RelativePath is not null)
+            {
+                CheckPath(diagnostic.RelativePath, diagnosticPath + ".relativePath", errors);
+            }
+
+            if (!Enum.IsDefined(diagnostic.Severity))
+            {
+                Add(errors, "diagnostic.severity", diagnosticPath + ".severity", "Unknown diagnostic severity.");
+            }
+        }
+    }
+
+    private static void ValidateExternalIntegrationEvidence(
+        Repo2C4.Core.ExternalIntegrations.ExternalIntegrationEvidenceResult? result,
+        ImmutableArray<Evidence> repositoryEvidence,
+        HashSet<string> inventoriedPaths,
+        string snapshotPath,
+        List<ContractError> errors)
+    {
+        if (result is null)
+        {
+            return;
+        }
+
+        string path = snapshotPath + ".externalIntegrationEvidence";
+        if (result.Evidence.IsDefault || result.Diagnostics.IsDefault)
+        {
+            Add(errors, "collection.missing", path, "External integration evidence and diagnostics must be initialized.");
+            return;
+        }
+
+        if (result.Evidence.Length > 5_000)
+        {
+            Add(errors, "external.findings.limit", path + ".evidence", "Persisted external integration evidence exceeds the bounded limit.");
+        }
+
+        Dictionary<string, Evidence> evidenceById = new(StringComparer.Ordinal);
+        foreach (Evidence? item in repositoryEvidence)
+        {
+            if (item is not null && !string.IsNullOrWhiteSpace(item.Id))
+            {
+                _ = evidenceById.TryAdd(item.Id, item);
+            }
+        }
+        HashSet<string> ids = new(StringComparer.Ordinal);
+
+        for (int index = 0; index < result.Evidence.Length; index++)
+        {
+            Repo2C4.Core.ExternalIntegrations.ExternalIntegrationEvidence? evidence = result.Evidence[index];
+            string evidencePath = path + ".evidence[" + index + "]";
+            if (evidence is null)
+            {
+                Add(errors, "external.evidence.missing", evidencePath, "External integration evidence must not be null.");
+                continue;
+            }
+
+            CheckId(evidence.Id, evidencePath + ".id", errors);
+            if (IsValidId(evidence.Id) && !ids.Add(evidence.Id))
+            {
+                Add(errors, "id.duplicate", evidencePath + ".id", "External integration evidence IDs must be unique.");
+            }
+
+            CheckPath(evidence.ProjectPath, evidencePath + ".projectPath", errors);
+            CheckPath(evidence.SourcePath, evidencePath + ".sourcePath", errors);
+            if (IsNormalizedRelativePath(evidence.ProjectPath) &&
+                !inventoriedPaths.Contains(evidence.ProjectPath))
+            {
+                Add(errors, "external.projectMissing", evidencePath + ".projectPath", "External integration project must exist in the inventory.");
+            }
+
+            if (IsNormalizedRelativePath(evidence.SourcePath) &&
+                !inventoriedPaths.Contains(evidence.SourcePath))
+            {
+                Add(errors, "external.sourceMissing", evidencePath + ".sourcePath", "External integration source must exist in the inventory.");
+            }
+
+            if (evidence.SourceLine <= 0)
+            {
+                Add(errors, "external.line", evidencePath + ".sourceLine", "External integration source line must be positive.");
+            }
+
+            if (!Enum.IsDefined(evidence.Kind) ||
+                !Enum.IsDefined(evidence.Direction) ||
+                !Enum.IsDefined(evidence.Confidence))
+            {
+                Add(errors, "external.vocabulary", evidencePath, "External integration kind, direction and confidence must be supported enum values.");
+            }
+
+            CheckBoundedMetadataText(evidence.Category, evidencePath + ".category", 256, errors);
+            CheckBoundedMetadataText(evidence.Description, evidencePath + ".description", 512, errors);
+            CheckBoundedMetadataText(evidence.Technology, evidencePath + ".technology", 256, errors);
+            CheckOptionalBoundedMetadataText(evidence.Target, evidencePath + ".target", 512, errors);
+            CheckOptionalBoundedMetadataText(evidence.ResourceType, evidencePath + ".resourceType", 256, errors);
+            CheckOptionalBoundedMetadataText(evidence.ConfigurationKey, evidencePath + ".configurationKey", 512, errors);
+            CheckOptionalBoundedMetadataText(evidence.Contract, evidencePath + ".contract", 512, errors);
+
+            if (evidence.Signals.IsDefault || evidence.Signals.Length is 0 or > 32)
+            {
+                Add(errors, "external.signals", evidencePath + ".signals", "External integration signals must be a non-empty bounded collection.");
+            }
+            else
+            {
+                for (int signalIndex = 0; signalIndex < evidence.Signals.Length; signalIndex++)
+                {
+                    CheckBoundedMetadataText(
+                        evidence.Signals[signalIndex],
+                        evidencePath + ".signals[" + signalIndex + "]",
+                        512,
+                        errors);
+                }
+            }
+
+            if (!evidenceById.TryGetValue(evidence.Id, out Evidence? persisted) ||
+                persisted != evidence.ToRepositoryEvidence())
+            {
+                Add(errors, "external.repositoryEvidenceMismatch", evidencePath + ".id", "Persisted external integration evidence must match repository evidence.");
+            }
+        }
+
+        for (int index = 0; index < result.Diagnostics.Length; index++)
+        {
+            Repo2C4.Core.ExternalIntegrations.ExternalIntegrationDiagnostic? diagnostic = result.Diagnostics[index];
+            string diagnosticPath = path + ".diagnostics[" + index + "]";
+            if (diagnostic is null)
+            {
+                Add(errors, "external.diagnosticMissing", diagnosticPath, "External integration diagnostic must not be null.");
+                continue;
+            }
+
+            CheckBoundedMetadataText(diagnostic.Code, diagnosticPath + ".code", 256, errors);
+            CheckBoundedMetadataText(diagnostic.Path, diagnosticPath + ".path", 512, errors);
+            CheckBoundedMetadataText(diagnostic.Message, diagnosticPath + ".message", 512, errors);
+            if (!Enum.IsDefined(diagnostic.Severity))
+            {
+                Add(errors, "diagnostic.severity", diagnosticPath + ".severity", "Unknown diagnostic severity.");
+            }
+        }
+    }
+
+    private static void CheckBoundedMetadataText(
+        string? value,
+        string path,
+        int maxLength,
+        List<ContractError> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.Length > maxLength ||
+            value.Any(char.IsControl))
+        {
+            Add(errors, "text.invalid", path, "Metadata text must be nonempty, bounded and free of control characters.");
+        }
+    }
+
+    private static void CheckOptionalBoundedMetadataText(
+        string? value,
+        string path,
+        int maxLength,
+        List<ContractError> errors)
+    {
+        if (value is not null &&
+            (string.IsNullOrWhiteSpace(value) ||
+             value.Length > maxLength ||
+             value.Any(char.IsControl)))
+        {
+            Add(errors, "text.invalid", path, "Optional metadata text must be bounded and free of control characters.");
+        }
     }
 
     private static void CheckProvenance(

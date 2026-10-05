@@ -24,5 +24,8 @@
     <None Include="../fixtures/external-integrations/dotnetrepoinspector-v1.6.5-canonical.json"
           Link="ExternalFixtures/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/fixtures/semantic-c3-dogfood/**"
+          Link="SemanticC3Dogfood/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

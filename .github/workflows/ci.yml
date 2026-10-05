@@ -405,6 +405,59 @@ jobs:
           grep -Fq "component" "$workdir/c3/model.c4"
           "${cli[@]}" validate --output "$workdir/c3"
 
+          "${cli[@]}" generate \
+            --model examples/models/multi-c3.c2.v1.json \
+            --output "$workdir/c3-multi" \
+            --c3-container el_beta \
+            --c3-container el_alpha \
+            --c3-container el_alpha \
+            --apply
+          test -s "$workdir/c3-multi/c3.views.c4"
+          grep -Fq "view c3_el_alpha {" "$workdir/c3-multi/c3.views.c4"
+          grep -Fq "view c3_el_beta {" "$workdir/c3-multi/c3.views.c4"
+          test "$(grep -Ec '^[[:space:]]*view c3_' "$workdir/c3-multi/c3.views.c4")" -eq 2
+          grep -Fq "component" "$workdir/c3-multi/model.c4"
+          "${cli[@]}" validate --output "$workdir/c3-multi"
+
+          "${cli[@]}" inspect \
+            --repository examples/fixtures/semantic-c3-dogfood \
+            --integration-report inspection-v1.6.json \
+            --output "$workdir/dogfood.snapshot.json"
+          python3 scripts/build-semantic-c3-dogfood-model.py \
+            "$workdir/dogfood.snapshot.json" \
+            "$workdir/dogfood.c2.json"
+          "${cli[@]}" generate \
+            --model "$workdir/dogfood.c2.json" \
+            --output "$workdir/dogfood" \
+            --c3-container el_ingestion_api \
+            --c3-container el_ingestion_outbox_worker \
+            --c3-container el_consolidation_api \
+            --c3-container el_consolidation_worker \
+            --apply
+          test -s "$workdir/dogfood/semantic-c3-evidence-report.md"
+          test "$(grep -Ec '^[[:space:]]*view c3_' "$workdir/dogfood/c3.views.c4")" -eq 4
+          grep -Fq 'ApplicationService' "$workdir/dogfood/semantic-c3-evidence-report.md"
+          grep -Fq 'PersistenceAdapter' "$workdir/dogfood/semantic-c3-evidence-report.md"
+          grep -Fq 'MessagingConsumer' "$workdir/dogfood/semantic-c3-evidence-report.md"
+          grep -Fq 'MessagingPublisher' "$workdir/dogfood/semantic-c3-evidence-report.md"
+          grep -Fq 'IntegrationAdapter' "$workdir/dogfood/semantic-c3-evidence-report.md"
+          if grep -Fq 'TelemetryNames' "$workdir/dogfood/model.c4"; then
+            echo "Semantic C3 dogfood promoted a utility type."
+            exit 1
+          fi
+          "${cli[@]}" validate --output "$workdir/dogfood"
+
+          dogfood_preview="$("${cli[@]}" generate \
+            --model "$workdir/dogfood.c2.json" \
+            --output "$workdir/dogfood" \
+            --c3-container el_consolidation_worker \
+            --c3-container el_ingestion_api \
+            --c3-container el_consolidation_api \
+            --c3-container el_ingestion_outbox_worker)"
+          [[ "$dogfood_preview" == *"unchanged model.c4"* ]]
+          [[ "$dogfood_preview" == *"unchanged c3.views.c4"* ]]
+          [[ "$dogfood_preview" == *"unchanged semantic-c3-evidence-report.md"* ]]
+
           preview="$("${cli[@]}" generate \
             --model examples/end-to-end/architecture.c2.v1.json \
             --output "$workdir/c2")"

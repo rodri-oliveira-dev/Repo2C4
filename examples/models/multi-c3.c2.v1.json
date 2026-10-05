@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "level": "C2",
+  "snapshot": {
+    "schemaVersion": "1.0",
+    "repositoryId": "multi_c3_fixture",
+    "files": [
+      {"relativePath": "Suite.slnx", "sizeBytes": 100},
+      {"relativePath": "src/Alpha/Alpha.csproj", "sizeBytes": 100},
+      {"relativePath": "src/Beta/Beta.csproj", "sizeBytes": 100},
+      {"relativePath": "src/Gamma/Gamma.csproj", "sizeBytes": 100},
+      {"relativePath": "src/Delta/Delta.csproj", "sizeBytes": 100}
+    ],
+    "evidence": [
+      {"id":"ev_solution","category":"dotnet.solution.project","relativePath":"Suite.slnx","line":1,"sourceType":"manifest","description":"Solution declares selected application projects."},
+      {"id":"ev_alpha_http","category":"dotnet.runtime.http.candidate","relativePath":"src/Alpha/Alpha.csproj","line":1,"sourceType":"projectFile","description":"Alpha is an HTTP host candidate."},
+      {"id":"ev_beta_http","category":"dotnet.runtime.http.candidate","relativePath":"src/Beta/Beta.csproj","line":1,"sourceType":"projectFile","description":"Beta is an HTTP host candidate."},
+      {"id":"ev_gamma_http","category":"dotnet.runtime.http.candidate","relativePath":"src/Gamma/Gamma.csproj","line":1,"sourceType":"projectFile","description":"Gamma is an HTTP host candidate."},
+      {"id":"ev_delta_http","category":"dotnet.runtime.http.candidate","relativePath":"src/Delta/Delta.csproj","line":1,"sourceType":"projectFile","description":"Delta is an HTTP host candidate."}
+    ],
+    "diagnostics": []
+  },
+  "elements": [
+    {"id":"el_user","kind":"actor","name":"User","evidenceIds":[],"status":"requiresReview","reviewReason":"Actor is included only to exercise non-container selection validation."},
+    {"id":"el_suite","kind":"softwareSystem","name":"Suite","evidenceIds":["ev_solution"],"status":"confirmed"},
+    {"id":"el_alpha","kind":"container","name":"Alpha API","parentId":"el_suite","evidenceIds":["ev_alpha_http"],"status":"requiresReview","reviewReason":"Deployment boundary requires review."},
+    {"id":"el_beta","kind":"container","name":"Beta API","parentId":"el_suite","evidenceIds":["ev_beta_http"],"status":"requiresReview","reviewReason":"Deployment boundary requires review."},
+    {"id":"el_gamma","kind":"container","name":"Gamma API","parentId":"el_suite","evidenceIds":["ev_gamma_http"],"status":"requiresReview","reviewReason":"Deployment boundary requires review."},
+    {"id":"el_delta","kind":"container","name":"Delta API","parentId":"el_suite","evidenceIds":["ev_delta_http"],"status":"requiresReview","reviewReason":"Deployment boundary requires review."}
+  ],
+  "relations": []
+}

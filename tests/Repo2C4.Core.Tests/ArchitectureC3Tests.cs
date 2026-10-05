@@ -196,6 +196,123 @@ public sealed class ArchitectureC3Tests
         Assert.Contains(errors, error => error.Code == "relation.destinationMissing");
     }
 
+    [Fact]
+    public void ZeroSelectionsKeepC2OnlyOutput()
+    {
+        ArchitectureModel c2 = LoadModel("multi-c3.c2.v1.json");
+
+        ArchitectureC3Workspace workspace = ArchitectureC3Builder.BuildMany(c2, []);
+        IReadOnlyList<LikeC4GeneratedFile> actual = LikeC4Emitter.EmitWithC3(workspace);
+        IReadOnlyList<LikeC4GeneratedFile> expected = LikeC4Emitter.Emit(c2);
+
+        Assert.Empty(workspace.Selections);
+        Assert.Equal(
+            expected.Select(file => (file.FileName, file.Content)),
+            actual.Select(file => (file.FileName, file.Content)));
+        Assert.DoesNotContain(actual, file => file.FileName == LikeC4Emitter.C3ViewsFileName);
+    }
+
+    [Fact]
+    public void SingleSelectionWorkspaceIsBackwardCompatibleWithLegacyEmission()
+    {
+        ArchitectureModel c2 = LoadModel("multi-c3.c2.v1.json");
+        ArchitectureC3Model single = ArchitectureC3Builder.Build(c2, "el_alpha");
+        ArchitectureC3Workspace workspace = ArchitectureC3Builder.BuildMany(c2, ["el_alpha"]);
+
+        IReadOnlyList<LikeC4GeneratedFile> legacy = LikeC4Emitter.EmitWithC3(c2, single);
+        IReadOnlyList<LikeC4GeneratedFile> multi = LikeC4Emitter.EmitWithC3(workspace);
+
+        Assert.Equal(
+            legacy.Select(file => (file.FileName, file.Content)),
+            multi.Select(file => (file.FileName, file.Content)));
+        Assert.Contains(
+            "view c3 {",
+            multi.Single(file => file.FileName == LikeC4Emitter.C3ViewsFileName).Content,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MultipleSelectionsAreCanonicalDeduplicatedAndShareOneWorkspace()
+    {
+        ArchitectureModel c2 = LoadModel("multi-c3.c2.v1.json");
+
+        ArchitectureC3Workspace workspace = ArchitectureC3Builder.BuildMany(
+            c2,
+            ["el_delta", "el_alpha", "el_beta", "el_alpha", "el_gamma"]);
+        IReadOnlyList<LikeC4GeneratedFile> files = LikeC4Emitter.EmitWithC3(workspace);
+
+        Assert.Equal(
+            ["el_alpha", "el_beta", "el_delta", "el_gamma"],
+            workspace.Selections.Select(selection => selection.SelectedContainerId));
+
+        string model = files.Single(file => file.FileName == LikeC4Emitter.ModelFileName).Content;
+        Assert.Equal(4, model.Split(" = component ", StringSplitOptions.None).Length - 1);
+
+        string views = files.Single(file => file.FileName == LikeC4Emitter.C3ViewsFileName).Content;
+        Assert.Contains("view c3_el_alpha {", views, StringComparison.Ordinal);
+        Assert.Contains("view c3_el_beta {", views, StringComparison.Ordinal);
+        Assert.Contains("view c3_el_delta {", views, StringComparison.Ordinal);
+        Assert.Contains("view c3_el_gamma {", views, StringComparison.Ordinal);
+        Assert.Contains("C3 - Alpha API", views, StringComparison.Ordinal);
+        Assert.Contains("C3 - Beta API", views, StringComparison.Ordinal);
+        Assert.Contains("C3 - Gamma API", views, StringComparison.Ordinal);
+        Assert.Contains("C3 - Delta API", views, StringComparison.Ordinal);
+        Assert.Equal(1, views.Split("views {", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void SelectionArgumentOrderDoesNotChangeGeneratedWorkspace()
+    {
+        ArchitectureModel c2 = LoadModel("multi-c3.c2.v1.json");
+
+        ArchitectureC3Workspace first = ArchitectureC3Builder.BuildMany(
+            c2,
+            ["el_gamma", "el_alpha", "el_beta"]);
+        ArchitectureC3Workspace second = ArchitectureC3Builder.BuildMany(
+            c2,
+            ["el_beta", "el_gamma", "el_alpha", "el_alpha"]);
+
+        IReadOnlyList<LikeC4GeneratedFile> firstFiles = LikeC4Emitter.EmitWithC3(first);
+        IReadOnlyList<LikeC4GeneratedFile> secondFiles = LikeC4Emitter.EmitWithC3(second);
+
+        Assert.Equal(
+            firstFiles.Select(file => (file.FileName, file.Content)),
+            secondFiles.Select(file => (file.FileName, file.Content)));
+    }
+
+    [Fact]
+    public void InvalidOrNonContainerSelectionsAndC1BaseAreRejected()
+    {
+        ArchitectureModel c2 = LoadModel("multi-c3.c2.v1.json");
+
+        ContractValidationException missing = Assert.Throws<ContractValidationException>(
+            () => ArchitectureC3Builder.BuildMany(c2, ["el_missing"]));
+        Assert.Contains(missing.Errors, error => error.Code == "c3.containerMissing");
+
+        ContractValidationException system = Assert.Throws<ContractValidationException>(
+            () => ArchitectureC3Builder.BuildMany(c2, ["el_suite"]));
+        Assert.Contains(system.Errors, error => error.Code == "c3.containerKind");
+
+        ContractValidationException actor = Assert.Throws<ContractValidationException>(
+            () => ArchitectureC3Builder.BuildMany(c2, ["el_user"]));
+        Assert.Contains(actor.Errors, error => error.Code == "c3.containerKind");
+
+        ArchitectureModel c1 = c2 with
+        {
+            Level = ArchitectureLevel.C1,
+            Elements =
+            [
+                .. c2.Elements.Where(element =>
+                    element.Kind is ArchitectureElementKind.Actor or ArchitectureElementKind.SoftwareSystem),
+            ],
+            Relations = [],
+        };
+
+        ContractValidationException invalidLevel = Assert.Throws<ContractValidationException>(
+            () => ArchitectureC3Builder.BuildMany(c1, ["el_suite"]));
+        Assert.Contains(invalidLevel.Errors, error => error.Code == "c3.baseLevel");
+    }
+
     private static ArchitectureModel LoadModel(string fileName)
     {
         string path = Path.Combine(AppContext.BaseDirectory, "MappingFixtures", fileName);

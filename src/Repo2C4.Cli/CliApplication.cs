@@ -25,7 +25,7 @@ public static class CliExitCodes
 
 internal static class CliApplication
 {
-    private const long MaxModelBytes = 4L * 1024 * 1024;
+    internal const long MaxModelBytes = 4L * 1024 * 1024;
     private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
 
     public static async Task<int> RunAsync(
@@ -494,9 +494,114 @@ internal static class CliApplication
         RepositorySnapshot snapshot,
         CancellationToken cancellationToken)
     {
-        string json = NormalizeText(ContractJson.SerializeSnapshot(snapshot));
+        RepositorySnapshot boundedSnapshot = FitSnapshotToCliInputBudget(snapshot);
+        string json = NormalizeText(ContractJson.SerializeSnapshot(boundedSnapshot));
         await WriteTextFileAsync(output, json, overwrite: false, cancellationToken).ConfigureAwait(false);
     }
+
+    internal static RepositorySnapshot FitSnapshotToCliInputBudget(RepositorySnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (GetSerializedSnapshotByteCount(snapshot) <= MaxModelBytes)
+        {
+            return snapshot;
+        }
+
+        SemanticC3FactSet? semanticFacts = snapshot.SemanticC3Facts;
+        if (semanticFacts is null || semanticFacts.Facts.IsEmpty)
+        {
+            throw SnapshotTooLarge();
+        }
+
+        RepositoryDiagnostic limitDiagnostic = new(
+            "semanticC3.snapshotByteLimit",
+            DiagnosticSeverity.Warning,
+            null,
+            "Semantic C3 facts were truncated so the persisted snapshot remains within the 4 MiB CLI input budget.");
+        RepositoryDiagnostic[] semanticDiagnostics =
+        [
+            .. semanticFacts.Diagnostics
+                .Append(limitDiagnostic)
+                .Distinct()
+                .OrderBy(item => item.Code, StringComparer.Ordinal)
+                .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
+                .ThenBy(item => item.Message, StringComparer.Ordinal),
+        ];
+        SemanticC3Fact[] orderedFacts =
+        [
+            .. semanticFacts.Facts.OrderBy(item => item.Id, StringComparer.Ordinal),
+        ];
+
+        int low = 0;
+        int high = orderedFacts.Length;
+        int bestCount = -1;
+        while (low <= high)
+        {
+            int count = low + ((high - low) / 2);
+            RepositorySnapshot candidate = snapshot with
+            {
+                SemanticC3Facts = semanticFacts with
+                {
+                    Facts = [.. orderedFacts.Take(count)],
+                    Diagnostics = [.. semanticDiagnostics],
+                },
+            };
+
+            if (GetSerializedSnapshotByteCount(candidate) <= MaxModelBytes)
+            {
+                bestCount = count;
+                low = count + 1;
+            }
+            else
+            {
+                high = count - 1;
+            }
+        }
+
+        if (bestCount >= 0)
+        {
+            return snapshot with
+            {
+                SemanticC3Facts = semanticFacts with
+                {
+                    Facts = [.. orderedFacts.Take(bestCount)],
+                    Diagnostics = [.. semanticDiagnostics],
+                },
+            };
+        }
+
+        RepositorySnapshot withoutSemanticFacts = snapshot with
+        {
+            SemanticC3Facts = null,
+            Diagnostics =
+            [
+                .. snapshot.Diagnostics
+                    .Append(limitDiagnostic)
+                    .Distinct()
+                    .OrderBy(item => item.Code, StringComparer.Ordinal)
+                    .ThenBy(item => item.RelativePath, StringComparer.Ordinal)
+                    .ThenBy(item => item.Message, StringComparer.Ordinal),
+            ],
+        };
+        if (GetSerializedSnapshotByteCount(withoutSemanticFacts) <= MaxModelBytes)
+        {
+            return withoutSemanticFacts;
+        }
+
+        throw SnapshotTooLarge();
+    }
+
+    private static int GetSerializedSnapshotByteCount(RepositorySnapshot snapshot) =>
+        Encoding.UTF8.GetByteCount(NormalizeText(ContractJson.SerializeSnapshot(snapshot)));
+
+    private static ContractValidationException SnapshotTooLarge() =>
+        new(
+            [
+                new ContractError(
+                    "snapshot.size",
+                    "$",
+                    "Snapshot exceeds the 4 MiB CLI input limit even after bounded Semantic C3 facts are omitted."),
+            ]);
 
     private static async Task<int> RunGenerateAsync(
         string[] args,
@@ -504,13 +609,24 @@ internal static class CliApplication
         TextWriter standardError,
         CancellationToken cancellationToken)
     {
+        if (!TryExtractRepeatedValueOption(
+                args,
+                "--c3-container",
+                out string[] remainingArgs,
+                out string[] selectedContainers,
+                out string? repeatedOptionError))
+        {
+            standardError.WriteLine(repeatedOptionError);
+            return CliExitCodes.UsageError;
+        }
+
         if (!TryParseOptions(
-            args,
-            ["--model", "--output", "--c3-container"],
-            ["--apply"],
-            out Dictionary<string, string> values,
-            out HashSet<string> flags,
-            out string? parseError))
+                remainingArgs,
+                ["--model", "--output"],
+                ["--apply"],
+                out Dictionary<string, string> values,
+                out HashSet<string> flags,
+                out string? parseError))
         {
             standardError.WriteLine(parseError);
             return CliExitCodes.UsageError;
@@ -541,16 +657,10 @@ internal static class CliApplication
 
             string json = await File.ReadAllTextAsync(fullModelPath, cancellationToken).ConfigureAwait(false);
             ArchitectureModel model = ContractJson.DeserializeModel(json);
-            IReadOnlyList<LikeC4GeneratedFile> files;
-            if (values.TryGetValue("--c3-container", out string? selectedContainer))
-            {
-                ArchitectureC3Model c3 = ArchitectureC3Builder.Build(model, selectedContainer);
-                files = LikeC4Emitter.EmitWithC3(model, c3);
-            }
-            else
-            {
-                files = LikeC4Emitter.Emit(model);
-            }
+            ArchitectureC3BuildResult c3Build =
+                ArchitectureC3Builder.BuildManyDetailed(model, selectedContainers);
+            IReadOnlyList<LikeC4GeneratedFile> files =
+                LikeC4Emitter.EmitWithC3(c3Build.Workspace);
 
             EvidenceReportResult report = EvidenceReportGenerator.Generate(model);
             List<LikeC4GeneratedFile> managedFiles =
@@ -558,6 +668,19 @@ internal static class CliApplication
                 .. files.Select(file => new LikeC4GeneratedFile(file.FileName, NormalizeText(file.Content))),
                 new LikeC4GeneratedFile(report.FileName, NormalizeText(report.Content)),
             ];
+
+            if (c3Build.SemanticResult is not null &&
+                model.Snapshot.SemanticC3Facts is not null)
+            {
+                EvidenceReportResult semanticReport =
+                    EvidenceReportGenerator.GenerateSemanticC3(
+                        model,
+                        c3Build.SemanticResult,
+                        model.Snapshot.SemanticC3Facts);
+                managedFiles.Add(new LikeC4GeneratedFile(
+                    semanticReport.FileName,
+                    NormalizeText(semanticReport.Content)));
+            }
 
             string outputRoot = Path.GetFullPath(outputPath);
             if (Directory.Exists(outputRoot) && IsReparsePoint(outputRoot))
@@ -681,6 +804,44 @@ internal static class CliApplication
         }
     }
 
+    private static bool TryExtractRepeatedValueOption(
+        string[] args,
+        string option,
+        out string[] remainingArgs,
+        out string[] values,
+        out string? error)
+    {
+        List<string> remaining = [];
+        List<string> repeatedValues = [];
+
+        for (int index = 0; index < args.Length; index++)
+        {
+            string token = args[index];
+            if (!string.Equals(token, option, StringComparison.Ordinal))
+            {
+                remaining.Add(token);
+                continue;
+            }
+
+            if (index + 1 >= args.Length ||
+                args[index + 1].StartsWith("--", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(args[index + 1]))
+            {
+                remainingArgs = [];
+                values = [];
+                error = "Missing value for option: " + option + ".";
+                return false;
+            }
+
+            repeatedValues.Add(args[++index]);
+        }
+
+        remainingArgs = [.. remaining];
+        values = [.. repeatedValues];
+        error = null;
+        return true;
+    }
+
     private static bool TryParseOptions(
         string[] args,
         string[] valueOptions,
@@ -776,8 +937,8 @@ internal static class CliApplication
                 output.WriteLine("Collects bounded evidence only. Remote HTTPS acquisition uses an isolated temporary workspace and writes separate acquisition provenance.");
                 return CliExitCodes.Success;
             case "generate":
-                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID] [--apply]");
-                output.WriteLine("Previews deterministic C1/C2 outputs and evidence-report.md; --apply writes only managed, unchanged outputs. --c3-container ID adds selected C3.");
+                output.WriteLine("Usage: repo2c4 generate --model architecture.json --output DIR [--c3-container ID ...] [--apply]");
+                output.WriteLine("Previews deterministic C1/C2 outputs and evidence-report.md; --apply writes only managed, unchanged outputs. Repeat --c3-container ID to add multiple selected C3 views to one workspace.");
                 return CliExitCodes.Success;
             case "validate":
                 output.WriteLine("Usage: repo2c4 validate --output DIR");

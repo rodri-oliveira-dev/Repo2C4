@@ -47,6 +47,7 @@ public sealed class McpLikeC4ToolsTests
         Assert.Equal(3, result.Files.Length);
         Assert.NotEmpty(result.Changes);
         Assert.False(result.HasConflicts);
+        Assert.Empty(result.C3Views);
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
     }
 
@@ -345,6 +346,201 @@ public sealed class McpLikeC4ToolsTests
                 cancellationToken: cancellation.Token));
 
         Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
+    public async Task LegacySingleC3SelectionRemainsCompatibleAndReportsView()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateMultiC3Snapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        McpGenerateLikeC4Result result = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            CreateMultiC3Model(snapshot),
+            destinationPath: "architecture",
+            c3ContainerId: "el_alpha",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        McpC3View view = Assert.Single(result.C3Views);
+        Assert.Equal("el_alpha", view.ContainerId);
+        Assert.Equal("c3", view.ViewId);
+        Assert.Contains(result.Files, file => file.FileName == "c3.views.c4");
+        Assert.False(result.Written);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
+    public async Task MultiC3SelectionIsCanonicalDeduplicatedAndReportsProducedViews()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateMultiC3Snapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        McpGenerateLikeC4Result result = await tools.GenerateLikeC4(
+            entry.SnapshotId,
+            CreateMultiC3Model(snapshot),
+            destinationPath: "architecture",
+            c3Containers: ["el_beta", "el_alpha", "el_alpha"],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            ["el_alpha", "el_beta"],
+            result.C3Views.Select(view => view.ContainerId));
+        Assert.Equal(
+            ["c3_el_alpha", "c3_el_beta"],
+            result.C3Views.Select(view => view.ViewId));
+        Assert.Equal(4, result.Files.Length);
+        Assert.Contains(result.Files, file => file.FileName == "c3.views.c4");
+        Assert.False(result.Written);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
+    public async Task MultiC3InvalidIdFailsBeforeManagedOutput()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateMultiC3Snapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        Exception invalid = await Assert.ThrowsAnyAsync<Exception>(
+            () => tools.GenerateLikeC4(
+                entry.SnapshotId,
+                CreateMultiC3Model(snapshot),
+                dryRun: false,
+                write: true,
+                destinationPath: "architecture",
+                c3Containers: ["el_alpha", "el_missing"],
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("model_invalid", invalid.Message, StringComparison.Ordinal);
+        Assert.Contains("c3.containerMissing", invalid.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
+    public async Task MultiC3SelectionBudgetIsEnforcedBeforeWriting()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateMultiC3Snapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        string[] overBudget =
+        [
+            "el_alpha",
+            "el_beta",
+            "el_alpha",
+            "el_beta",
+            "el_alpha",
+            "el_beta",
+            "el_alpha",
+            "el_beta",
+            "el_alpha",
+        ];
+
+        Exception budget = await Assert.ThrowsAnyAsync<Exception>(
+            () => tools.GenerateLikeC4(
+                entry.SnapshotId,
+                CreateMultiC3Model(snapshot),
+                dryRun: false,
+                write: true,
+                destinationPath: "architecture",
+                c3Containers: overBudget,
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("c3_budget_exceeded", budget.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    [Fact]
+    public async Task MultiC3ProposalValidationReportsSameViewsWithoutWriting()
+    {
+        using TempDirectory temp = new();
+        using McpSnapshotStore store = new();
+        RepositorySnapshot snapshot = CreateMultiC3Snapshot();
+        McpSnapshotStore.SnapshotEntry entry = store.Store(snapshot);
+        McpLikeC4Tools tools = new(temp.Path, store);
+
+        McpValidateLikeC4Result result = await tools.ValidateLikeC4(
+            entry.SnapshotId,
+            CreateMultiC3Model(snapshot),
+            c3Containers: ["el_alpha", "el_beta"],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            ["el_alpha", "el_beta"],
+            result.C3Views.Select(view => view.ContainerId));
+        Assert.False(Directory.Exists(Path.Combine(temp.Path, "architecture")));
+    }
+
+    private static RepositorySnapshot CreateMultiC3Snapshot()
+    {
+        RepositoryFile alpha = new("src/Alpha/Alpha.csproj", 128, null);
+        RepositoryFile beta = new("src/Beta/Beta.csproj", 128, null);
+        Evidence alphaEvidence = new(
+            "ev_alpha_http",
+            "dotnet.runtime.http.candidate",
+            alpha.RelativePath,
+            1,
+            EvidenceSourceType.ProjectFile,
+            "Alpha is an HTTP host candidate.");
+        Evidence betaEvidence = new(
+            "ev_beta_http",
+            "dotnet.runtime.http.candidate",
+            beta.RelativePath,
+            1,
+            EvidenceSourceType.ProjectFile,
+            "Beta is an HTTP host candidate.");
+
+        return new RepositorySnapshot(
+            ContractSchema.Version,
+            "repo_multi_c3_test",
+            [alpha, beta],
+            [alphaEvidence, betaEvidence],
+            []);
+    }
+
+    private static ArchitectureModel CreateMultiC3Model(RepositorySnapshot snapshot)
+    {
+        ArchitectureElement system = new(
+            "el_system",
+            ArchitectureElementKind.SoftwareSystem,
+            "System",
+            null,
+            ["ev_alpha_http"],
+            ReviewStatus.RequiresReview,
+            "System boundary requires review.");
+        ArchitectureElement alpha = new(
+            "el_alpha",
+            ArchitectureElementKind.Container,
+            "Alpha API",
+            "el_system",
+            ["ev_alpha_http"],
+            ReviewStatus.RequiresReview,
+            "Deployment boundary requires review.");
+        ArchitectureElement beta = new(
+            "el_beta",
+            ArchitectureElementKind.Container,
+            "Beta API",
+            "el_system",
+            ["ev_beta_http"],
+            ReviewStatus.RequiresReview,
+            "Deployment boundary requires review.");
+
+        return new ArchitectureModel(
+            ContractSchema.Version,
+            ArchitectureLevel.C2,
+            snapshot,
+            [system, alpha, beta],
+            []);
     }
 
     private static RepositorySnapshot CreateSnapshot(string category = "dotnet.project.kind")

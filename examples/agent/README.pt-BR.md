@@ -37,9 +37,9 @@ Nesta fixture, um modelo não deve promover fronteira de runtime/deployment para
 
 Nenhum arquivo `.c4` gerenciado é criado nesta etapa. Uma execução bem-sucedida imprime `Status: completed` ou `Status: requires_review`, seguida pelo run ID e pelos contadores limitados da execução.
 
-### C3 seletivo opcional
+### C3 seletivo multi-container opcional
 
-Se uma proposta C2 revisada contiver um container com ID arquitetural `container_api`, autorize somente esse container:
+Se uma proposta C2 revisada contiver vários containers sustentados por evidência, repita `--c3-container` para autorizar somente os candidatos que o Agent pode considerar:
 
 ```bash
 repo2c4-agent \
@@ -47,10 +47,11 @@ repo2c4-agent \
   --model SEU_MODELO_LOCAL \
   --repository-root "$(pwd)/examples/fixtures/library-only" \
   --c3-container "container_api" \
-  --goal "Produza C1/C2 e proponha C3 somente para container_api quando houver evidência suficiente."
+  --c3-container "container_worker" \
+  --goal "Produza C1/C2 e proponha C3 somente para containers autorizados, relevantes e sustentados por evidência."
 ```
 
-Não derive o ID do nome de um projeto. Ele precisa identificar previamente um container C2; caso contrário, o C3 é omitido.
+Os valores repetidos formam uma allow-list, não uma ordem para expandir todos. O Agent seleciona somente o subconjunto sustentado, com máximo de 8 IDs autorizados. Não derive IDs do nome de projetos; eles devem identificar containers C2 revisados.
 
 ## 3. Escrita protegida opcional
 

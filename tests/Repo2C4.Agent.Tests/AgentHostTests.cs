@@ -52,6 +52,31 @@ public sealed class AgentHostTests
         Assert.Contains("repository-relative", error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void C3AuthorizationSetIsBounded()
+    {
+        List<string> args =
+        [
+            "--provider", "ollama",
+            "--model", "model",
+            "--goal", "Document architecture",
+        ];
+
+        for (int index = 0; index <= AgentHostOptions.MaxC3ContainersPerRun; index++)
+        {
+            args.Add("--c3-container");
+            args.Add("el_" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        bool valid = AgentHostOptions.TryParse(
+            [.. args],
+            out _,
+            out string? error);
+
+        Assert.False(valid);
+        Assert.Contains("at most 8", error, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(new[] { "--model", "model" }, "--provider")]
     [InlineData(new[] { "--provider", "ollama" }, "--model")]

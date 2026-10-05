@@ -7,6 +7,26 @@ namespace Repo2C4.Core.Tests;
 public sealed class RepositoryFactExtractorTests
 {
     [Fact]
+    public void ProjectOnlyInspectionPreservesLegacySnapshotSurface()
+    {
+        using Fixture fixture = new();
+        fixture.Add("OnlyLib.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+
+        RepositoryScanOptions options = new(fixture.Root, "legacy_snapshot_surface");
+        RepositorySnapshot result = RepositoryFactExtractor.Extract(
+            options,
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(result.SemanticC3Facts);
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            diagnostic => diagnostic.Code.StartsWith("semanticC3.", StringComparison.Ordinal));
+
+        string json = ContractJson.SerializeSnapshot(result);
+        Assert.DoesNotContain("semanticC3Facts", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MultiProjectFixturePreservesProvenanceAndNeverPromotesCandidateToRuntimeRelation()
     {
         using Fixture fixture = new();

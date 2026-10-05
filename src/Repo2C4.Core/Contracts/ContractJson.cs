@@ -70,6 +70,40 @@ public static class ContractJson
                     .ThenBy(diagnostic => diagnostic.RelativePath, StringComparer.Ordinal)
                     .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal),
             ],
+            SemanticC3Facts = snapshot.SemanticC3Facts is null
+                ? null
+                : snapshot.SemanticC3Facts with
+                {
+                    Facts =
+                    [
+                        .. snapshot.SemanticC3Facts.Facts
+                            .OrderBy(fact => fact.Id, StringComparer.Ordinal),
+                    ],
+                    Diagnostics =
+                    [
+                        .. snapshot.SemanticC3Facts.Diagnostics
+                            .OrderBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                            .ThenBy(diagnostic => diagnostic.RelativePath, StringComparer.Ordinal)
+                            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal),
+                    ],
+                },
+            ExternalIntegrationEvidence = snapshot.ExternalIntegrationEvidence is null
+                ? null
+                : snapshot.ExternalIntegrationEvidence with
+                {
+                    Evidence =
+                    [
+                        .. snapshot.ExternalIntegrationEvidence.Evidence
+                            .OrderBy(evidence => evidence.Id, StringComparer.Ordinal),
+                    ],
+                    Diagnostics =
+                    [
+                        .. snapshot.ExternalIntegrationEvidence.Diagnostics
+                            .OrderBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                            .ThenBy(diagnostic => diagnostic.Path, StringComparer.Ordinal)
+                            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal),
+                    ],
+                },
         };
 
     private static ArchitectureModel CanonicalModel(ArchitectureModel model) =>
@@ -116,6 +150,10 @@ public static class ContractJson
         options.Converters.Add(new JsonStringEnumConverter<ReviewStatus>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         options.Converters.Add(new JsonStringEnumConverter<EvidenceSourceType>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         options.Converters.Add(new JsonStringEnumConverter<DiagnosticSeverity>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(new JsonStringEnumConverter<SemanticC3FactKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(new JsonStringEnumConverter<Repo2C4.Core.ExternalIntegrations.ExternalIntegrationKind>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(new JsonStringEnumConverter<Repo2C4.Core.ExternalIntegrations.ExternalIntegrationDirection>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+        options.Converters.Add(new JsonStringEnumConverter<Repo2C4.Core.ExternalIntegrations.ExternalIntegrationConfidence>(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         return options;
     }
 }
