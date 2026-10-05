@@ -4,6 +4,8 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-05
+
 ### Added
 - End-to-end Semantic C3 dogfooding derived from `dotnet-observability-lab`, with persisted bounded structural facts, sanitized external-integration correlation, responsibility-level four-container golden coverage, semantic provenance report, managed regeneration, real CLI/MCP paths and official LikeC4 validation while preserving legacy C3 fallback for older snapshots.
 - Bounded Semantic C3 multi-container support across MCP and Agent: typed `c3Containers` with legacy singular compatibility, deterministic `c3Views` reporting, pre-write ID/budget validation, repeated Agent authorization with evidence-supported subset selection, and exact C3 selection preserved through preview, validation and HITL write approval.
