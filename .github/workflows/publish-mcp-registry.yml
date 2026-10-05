@@ -24,7 +24,7 @@ concurrency:
 jobs:
   publish-mcp-registry:
     name: Publish Repo2C4 MCP to Official Registry
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: read
