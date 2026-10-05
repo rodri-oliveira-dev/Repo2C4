@@ -37,7 +37,7 @@ jobs:
   build-and-pack:
     name: Validate, build, test and pack
     if: ${{ github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -219,7 +219,7 @@ jobs:
     name: Create release tag
     needs: build-and-pack
     if: ${{ needs.build-and-pack.result == 'success' && needs.build-and-pack.outputs.publishing == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     outputs:
@@ -291,7 +291,7 @@ jobs:
       - build-and-pack
       - ensure-release-tag
     if: ${{ needs.build-and-pack.outputs.publishing == 'true' && needs.ensure-release-tag.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: read
@@ -350,7 +350,7 @@ jobs:
       - build-and-pack
       - ensure-release-tag
     if: ${{ needs.build-and-pack.outputs.publishing == 'true' && needs.ensure-release-tag.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: read
@@ -399,7 +399,7 @@ jobs:
       - publish-nuget
       - publish-github-packages
     if: ${{ needs.build-and-pack.outputs.publishing == 'true' && needs.publish-nuget.result == 'success' && needs.publish-github-packages.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
@@ -489,7 +489,7 @@ jobs:
       - publish-nuget
       - publish-github-packages
       - github-release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
