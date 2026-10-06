@@ -57,7 +57,7 @@ concurrency:
 jobs:
   prepare:
     name: Validate reviewed model and LikeC4 diff
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     permissions:
       contents: read
     outputs:
@@ -155,7 +155,7 @@ jobs:
     name: Create review PR only for a validated diff
     needs: prepare
     if: ${{ needs.prepare.outputs.has_changes == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     permissions:
       actions: read
       contents: write
