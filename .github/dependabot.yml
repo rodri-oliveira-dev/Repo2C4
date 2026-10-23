@@ -1,5 +1,7 @@
 # Dependabot groups updates per ecosystem. Cross-ecosystem PR grouping is not supported.
-# .NET SDK updates are handled by the central SDK synchronization workflow.
+# SDK updates are also managed by a separate central workflow in rodri-oliveira-dev/.github.
+# Keep SDK updates in this repository's Dependabot configuration as a local fallback.
+# Note: the central workflow must be coordinated to avoid duplicate SDK pull requests.
 version: 2
 
 updates:
@@ -15,6 +17,15 @@ updates:
       all-nuget-dependencies:
         patterns:
           - "*"
+
+  - package-ecosystem: "dotnet-sdk"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:15"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 1
 
   - package-ecosystem: "github-actions"
     directory: "/"
