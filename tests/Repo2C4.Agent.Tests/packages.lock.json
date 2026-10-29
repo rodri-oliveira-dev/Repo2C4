@@ -399,7 +399,7 @@
           "Microsoft.Agents.AI.Workflows": "[1.25.0, )",
           "Microsoft.Extensions.AI": "[10.11.0, )",
           "Microsoft.Extensions.AI.OpenAI": "[10.11.0, )",
-          "ModelContextProtocol.Core": "[2.2.0, )",
+          "ModelContextProtocol.Core": "[2.3.0, )",
           "OllamaSharp": "[5.5.0, )"
         }
       },
@@ -466,12 +466,12 @@
       },
       "ModelContextProtocol.Core": {
         "type": "CentralTransitive",
-        "requested": "[2.2.0, )",
-        "resolved": "2.2.0",
-        "contentHash": "FeBfXU6T8k+jw4afg4sfxdEX2rL/e5oKOk9ROOGztu9k47+7Bz08sdaToYt2XvMY1opNbwxYQOFMj6wH9TInhA==",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "EDpbQholhVWoNumb0Ab3oGv9LmXOLgaD5ixEIUkrnzpnqD0TJCSHTJ5G71/J1KlrQ98aWDclWTPMffKTnCJoMw==",
         "dependencies": {
-          "Microsoft.Extensions.AI.Abstractions": "10.8.3",
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.10"
+          "Microsoft.Extensions.AI.Abstractions": "10.11.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.13"
         }
       },
       "OllamaSharp": {
