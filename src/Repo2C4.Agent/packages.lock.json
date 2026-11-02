@@ -4,11 +4,11 @@
     "net10.0": {
       "Microsoft.Agents.AI": {
         "type": "Direct",
-        "requested": "[1.25.0, )",
-        "resolved": "1.25.0",
-        "contentHash": "4tlAYXt8d52vkq9mFb4brThwV+UdRt8mvzW2taNuzg1J3I/GDzzzJekjeRDFWnLiIIfxcTHG6roRDT8Ee3HVqg==",
+        "requested": "[1.27.0, )",
+        "resolved": "1.27.0",
+        "contentHash": "JMCxvNed3W1D0SDqsDlOl98BerkLaH/F2k8+iLMVMtKPKzy9aaU/5nvJzkbm/JNprULAxA5mjy8YAzxY3/+aOQ==",
         "dependencies": {
-          "Microsoft.Agents.AI.Abstractions": "1.25.0",
+          "Microsoft.Agents.AI.Abstractions": "1.27.0",
           "Microsoft.Extensions.AI": "10.10.0",
           "Microsoft.Extensions.AI.Abstractions": "10.10.1",
           "Microsoft.Extensions.AI.Evaluation": "10.10.0",
@@ -22,12 +22,12 @@
       },
       "Microsoft.Agents.AI.Workflows": {
         "type": "Direct",
-        "requested": "[1.25.0, )",
-        "resolved": "1.25.0",
-        "contentHash": "xyCUBNweZzpx7+b/W//bla+eKaLvGn9aCqL7Ou5PwQz7wQdkYg/v1OmmyyYbKaq0LRQSXbgXflTdEaOoVsG5iw==",
+        "requested": "[1.27.0, )",
+        "resolved": "1.27.0",
+        "contentHash": "K2YDHHtDFPySenOvPfowpj1vs7TtlQwJJXv9HhbwEva+fSSWmeGTVfJSoUL4YxDnk2DkU99LOPYmfLHZYb215w==",
         "dependencies": {
-          "Microsoft.Agents.AI": "1.25.0",
-          "Microsoft.Agents.AI.Abstractions": "1.25.0",
+          "Microsoft.Agents.AI": "1.27.0",
+          "Microsoft.Agents.AI.Abstractions": "1.27.0",
           "Microsoft.Extensions.AI": "10.10.0",
           "Microsoft.Extensions.AI.Abstractions": "10.10.1",
           "Microsoft.Extensions.AI.Evaluation": "10.10.0",
@@ -90,8 +90,8 @@
       },
       "Microsoft.Agents.AI.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.25.0",
-        "contentHash": "HuJ8dlKcippI6ZREvRhcc1h2EkK//EEyjJcZSjKN56aNedjUZrGrgF10i3BoMzo1wFceM1L0y6QbxVsWjgfP2g==",
+        "resolved": "1.27.0",
+        "contentHash": "FTGX3V3DqrkEahoU7BtlMs/c8hE7W5QxzFaf+AcB6j50fYjsBMEkIE0kDMyrK+wH+xUVqAE41Zd01J+GwlrhDg==",
         "dependencies": {
           "Microsoft.Extensions.AI.Abstractions": "10.10.1"
         }
