@@ -4,6 +4,11 @@ Notable changes to Repo2C4 follow [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### Changed
+- Consolidated the NuGet dependency updates from PR #88, including Microsoft Agent Framework `1.28.0`, MCP SDK `2.4.0`, Microsoft.Extensions.AI/OpenAI `11.0.0`, OllamaSharp `5.5.2`, updated test packages, and SonarScanner `12.1.0`.
+- Updated the repository build SDK from .NET `10.0.404` to `11.0.100`; executable projects and tests still target `net10.0`, and CI installs the .NET 10 runtime alongside the .NET 11 SDK.
+- Retained workflow OpenTelemetry tracing while removing the obsolete no-op `WorkflowTelemetryOptions.EnableSensitiveData` assignment introduced by Agent Framework `1.28.0`. Workflow payload attributes are no longer emitted by that framework.
+
 ## [1.2.0] - 2026-10-05
 
 ### Added
