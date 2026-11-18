@@ -450,9 +450,9 @@ public sealed class ArchitectureAnalysisWorkflow
         }
 
         builder.WithOutputFrom(finalize);
-        builder.WithOpenTelemetry(
-            configure: telemetry => telemetry.EnableSensitiveData = false,
-            activitySource: AgentExecutionContext.TelemetryActivitySource);
+        // Workflow payload attributes are no longer emitted by Agent Framework 1.28+.
+        // Keep workflow spans while avoiding the obsolete no-op EnableSensitiveData option.
+        builder.WithOpenTelemetry(activitySource: AgentExecutionContext.TelemetryActivitySource);
         return builder.Build();
     }
 
