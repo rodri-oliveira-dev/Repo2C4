@@ -29,10 +29,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Configurar .NET 10
+      - name: Configurar SDK .NET 11 e runtime .NET 10
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: |
+            11.0.x
+            10.0.x
 
       - name: Restaurar ferramentas locais
         run: dotnet tool restore
@@ -99,8 +101,8 @@ jobs:
         run: |
           test -s global.json
           configured_sdk="$(sed -nE 's/^[[:space:]]*"version":[[:space:]]*"([^"]+)".*/\1/p' global.json | head -n 1)"
-          if [[ ! "$configured_sdk" =~ ^10\.0\.[0-9]+$ ]]; then
-            echo "global.json deve declarar um SDK estável do canal .NET 10, obtido '$configured_sdk'."
+          if [[ ! "$configured_sdk" =~ ^11\.0\.[0-9]+$ ]]; then
+            echo "global.json deve declarar um SDK estável do canal .NET 11, obtido '$configured_sdk'."
             exit 1
           fi
           grep -Fq '"rollForward": "latestFeature"' global.json
@@ -108,8 +110,8 @@ jobs:
           grep -Fq '"runner": "Microsoft.Testing.Platform"' global.json
 
           sdk_version="$(dotnet --version)"
-          if [[ ! "$sdk_version" =~ ^10\.0\.[0-9]+$ ]]; then
-            echo "SDK .NET 10 esperado pelo global.json, obtido '$sdk_version'."
+          if [[ ! "$sdk_version" =~ ^11\.0\.[0-9]+$ ]]; then
+            echo "SDK .NET 11 esperado pelo global.json, obtido '$sdk_version'."
             exit 1
           fi
 

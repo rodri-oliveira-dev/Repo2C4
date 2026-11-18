@@ -43,11 +43,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Configurar .NET 10
+      - name: Configurar SDK .NET 11 e runtime .NET 10
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: |
+            11.0.x
+            10.0.x
 
       - name: Validar configuração Sonar
         if: ${{ env.SONAR_TOKEN != '' }}
